@@ -1,0 +1,18 @@
+/* soranji-vfx global base — no UI framework (Tailwind stripped per spec "no UI libs"). */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: #0c1322;
+}
+
+/* Crisp pixel-art scaling is opt-in per element via the `.pixelated` class
+   (applied by the Mushroom sprite wrapper) so SVG/photo footage stays smooth. */
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}

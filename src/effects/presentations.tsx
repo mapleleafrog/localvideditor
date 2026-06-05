@@ -87,6 +87,19 @@ const doomMaskURI = (p: number) => {
   return `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
 };
 
+// 4x4 Bayer-ordered dither: an 8px tile where cells whose threshold < p are
+// black (revealed). Grows from none (p=0) to full (p=1) for a true 8-bit dissolve.
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const ditherURI = (p: number) => {
+  let rects = "";
+  for (let i = 0; i < 16; i++) {
+    if ((BAYER4[i] + 0.5) / 16 < p) {
+      rects += `%3Crect x='${(i % 4) * 2}' y='${Math.floor(i / 4) * 2}' width='2' height='2' fill='black'/%3E`;
+    }
+  }
+  return `url("data:image/svg+xml,%3Csvg width='8' height='8' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
+};
+
 // Dip-to-color / flash: scenes hard-cut at the midpoint while a full-frame
 // color overlay peaks at p=0.5.
 const dip = (color: string, sharpness = 1): Factory => {
@@ -237,4 +250,34 @@ export const cssPresentations: Record<string, Factory> = {
       : { opacity: clamp(p * 1.5), transform: `scale(${lerp(1.15, 1, p)}) rotate(${(1 - p) * 4}deg)` },
   ),
   doomScreen: enter((p) => fullMask(doomMaskURI(clamp(p)), "100% 100%")),
+
+  // Advanced retro
+  crtOn: enter((p) => {
+    const a = clamp(p / 0.4);
+    const b = clamp((p - 0.4) / 0.6);
+    return {
+      transform: `scaleX(${0.2 + a * 0.8}) scaleY(${0.02 + b * 0.98})`,
+      filter: `brightness(${1 + (1 - b) * 2})`,
+      transformOrigin: "center",
+    };
+  }),
+  glitchCut: enter((p) => {
+    const j = 1 - clamp(p * 1.4);
+    return {
+      opacity: clamp(p * 1.6),
+      transform: `translateX(${Math.sin(p * 80) * 22 * j}px) skewX(${Math.sin(p * 50) * 6 * j}deg)`,
+      filter: `hue-rotate(${Math.sin(p * 60) * 160 * j}deg) saturate(${1 + 2 * j}) contrast(${1 + j})`,
+    };
+  }),
+  pixelDither: enter((p) => tiledMask(ditherURI(clamp(p)), "8px 8px")),
+  scanlineWipe: enter((p) => {
+    const e = p * 102;
+    const g = `linear-gradient(180deg, #000 ${Math.max(0, e - 2)}%, transparent ${e}%)`;
+    return { maskImage: g, WebkitMaskImage: g };
+  }),
+  vhsRewind: enter((p) => ({
+    opacity: clamp(p * 1.5),
+    filter: `blur(${(1 - p) * 2.5}px) saturate(1.6) contrast(1.1)`,
+    transform: `translateX(${(1 - p) * -34}px) skewX(${(1 - p) * 8}deg)`,
+  })),
 };

@@ -34,8 +34,8 @@ A Remotion (React → MP4) VFX pipeline for a wedding walk-in video set to "Sora
 - Composition length must equal footage content (transitions overlap; total = ΣsequenceDurations − Σtransitions).
 
 ## Coverage this build
-- ~60 motions implemented (Ken Burns/zoom, pan, path, physics, CSS pseudo-3D, CSS camera analogs, loop/idle, beat-reactive, **depth/2.5D**, **pixel-art**). `todo` stubs: cardStack, photoFloat3D, revolve3D, bassWarp (need Three.js / real audio).
-- ~36 transitions implemented: 7 built-ins (fade/slide/wipe/flip/clockWipe/iris), ~22 custom CSS presentations, and 7 shipped HTML-in-canvas shader presentations (filmBurn, bookFlip, crossWarp, crossZoom, linearBlur, ripple, filmDissolve). Remaining GLSL-only warps/glitch/particle/3D effects are typed `todo` and safe-fallback to `fade`.
+- ~80 motions implemented (Ken Burns/zoom, pan, path, physics, CSS pseudo-3D, CSS camera analogs, loop/idle, beat-reactive, **depth/2.5D** `depth.ts`, **pixel-art** `pixel.ts`, **Retro / FX** + **Backgrounds** `retro.ts` — neon, chroma, VHS, glitch, hologram, echo, CRT, flame, rainbow, power-up, synthwave grid, starfield, vignette). `todo` stubs: cardStack, photoFloat3D, revolve3D, bassWarp (need Three.js / real audio).
+- ~41 transitions implemented: 7 built-ins (fade/slide/wipe/flip/clockWipe/iris), ~22 custom CSS presentations, 5 retro CSS transitions (crtOn, glitchCut, pixelDither, scanlineWipe, vhsRewind), and 7 shipped HTML-in-canvas shader presentations (filmBurn, bookFlip, crossWarp, crossZoom, linearBlur, ripple, filmDissolve). Remaining GLSL-only warps/glitch/particle/3D effects are typed `todo` and safe-fallback to `fade`.
 
 ## Shader transitions caveat
 The 7 shader presentations are `engine:"webgl"` (HTML-in-canvas). They **render correctly** via `npx remotion render` / Lambda, but their **Studio preview** needs Chrome 149+ with `chrome://flags/#canvas-draw-element` enabled. They are excluded from the preview-safe `TransitionGallery`. Everything else previews with no flags.
@@ -44,6 +44,9 @@ The 7 shader presentations are `engine:"webgl"` (HTML-in-canvas). They **render 
 - `SoranjiSample` — the fixed 180-frame BPM demo (footage A→B + windowed sprites + beat flash).
 - `MotionGallery` — every ready motion on a sprite, labeled (QA surface).
 - `TransitionGallery` — a reel cycling clips through every preview-safe ready transition.
+
+## No-npm Retro Portal (`index.html`)
+A self-contained synthwave/arcade playground at the project root — **double-click to open, no npm, no server**. It is a live preview/composer (CSS driven by `requestAnimationFrame`), NOT the render pipeline. Its inline JS mirrors `src/effects` formulas (helpers, MOTIONS, TRANSITIONS) plus a `composeStyles()` engine so you can **stack multiple motions at once** (transforms + filters concatenated, opacity multiplied). Tabs: MOTIONS (multi-select stacking), BACKDROP (synthGrid/starfield/CRT), TRANSITIONS (A↔B loop + "play all"). Sprite loads from `public/orange-mush.gif` (sibling), with an inlined base64 fallback. Shader transitions appear as CSS approximations (⚡) since the browser has no Remotion/WebGL pipeline. Keep portal effects in sync with `src/effects` when you add new ones. (`.claude/launch.json` + `.claude/static-server.mjs` are a dev-only static server for previewing it.)
 
 ## Sprites
 - Orange mushroom: maplestory.io mob 100004 (`public/orange-mush.gif`)

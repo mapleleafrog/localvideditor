@@ -195,4 +195,31 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "pixelShake", name: "Integer-pixel Shake", category: "Pixel-art", engine: "css", tier: "Core", status: "todo", tags: ["pixel", "energetic"] },
   { kind: "motion", id: "crtScanlines", name: "CRT Scanline Overlay", category: "Pixel-art", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "retro"] },
   { kind: "motion", id: "stepWalk", name: "Stepped Walk Cycle", category: "Pixel-art", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "game"] },
+
+  // --- Retro / FX (NEW — advanced "impressive retro" sprite + overlay effects) ---
+  { kind: "motion", id: "neonGlow", name: "Neon Glow Pulse", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "neon", "glow"] },
+  { kind: "motion", id: "chromaPulse", name: "Chromatic Aberration Pulse", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch"] },
+  { kind: "motion", id: "vhsJitter", name: "VHS Tracking Jitter", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"] },
+  { kind: "motion", id: "glitchSlice", name: "Glitch Slice Bursts", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "energetic"] },
+  { kind: "motion", id: "hologram", name: "Hologram Flicker", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "sci-fi"] },
+  { kind: "motion", id: "echoTrail", name: "Afterimage Echo Trail", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "trail"] },
+  { kind: "motion", id: "crtTurnOn", name: "CRT Power-on", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "crt"] },
+  { kind: "motion", id: "flameFlicker", name: "Flame Flicker", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "fire"] },
+  { kind: "motion", id: "rainbowCycle", name: "Rainbow Hue Cycle", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "rainbow"] },
+  { kind: "motion", id: "powerUp", name: "Arcade Power-up", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "arcade", "BPM"] },
+  { kind: "motion", id: "arcadeHop", name: "Arcade Hop (stepped)", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "arcade", "pixel"] },
+  { kind: "motion", id: "wobbleVHS", name: "VHS Warp Wobble", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"] },
+  { kind: "motion", id: "vignette", name: "Vignette Overlay", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "overlay"] },
+
+  // --- Backgrounds (NEW — full-frame retro backdrops) ---
+  { kind: "motion", id: "synthGrid", name: "Synthwave Grid + Sun", category: "Backgrounds", engine: "css", tier: "Core", status: "todo", tags: ["retro", "synthwave", "background"] },
+  { kind: "motion", id: "starfield", name: "Parallax Starfield", category: "Backgrounds", engine: "css", tier: "Core", status: "todo", tags: ["retro", "space", "background"] },
+  { kind: "motion", id: "crtRoom", name: "CRT Room (scanlines + vignette)", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt", "background"] },
+
+  // --- Retro transitions (NEW — custom CSS, preview-safe) ---
+  { kind: "transition", id: "crtOn", name: "CRT Power-on", category: "Retro", engine: "css", tier: "Core", status: "todo", tags: ["retro", "crt"], license: "write-own" },
+  { kind: "transition", id: "glitchCut", name: "Glitch Cut", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "energetic"], license: "write-own" },
+  { kind: "transition", id: "pixelDither", name: "Bayer Dither Dissolve", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "pixel", "8-bit"], license: "write-own" },
+  { kind: "transition", id: "scanlineWipe", name: "Scanline Sweep", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt"], license: "write-own" },
+  { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" },
 ];

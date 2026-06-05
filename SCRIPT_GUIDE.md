@@ -6,7 +6,8 @@
 - `catalog.ts` — full ~110-effect catalog as data; single source of truth for metadata. Every row `status:'todo'`.
 - `depth.ts` — 2.5D toolkit: `depthShadow(z)`, `depthScale(z)`, `bevel()`, and the depth motion styles (dropShadowLift, bevelEmboss, parallaxDepth, floatShadow, tiltShadow, popLayer).
 - `pixel.ts` — pixel-art motion styles (pixelBob, spriteBlink, paletteCycle, pixelShake, crtScanlines, stepWalk).
-- `motions.ts` — `motions` registry: stubs from catalog + ~60 ready CSS implementations + merged depth/pixel families.
+- `retro.ts` — advanced-retro / FX styles: sprite (neonGlow, chromaPulse, vhsJitter, glitchSlice, hologram, echoTrail, crtTurnOn, flameFlicker, rainbowCycle, powerUp, arcadeHop, wobbleVHS), full-frame backgrounds (synthGrid, starfield, crtRoom), overlay (vignette).
+- `motions.ts` — `motions` registry: stubs from catalog + ~80 ready CSS implementations + merged depth/pixel/retro families.
 - `presentations.tsx` — custom CSS `TransitionPresentation` factories (dip/flash/lightLeak, zoom/whip/rgb look-alikes, clip/mask reveals, star wipe, pixel reveals). `cssPresentations` map.
 - `transitions.ts` — `transitions` registry: stubs from catalog + 7 built-ins + 7 shipped shader presentations + the custom CSS presentations.
 - `index.ts` — barrel + getMotion/getTransitionPresentation (safe fallback, never throw) + buildCreditsMarkdown + readyMotions/readyTransitions.
@@ -31,8 +32,13 @@
 ## public/
 - orange-mush.gif, pixel-mush.gif — sprites. clip-a.svg (warm), clip-b.svg (cool) — placeholder footage.
 
+## root (no-npm portal)
+- `index.html` — self-contained synthwave playground (double-click, no npm). Inline JS mirrors `src/effects` (helpers, MOTIONS, TRANSITIONS) + a `composeStyles()` stacking engine; rAF-driven live preview. Tabs: MOTIONS (multi-select stacking), BACKDROP, TRANSITIONS. Sprite from `public/orange-mush.gif` (+ base64 fallback). Shader transitions are CSS approximations (⚡).
+- `.claude/static-server.mjs` + `.claude/launch.json` — dev-only static server for previewing `index.html`.
+
 ## Adding / promoting an effect
-1. Metadata already lives in `catalog.ts`. To implement: override the entry to `status:'ready'` with a `style()` (motions.ts / depth.ts / pixel.ts) or a `presentation()` (transitions.ts / presentations.tsx).
+1. Metadata already lives in `catalog.ts`. To implement: override the entry to `status:'ready'` with a `style()` (motions.ts / depth.ts / pixel.ts / retro.ts) or a `presentation()` (transitions.ts / presentations.tsx).
 2. Reference it in a scene by id. No scene-level animation code.
 3. If it carries a license/credit, run `npm run credits`.
 4. Depth-aware motions read `ctx.z`; pixel-stepped motions use `quantize`/`stepTime` from helpers.
+5. To expose it in the no-npm portal, port the same formula into `index.html`'s MOTIONS/TRANSITIONS object (it can't import the TS without a build).

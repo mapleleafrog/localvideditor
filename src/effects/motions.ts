@@ -14,6 +14,7 @@ import {
 } from "./helpers";
 import { depthStyles } from "./depth";
 import { pixelStyles } from "./pixel";
+import { retroStyles } from "./retro";
 
 // Moving film-grain via an inline SVG turbulence texture (repositioned per frame).
 const GRAIN_URI =
@@ -201,8 +202,9 @@ ready("waveform", ({ t, beat }) => ({
   transformOrigin: "center",
 }));
 
-// --- Merge the Depth/2.5D and Pixel-art families (all 'ready') ---
+// --- Merge the Depth/2.5D, Pixel-art and Retro/FX families (all 'ready') ---
 for (const [id, style] of Object.entries(depthStyles)) ready(id, style);
 for (const [id, style] of Object.entries(pixelStyles)) ready(id, style);
+for (const [id, style] of Object.entries(retroStyles)) ready(id, style);
 
 export { motions };

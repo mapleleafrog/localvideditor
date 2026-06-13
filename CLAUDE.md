@@ -41,9 +41,17 @@ A Remotion (React → MP4) VFX pipeline for a wedding walk-in video set to "Sora
 The 7 shader presentations are `engine:"webgl"` (HTML-in-canvas). They **render correctly** via `npx remotion render` / Lambda, but their **Studio preview** needs Chrome 149+ with `chrome://flags/#canvas-draw-element` enabled. They are excluded from the preview-safe `TransitionGallery`. Everything else previews with no flags.
 
 ## Compositions
+- `Timeline` — the **generic, config-driven video composition** (the real video builder — see "Make a video").
 - `SoranjiSample` — the fixed 180-frame BPM demo (footage A→B + windowed sprites + beat flash).
 - `MotionGallery` — every ready motion on a sprite, labeled (QA surface).
 - `TransitionGallery` — a reel cycling clips through every preview-safe ready transition.
+
+## Make a video (Timeline)
+The `Timeline` composition renders ANY video from a `project` config (Zod-schema'd props): a **clip track** (image/video clips joined by transitions) + positioned **overlays** (text/image with stacked effects) + a **background**. Effect ids resolve against `src/effects`, so new effects work immediately — one registry, exact preview, render-grade. Files: `src/timeline/schema.ts` (`projectSchema`, `SAMPLE_PROJECT`), `src/timeline/Timeline.tsx`; sample configs in `projects/`.
+- **Edit:** `npm run dev` → Studio opens `Timeline` with a live props form + scrubber (or hand-edit a `projects/*.json`). Drop photos/clips in `public/media/`, reference as `media/<file>`.
+- **Render:** `npm run render:timeline` (sample) or `npx remotion render Timeline out/video.mp4 --props=./projects/your.json`.
+- Duration is computed from the config (`calculateTimelineMetadata`: Σclips − Σtransitions, covering overlays). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
+- Stage 2 (next): a `@remotion/player` drag-drop visual editor on the same schema + `<Audio>` soundtrack with real beat-sync.
 
 ## No-npm Retro Portal (`index.html`)
 A self-contained synthwave/arcade playground at the project root — **double-click to open, no npm, no server**. It is a live preview/composer (CSS driven by `requestAnimationFrame`), NOT the render pipeline. Its inline JS mirrors `src/effects` formulas (helpers, MOTIONS, TRANSITIONS) plus a `composeStyles()` engine so you can **stack multiple motions at once** (transforms + filters concatenated, opacity multiplied). Tabs: MOTIONS (multi-select stacking), BACKDROP (synthGrid/starfield/CRT), TRANSITIONS (A↔B loop + "play all"). Sprite loads from `public/orange-mush.gif` (sibling), with an inlined base64 fallback. Shader transitions appear as CSS approximations (⚡) since the browser has no Remotion/WebGL pipeline. Keep portal effects in sync with `src/effects` when you add new ones. (`.claude/launch.json` + `.claude/static-server.mjs` are a dev-only static server for previewing it.)

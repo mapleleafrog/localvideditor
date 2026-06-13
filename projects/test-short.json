@@ -1,0 +1,19 @@
+{
+  "background": { "type": "motion", "motion": "starfield" },
+  "clips": [
+    { "type": "image", "src": "clip-a.svg", "durationInFrames": 60, "motion": "panLR" }
+  ],
+  "overlays": [
+    {
+      "type": "text",
+      "text": "TEST",
+      "from": 0,
+      "durationInFrames": 60,
+      "x": 50,
+      "y": 50,
+      "fontSize": 140,
+      "color": "#00f0ff",
+      "motions": ["pixelShake", "chromaPulse"]
+    }
+  ]
+}

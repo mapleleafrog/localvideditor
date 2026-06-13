@@ -28,6 +28,7 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "render": "remotion render SoranjiSample out/soranji-sample.mp4",
+    "render:timeline": "remotion render Timeline out/timeline.mp4",
     "credits": "node scripts/gen-credits.mjs",
     "typecheck": "tsc",
     "lint": "eslint src && tsc",

@@ -1,10 +1,13 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { getMotion, depthShadow } from "../effects";
+import { getMotion, depthShadow, composeStyles } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 
 interface LayerProps {
-  motionId: string;
+  /** Single motion id (back-compat). Ignored if `motionIds` is given. */
+  motionId?: string;
+  /** Stack of motion ids — composed (transforms/filters concatenated, opacity multiplied). */
+  motionIds?: string[];
   /** Mount frame (inclusive). */
   from?: number;
   /** Frames the layer stays on screen; unmounts after. Prevents duplicate overlap. */
@@ -16,25 +19,32 @@ interface LayerProps {
   z?: number;
   /** When true, prepend translate(-50%,-50%) so the layer centers on its left/top anchor. */
   centered?: boolean;
+  /** Base scale folded into the transform (before motion transforms). */
+  scale?: number;
+  /** Base rotation in degrees folded into the transform. */
+  rotation?: number;
   params?: Record<string, number>;
   style?: React.CSSProperties;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 /**
  * The single frame->ctx boundary. Reads the frame, computes progress/t/beat/z,
- * mount-gates the window, and applies the motion's CSS. `t` is ABSOLUTE
- * composition seconds so loops + beat stay locked to the song grid — do NOT
- * wrap beat-reactive layers in a frame-rebasing <Sequence>.
+ * mount-gates the window, composes one or many motions, and applies the CSS.
+ * `t` is ABSOLUTE composition seconds so loops + beat stay locked to the song
+ * grid — do NOT wrap beat-reactive layers in a frame-rebasing <Sequence>.
  */
 export const Layer: React.FC<LayerProps> = ({
   motionId,
+  motionIds,
   from = 0,
   durationInFrames,
   windowInFrames,
   bpm = 120,
   z,
   centered = false,
+  scale,
+  rotation,
   params = {},
   style,
   children,
@@ -52,19 +62,16 @@ export const Layer: React.FC<LayerProps> = ({
   const beat = beatKick(t, bpm, 6);
   const zz = z ?? 0;
 
-  const { transform: motionTransform, ...motionRest } = getMotion(motionId)({
-    progress,
-    frame,
-    fps,
-    t,
-    beat,
-    z: zz,
-    params,
-  });
+  const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];
+  const ctx = { progress, frame, fps, t, beat, z: zz, params };
+  const { transform: motionTransform, ...motionRest } = composeStyles(ids.map((id) => getMotion(id)(ctx)));
 
-  const transform = centered
-    ? `translate(-50%, -50%) ${motionTransform ?? ""}`.trim()
-    : motionTransform;
+  const baseParts: string[] = [];
+  if (centered) baseParts.push("translate(-50%, -50%)");
+  if (scale != null && scale !== 1) baseParts.push(`scale(${scale})`);
+  if (rotation) baseParts.push(`rotate(${rotation}deg)`);
+  if (motionTransform) baseParts.push(String(motionTransform));
+  const transform = baseParts.length ? baseParts.join(" ") : undefined;
 
   return (
     <div

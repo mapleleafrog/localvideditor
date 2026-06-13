@@ -11,9 +11,10 @@
 - `presentations.tsx` — custom CSS `TransitionPresentation` factories (dip/flash/lightLeak, zoom/whip/rgb look-alikes, clip/mask reveals, star wipe, pixel reveals). `cssPresentations` map.
 - `transitions.ts` — `transitions` registry: stubs from catalog + 7 built-ins + 7 shipped shader presentations + the custom CSS presentations.
 - `index.ts` — barrel + getMotion/getTransitionPresentation (safe fallback, never throw) + buildCreditsMarkdown + readyMotions/readyTransitions.
+- `compose.ts` — `composeStyles(styles[])`: the stacking engine (concat transform + filter, multiply opacity, last-wins). Used by Layer; mirrored in the portal's JS.
 
 ## src/components/
-- `Layer.tsx` — generic positioned layer; the frame→ctx boundary. Mount-gates `[from, from+duration)`, computes progress/t/beat/z, composes `translate(-50%,-50%)` when `centered`, applies a motion by id. ALL frame reads happen here.
+- `Layer.tsx` — generic positioned layer; the frame→ctx boundary. Mount-gates `[from, from+duration)`, computes progress/t/beat/z, applies a single `motionId` OR a stacked `motionIds[]` (via composeStyles), folds in `scale`/`rotation` + `translate(-50%,-50%)` when `centered`. ALL frame reads happen here.
 - `Mushroom.tsx` — sprite wrapper over Layer; `<Gif>` for animated GIFs (pixelated), `<Img>` fallback for PNGs. Default depth `z=0.4`.
 
 ## src/scenes/
@@ -21,8 +22,12 @@
 - `MotionGallery.tsx` — walks every ready motion on a sprite, labeled. Exports `MOTION_GALLERY_FRAMES`.
 - `TransitionGallery.tsx` — a TransitionSeries reel cycling clips through every preview-safe ready transition. Exports `TRANSITION_GALLERY_FRAMES`.
 
+## src/timeline/ (the video builder)
+- `schema.ts` — Zod `projectSchema` (clip track + positioned overlays + background) + `Project`/`Clip`/`Overlay` types + `SAMPLE_PROJECT`. Effect ids are plain strings resolved against `src/effects`. Sample configs live in `projects/*.json`; drop media in `public/media/` and reference as `media/<file>`.
+- `Timeline.tsx` — generic config-driven composition: `ClipTrack` (TransitionSeries of image/video clips + transitions), `OverlayLayer` (stacked `motions[]` via the extended Layer), `BackgroundLayer`, and `calculateTimelineMetadata` (duration from the config).
+
 ## src/
-- `Root.tsx` — registers compositions SoranjiSample (180f), MotionGallery, TransitionGallery (all 1920×1080, 30fps). Imports `index.css`.
+- `Root.tsx` — registers Timeline (config-driven, schema + `SAMPLE_PROJECT`), SoranjiSample (180f), MotionGallery, TransitionGallery. Imports `index.css`.
 - `index.ts` — registerRoot(RemotionRoot).
 - `index.css` — minimal reset + `.pixelated` helper (no UI framework).
 

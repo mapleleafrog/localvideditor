@@ -161,145 +161,31 @@
       </div>
     </main>
 
+    <!-- Single-source effects, generated from src/effects/portable.ts by
+         `npm run gen:portal`. Classic <script> (NOT a module) so file://
+         double-click still works. -->
+    <script src="public/portal/effects.bundle.js"></script>
     <script>
-      // ===== sprite (inlined, no npm / no network) =====
+      // ===== sprite (inlined fallback, no npm / no network) =====
       const SPRITE =
         "data:image/gif;base64,R0lGODlhPwA9APfXAAAAABEAABERABEAERERESIRADMRACIRESIiADMiACIiETMiESIiIiIzIjMzIjMzM0QiAEQiEUQzEVUzEWYzAHczAEQzIkQzM3dEAGZEEXdEEXdVEUREIkREM1VEM1VVM2ZEIndEImZVIndVImZVM3dVM3dmM1VVRGZVRFVmRGZmRHdmRHd3RGZmVXdmVWZ3VXd3VXd3ZplEAJlVAIhEEYhVEZlVEapEAKpVALtVALtVEapmALtmAKp3ALt3ALtmEbt3EYhVIplVIohVM6pVIohmIplmIohmM5lmM5l3M6pmIrtmIqp3Irt3IqpmM6p3M7t3M8xVAMxmAN1mAMx3AN13AMxmEcx3Ee53AP93AIhmRIh3RJl3RIh3VYh3ZruIALuZALuZEbuqALu7AKqqEbuqEbuZIruZM7uqIsyIAN2IAMyZAN2ZAMyIEd2IEcyZEe6IAP+IAO6ZAP+ZAO6IEf+IEe6ZEf+ZEcyqAN2qAMy7AN27AMyqEcy7Ef+qAO67AP+7AP+qEf+7EcyZIv+ZIv+ZM8yqIv+qIu6qM/+qM/+7M8zMAN3MAN3dAMzMEe7MAP/MAO7dAP/dAP/dEe7uAP/uAP/uEf//Ef/dIv/MM//dM+7uIv/uIv//Iu7uM//uM+7/M///M5mIVYiIZpmIZpmZZpmId5mZd6qIZqqId6qZd5mqd6qqd/+qRP+7RP/MRP//RJmZiKqZiKqqiLuqiKq7iLu7iKqqmbuqmaq7mbu7mbu7qsy7mcy7qrvMqszMmczMqt3Mqt3dqszMu93Mu8zdu93du+7du93dzO7dzP/dzO7d3f/d3d3uzO7uzP/uzO7u3f/u3e7/3f//3e7u7v/u7u7/7gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQJEgDXACwAAAAAPwA9AAcI/gCvCRxIsKDBgwASKlx4sKHDhxAJLvzEaZOlSpLixIGDhWHEjyAHJoQFK9SnTpwsXfSzcSMWOFWqJAxJs2FCV64yadKEadIkSILmaNQIhyOWmDIB1Fx6DQDORIgKJSJkp06doUSJcoQZU4pSph8TKkpEthAhQlaFtsTqpy1HpFSmfAWLMGEoUJoSHZp6iNAdrFjnSKpEmNIjrlOoeKUr0S6oTp0sCYpzVW2cO1evahRMuHOkSIzYVJkiZTHdhGQ/eUo56e/VqnVgt4SjkRLhSIU/M2KUh7TppQnPovUDCJAc2i+xKK9yFKnzRo8afZ7eiFF1NqV/g0zIss4d5Eab/jd3HpPK6Jhqqu9ev766GilRtEMEQDjrS+Zwq8Q1nz17YimKuaEHewSGlt1c8xHG0lv5VSFFTImpoYZ5FOpHhWIY8qHHIoxw2OFuEx4YEX0YFQVhXPol5qAUa+jhYh9plGaFFDNmhyEVa+Dhood4TLFiaQgiVIlh5QEIoBU/WkFFH2L0gUcZa1zBQ3809oehD1+koWV5pJGmR5AS3YYdldlZ8cMPQDTBhBJKGMFmEk4gweaZMlZpxZQ85MDDlBUCuMeXYDZVSSSL+ECmmW0GEcQQJpRgwgparLACCSuw0MWlXAyx5g9mzviDFD/oqWdpKer4Z5D0gQbGqKX9YEMN/iGMUIKlMMDgAAoqqABDFwyogKsKXXzwwK5aJMHEEpxKMWUOOeCwJ4D6/anHHgjS18gaO+TQag0alLBCrSS4oIK4Cixk7rkAXGqBEcjSyMOdzbJKRR4ufikSIGs0OyUOGoywwqVdtNCAAycoFIMsrMhyisKznKJKLKo43LBCXYgCRRMz3vlDnjiwqqOLXwEQhxQd59ltFyqcUOsJHiREyiyzqMKKw6qsEvHNDuccsSwJjaLFEUokuzEORDsLYI5pKAUAFjx0LAUFGlwKgwcMKFDuKTDTQkvMqnAtiypgdy02zqywkpAFWgihRJU/4HAD0c8C2RQcTTc7QRAwjAJD/q4tn7K11jDD3DXMrASe9SxbJ6yKwqMAwAoqRRDB6ZnNvj1qfEorm4MMEIzQRa0oEABA138jXjriqJdOSy2nszJ4ui6MEPQVQxMtg7ZyA6Bs0xFo4MIJFjjAAAC06EKLQqjbkrrqf6seOC2Nd4CCCCH8cIUVlRcNX8jKSgHBAiPs+oIKDNhy/EK68NILMMCsn74u5qOOfPOBj04KCBkYEkYazc5guWm6k0IOZiCAAUigCy4gHi50YS5jEAMZyXBGBJOBDAcCgxcMXAgtbrE1xJ0CAB2IwRYmkAEnicFtM3DaXACAoR0UIAACsAAAdJE+YCgkGREEgAShMUEA8NCB/uZaHf1AqIATTCACZOCDGHzgvxloq1pt0AMe1kABAcyQF+wjhjGQsUNn+NCLzoCGFyO4jGQYQyELBFwHVQEAU5xiBAUYBB7E0IMb+O+JBQGAI/qgGCvMEBha5GIExQgNaCTEkIcMozMk6AxiXNB4xjPdLADgAFpk4ACGGAMYiPY/MCVkRjPshRadsYwwFjIa0EBlKgvpjGiEMRk8lKAx2kdDWuCCdZMkAAoKIAEzXGGAdtRToASSEAxukZGrLKQyl8lKaDyDkBF0IAaNt8GtAaAAC7DBjNzmtCgMsykXNAYOTVlIaqCyGqk05ylfKcZS8hAas+wFJAEHAAPUAE88/ujBF6iQg28CAJDiHCQqVblMaZRzmYp05iJl+citKQ8AGGORGMQwRzz4Exhb5OIyqXFKaHA0GuocaCrZCcuSOsMY8qTm8a5QGimKAVAOAQAxtIhDQq4SldSQBkE5ysxWLpKQizQjMOY5SZZSwaIzeQgAjMHUoCbToyKFRjV0mk6CvvOZJeUhMTC4QfN5ZD6BnOAy0TkNnqrzoMp0JVBhGdRmIAMYuDBf8b6JEGMcA4LkfKpIpRHSjhYyGa5chhhJKcFkCEMXuPgbXfMY1kWWUpUcRac1pLrKjyIUqI5lJDKQ0QvlWTMkS0XGXSNIzqgm07LKZEZC2VpKRQoVcLMw/tt2mMrFHT61kOjkKUFRqUhmALW1pYzgW5UHNp7NloLJcKcpo8pcchJ2sK0l7CtRysGYfXC2ol2oO61qVWW+8pmKBO5PhWsMXphvZmw8riCBWshlcDeZ4GVla2NZyuAiIxiIFdx1t9MMtrL2md5VpSkJG1ynDpK0DC1dKfYblnHCMr5hBPBTE7paMU7QGf2t4DC4at1ULFYipIVuZt3J1neylbCkFWRhzUiMX0TSuh/OI4EpPFho2lS6yejvOAVZQUcmFnGscGOMJVJjdraznYpkZI4vHMH+3pWp7IskLSJWiiHLmMRBXShpL6xkZ3ARgshlKjHkCVtVCBksOmSkl2Y1O8EMCxeHOBSnmDdMTf0ymCkAmKAgcQjBPsMZuWas4BYt2NA1nuLOaEZuBQXN1EY7WswOLEYw2jfNDlo3vYwRiaO1GAxidJoYw3CgA0EtjGEEoxfTrDPXPmjlsCzV08Ngn6wnHetJ05KGtQxc2CaZ6ZgmhH3rw2KwL7gLDHJVdWZTSK9HhK5mo2vZ0I62tKdN7WrXJCAAIfkECRIA1wAsAAADAD8ANwAHCP4ArwkcSLCgwYMAEipceLChw4cQCS78xMmSpUqV4miEwzCix48DE8IKFYpiJ4uV/GzMAgcLlioJQcpsmNCVoleaNGGaNAmSSo0bscCpQhQmgJlIrwGw2SpRoUKE6tSJMxWo1ZZDiU45mtRjQkWJnEIldKfOHKtA5/gB5KdlUSpSuHZFmJCkpkSHDhE6VPYs2jhzJGHE+EhOUSlx50qsG6rTJUuBqAKdKnWjRj+RBleiFCkSIzZVpiCWmzThoUQUK06aA2fqHTpx7MSBQweObThyKkmitFl3Z0aN8kgRTVpmQkLIzf4BdFuoSzUuq7yUTp1RpEaPOl9vxKi7cClRiv5HTKiyavOW04tWobK+ihSi7NV0n8/dOnBGahCHBwlAt1/06bW33hRwISYFXAUemIYejCwy34OfGSgeTRip5JZ6BE7hHoFssMFeaOy9lyAVeDDIoIPzqSEaeBMW1B9GFyLoXogHrqGHHn3o0QZiVkjRY48jLnijHg7isZ6BiT304iNEGVigez5KcUUffPAhxhtlXMFDj0j+eKAUPPjgQxpkqocYFXq0qBRGkaxxZpc+/vBDE0woYYSddiKRhBFOMLHED1z6GCgPOfAApogb3hiTQf1FogcVhhpohRU/2BnEECOYUIIJK6ygxQokrABDF11ssUUJTyjxJ6VWGEpoDv6FItbeGnso6mIlkSwCBg+RSvGDDRuEMEIJLIwKgwMoqKDCqAyokKwKXnxwwahbPPGEnJO6mgMOvMqKph61ktYfI2vskEMUYNYg7ApdwHCCCyrAy8BC9NYLwKgWHNEEoK22um2s75VYolwAAMIGDtxKgYMGJWgxSrstKODACQp5MYsqF6siiyqncNyxKiArRIooUKzqqxQ57IBwpCXaqhQcCp+bQwYldJGCBzDAgMIHCZ0yCy2scKxKLKx03PHGpyRttCoJjbLFEUrwy+u2OMRKxRprsHEUAFjEzAMGGrTbRQcMKKAAAD7TQssss8jCittut10022wL3fEsCVmgRf4RSghK9Q1VI7k1FjxUjQMEQcAwCgzweoC22j//zErdlLMNNOSUJz0KALOgUgQRgAKhA8KkgzeaUmDmMAPiXjD+AQGcQ7727JHTbvvPtGMsCy33ulCCET9c4S/pOJi+NZiFR5ABCydw4MC8tOTCe0KyV1/79bZPvnkHKIgQghLCb3vDDICfjrqhEBhAQrvwOoCLLfTu8ksvwNRfPy+62IKL2tMDYEvttJAF3lRRigxkoAx8+IL4ZhA4rgAAMaorQAAkwDgA0EIXuKCXMYyBjGQ4IxnJ6KAxiAGMXeiCXrT7GdMe4IUuTCADVRIDDsjXwJAgqAcGAEABLAAAXeiCF/7AUMgHnQEAaDjDiM4gohFHSC9dzG5teOuAAk4wgQWEQQxi8AEOZDCDHCRJIABoQ47WUAEB9BCIwCBGBz8IDWgAIBluhGMck5gMYyjEiU6sHSsAYIpTjMAAhsCDGHowvht4sTgA6EMfqDApAABxGMbw4BGPCMeEuDEhR4QGHD9oDGD0wocXjJwsTgEAVYCgAGjgAxgQBrhDMgoAjQQiMY5Bxzba8pa2dMYyJulBEQIDf7SwxdqCBgAUFEACZ6DCtmRQNR6oKSG88IUadYlLaETDmthsYzQmacRe1tEYn8TFz4yGgATYoFWkg9UXGeXJSCYxk9qspjUz6QxlGFGTdP5ERieduLaOAYAGBupBD76Qhv3QZBjE4GASl2HLa0KDGtGA6EMdqsl7btKDGAWnLurmTymsQQyCxAMenjkMYbjzltekRjYbytJ7LlSXzehlJ6HoMQDoQaQjfSYwOOjBirZRog2lxjRUistn7HKbSMToB4nxi7VpjJQ5VRMYNxhCeF7TodWARlaDetU2UtKIu6xoMpqBjGHksaZe2SAyaHnPlD50Gm2UhlaxKddb8rKb78woMMQZNFKmtYM9ZWg8UxrRa0pDpVl16DMq+lI4KnWEefTneEZ4DGRMsqvUkCtQJ7rSXII1ifikpDOQQUKnJk2qSuHgGgXLVWjINRrSoP6oXTW5TV0OEZ8y3evFJKskY1SWm0eUbUTlOU9nMGOSu2QjRvFKDLPu1q9KQsYa5bjYeA7WusANbVgba9sR8mK3TIMIACrb00zKsbPZRK5tvzrETQ5xtMZwLlqVVNXzHnGxVq0mfpEqyZ5idJPLAKFGQcZbhwAgkpY1YjQES838fnaXy3UsG3k5Wmd4t58cQ21qQdhgl+LXpcAV7XuTy+EQfvOTsyjaaceT0Om2laG2jYaEj6tUCOMWnx3UZ3zzOMrw/jWSMeWwbfEJYtvucrofzDEHN0jC/d2ir9AdTxqXLN0ctxeEWM5xHeso3SVvcITBqN8naVpgr8gyoQn9sm4+1/zlERqjGGlGc3PDTL9d4G9/HI0yf+xsv/rNGaHAGEagBT2MMAtazL80oQ/fJ04y+xgpCVn0D+3MZ/r1gheXpvSdMZg/Rq+t0Rxd1FwWsjYM2uIWF4weLWoB6ttFDtR4U4hi6GKvWtu6IzMJCAA7AOIBeyJub3RpY2UiOiJHZW5lcmF0ZWQgYnkgTWFwbGVTdG9yeS5JTyIsImNvbnRhaW5lciI6ImlvLTU3NzY4YzhmOTktOGg3Z2YiLCJnaXRIYXNoIjoiNzMxMDgxNTVjN2EyYTA0MTEyYTAyNjVhMTE5N2ZjYmJmYzU1NjUwMSIsInVybCI6Ii9hcGkvU0VBLzIyMC9tb2IvMTAwMDA0L3JlbmRlci9zdGFuZCIsImNyZWF0ZWRBdCI6IjIwMjYtMDUtMjhUMjM6MTk6MDEuNzc5MTIyNloiLCJtZXRhIjpudWxsfQ==";
 
-      // ===== helpers (ported verbatim from src/effects/helpers.ts) =====
-      const TAU = Math.PI * 2;
-      const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
-      const lerp = (a, b, t) => a + (b - a) * t;
-      const smooth = (t) => t * t * (3 - 2 * t);
-      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-      const springy = (p) => (p >= 1 ? 1 : 1 - Math.exp(-6 * p) * Math.cos(9 * p));
-      const bounceOut = (p) => {
-        const n = 7.5625, d = 2.75;
-        if (p < 1 / d) return n * p * p;
-        if (p < 2 / d) { p -= 1.5 / d; return n * p * p + 0.75; }
-        if (p < 2.5 / d) { p -= 2.25 / d; return n * p * p + 0.9375; }
-        p -= 2.625 / d; return n * p * p + 0.984375;
-      };
-      const elasticOut = (p) => {
-        if (p <= 0) return 0; if (p >= 1) return 1;
-        const c4 = TAU / 3; return Math.pow(2, -10 * p) * Math.sin((p * 10 - 0.75) * c4) + 1;
-      };
-      const beatKick = (t, bpm = 120, exp = 6) => { const spb = 60 / bpm; const ph = (t % spb) / spb; return Math.pow(1 - ph, exp); };
-      const bez = (t, p0, p1, p2, p3) => {
-        const u = 1 - t;
-        return [
-          u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
-          u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1],
-        ];
-      };
-      const quantize = (v, steps) => Math.round(v * steps) / steps;
-      const stepTime = (t, fps = 8) => Math.floor(t * fps) / fps;
-      const seededRandom = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-      const depthShadow = (z) => {
-        z = clamp(z);
-        const y = lerp(1, 28, z), bl = lerp(2, 38, z), op = lerp(0.18, 0.5, z);
-        return `drop-shadow(0px ${y.toFixed(1)}px ${bl.toFixed(1)}px rgba(0,0,0,${op.toFixed(2)}))`;
-      };
-      const GRAIN =
-        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+      // ===== single-source effects from the generated bundle (window.SoranjiEffects) =====
+      // Generated from src/effects/portable.ts by `npm run gen:portal`. This file
+      // declares ZERO motion formulas / composeStyles — they all come from the bundle.
+      const SE = window.SoranjiEffects;
+      const { TAU, clamp, lerp, smooth, easeOutCubic, springy, bounceOut, elasticOut, beatKick, bez, quantize, stepTime, seededRandom, depthShadow } = SE;
+      const composeStyles = SE.composeStyles;
 
-      // ===== MOTIONS (ported from motions.ts + depth.ts + pixel.ts + retro.ts) =====
-      // layer: 'sprite' (default) | 'overlay' | 'bg'
-      const m = (name, cat, tier, fn, layer) => ({ name, cat, tier, fn, layer: layer || "sprite" });
-      const MOTIONS = {
-        // Ken Burns / Zoom
-        kenBurns: m("Ken Burns", "Ken Burns / Zoom", "Core", ({ progress: p }) => ({ transform: `scale(${1.1 + p * 0.25}) translate(${(0.5 - p) * 4}%, ${(0.5 - p) * 3}%)` })),
-        slowZoomIn: m("Slow Zoom In", "Ken Burns / Zoom", "Core", ({ progress: p }) => ({ transform: `scale(${1 + p * 0.4})` })),
-        slowZoomOut: m("Slow Zoom Out", "Ken Burns / Zoom", "Core", ({ progress: p }) => ({ transform: `scale(${1.4 - p * 0.4})` })),
-        pulseZoom: m("Pulse Zoom", "Ken Burns / Zoom", "Core", ({ beat }) => ({ transform: `scale(${1.05 + beat * 0.14})` })),
-        smashZoom: m("Smash Zoom", "Ken Burns / Zoom", "Ext", ({ progress: p }) => ({ transform: `scale(${1 + smooth(clamp(p * 1.3)) * 0.55})`, filter: `blur(${Math.sin(p * Math.PI) * 6}px)` })),
-        focusBreath: m("Focus Breath", "Ken Burns / Zoom", "Ext", ({ t }) => ({ transform: `scale(${1.02 + Math.sin(t * 1.4) * 0.02})`, filter: `blur(${(1 + Math.cos(t * 1.4)) * 0.3}px)` })),
-        // Pan / Move
-        panLR: m("Pan L/R", "Pan / Move", "Core", ({ progress: p }) => ({ transform: `scale(1.3) translateX(${(0.5 - p) * 18}%)` })),
-        panUD: m("Pan U/D", "Pan / Move", "Core", ({ progress: p }) => ({ transform: `scale(1.3) translateY(${(0.5 - p) * 18}%)` })),
-        parallaxPan: m("Parallax Pan", "Pan / Move", "Core", ({ progress: p, params }) => ({ transform: `scale(1.4) translateX(${(0.5 - p) * 20 * (params.speed ?? 1)}%)` })),
-        driftFloat: m("Drift Float", "Pan / Move", "Ext", ({ t }) => ({ transform: `translate(${Math.sin(t * 0.5) * 12}px, ${Math.cos(t * 0.4) * 10}px)` })),
-        kineticText: m("Kinetic Slide", "Pan / Move", "Ext", ({ progress: p }) => ({ transform: `translateX(${(1 - smooth(clamp(p * 1.5))) * -40}px)`, opacity: clamp(p * 2) })),
-        // Path
-        motionPath: m("Motion Path", "Path", "Core", ({ progress: p }) => { const pt = bez(p, [12, 82], [28, 12], [72, 92], [88, 18]); return { left: `${pt[0]}%`, top: `${pt[1]}%` }; }),
-        arcMove: m("Arc Move", "Path", "Ext", ({ progress: p }) => ({ left: `${lerp(10, 90, p)}%`, top: `${80 - Math.sin(p * Math.PI) * 55}%` })),
-        orbit: m("Orbit", "Path", "Ext", ({ t, params }) => { const r = params.radius ?? 30; return { left: `${50 + Math.cos(t * 1.2) * r}%`, top: `${50 + Math.sin(t * 1.2) * r * 0.6}%` }; }),
-        drawOn: m("Draw On", "Path", "Ext", ({ progress: p }) => ({ clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` })),
-        bezierFloat: m("Bezier Float", "Path", "Adv", ({ t }) => { const pt = bez((Math.sin(t * 0.5) + 1) / 2, [20, 50], [40, 10], [60, 90], [80, 50]); return { left: `${pt[0]}%`, top: `${pt[1]}%` }; }),
-        // Physics / Spring
-        springPop: m("Spring Pop", "Physics / Spring", "Core", ({ progress: p }) => ({ transform: `scale(${springy(p)})` })),
-        bounceIn: m("Bounce In", "Physics / Spring", "Core", ({ progress: p }) => ({ transform: `translateY(${(1 - bounceOut(p)) * -60}px)`, opacity: Math.min(1, p * 3) })),
-        elasticIn: m("Elastic In", "Physics / Spring", "Core", ({ progress: p }) => ({ transform: `scale(${elasticOut(p)})` })),
-        jiggleWobble: m("Jiggle Wobble", "Physics / Spring", "Ext", ({ progress: p }) => ({ transform: `rotate(${Math.sin(p * TAU * 3) * (1 - p) * 10}deg)` })),
-        inertiaSlide: m("Inertia Slide", "Physics / Spring", "Ext", ({ progress: p }) => ({ transform: `translateX(${(1 - easeOutCubic(p)) * 140}px)` })),
-        squashStretch: m("Squash & Stretch", "Physics / Spring", "Ext", ({ t }) => { const s = Math.sin(t * 4); return { transform: `scale(${1 + s * 0.15}, ${1 - s * 0.12})`, transformOrigin: "bottom center" }; }),
-        pendulum: m("Pendulum", "Physics / Spring", "Adv", ({ t }) => ({ transform: `rotate(${Math.sin(t * 2) * 18}deg)`, transformOrigin: "top center" })),
-        // 3D / Perspective (CSS)
-        tiltPerspective: m("Tilt Perspective", "3D / Perspective", "Core", ({ t }) => ({ transform: `perspective(800px) rotateY(${Math.sin(t * 1.2) * 10}deg) rotateX(${Math.cos(t * 1.0) * 6}deg)` })),
-        flip3DLayer: m("Flip 3D Layer", "3D / Perspective", "Ext", ({ progress: p }) => ({ transform: `perspective(800px) rotateY(${p * 360}deg)` })),
-        // Camera
-        dollyInOut: m("Dolly In/Out", "Camera", "Core", ({ progress: p }) => ({ transform: `scale(${1 + Math.sin(p * Math.PI) * 0.4})` })),
-        truck: m("Truck", "Camera", "Core", ({ progress: p }) => ({ transform: `scale(1.2) translateX(${(0.5 - p) * 30}%)` })),
-        pedestal: m("Pedestal", "Camera", "Ext", ({ progress: p }) => ({ transform: `scale(1.2) translateY(${(0.5 - p) * 22}%)` })),
-        panCam: m("Pan Cam", "Camera", "Core", ({ progress: p }) => ({ transform: `perspective(1200px) rotateY(${(0.5 - p) * 16}deg) scale(1.15)` })),
-        tiltCam: m("Tilt Cam", "Camera", "Ext", ({ progress: p }) => ({ transform: `perspective(1200px) rotateX(${(p - 0.5) * 14}deg) scale(1.15)` })),
-        zoomLens: m("Zoom Lens", "Camera", "Core", ({ progress: p }) => ({ transform: `scale(${1 + p * 0.6})` })),
-        rackFocus: m("Rack Focus", "Camera", "Ext", ({ progress: p }) => ({ filter: `blur(${(1 - smooth(clamp(p * 1.3))) * 10}px)` })),
-        dollyZoom: m("Dolly Zoom", "Camera", "Adv", ({ progress: p }) => ({ transform: `perspective(${lerp(1200, 320, p)}px) scale(${1 + p * 0.25})` })),
-        whipPanCam: m("Whip Pan Cam", "Camera", "Core", ({ progress: p }) => ({ transform: `translateX(${(0.5 - p) * 120}%)`, filter: `blur(${Math.sin(p * Math.PI) * 8}px)` })),
-        craneJib: m("Crane Jib", "Camera", "Ext", ({ progress: p }) => ({ transform: `scale(${1.1 + p * 0.2}) translateY(${(0.5 - p) * 20}%)` })),
-        arcShot: m("Arc Shot", "Camera", "Ext", ({ progress: p }) => ({ transform: `perspective(1000px) rotateY(${(0.5 - p) * 24}deg) scale(1.2)` })),
-        handheld: m("Handheld", "Camera", "Core", ({ t }) => { const nx = (Math.sin(t * 7) + Math.sin(t * 13) * 0.5) * 5; const ny = (Math.cos(t * 9) + Math.sin(t * 5) * 0.5) * 4; return { transform: `translate(${nx}px, ${ny}px) rotate(${Math.sin(t * 4) * 1.2}deg)` }; }),
-        dutchAngle: m("Dutch Angle", "Camera", "Ext", ({ params }) => ({ transform: `rotate(${params.angle ?? 8}deg) scale(1.1)` })),
-        steadicamFollow: m("Steadicam", "Camera", "Adv", ({ t }) => ({ transform: `translate(${Math.sin(t * 0.6) * 20}px, ${Math.cos(t * 0.5) * 10}px) scale(1.1)` })),
-        // Loop / Idle
-        breathingLoop: m("Breathing", "Loop / Idle", "Core", ({ t }) => ({ transform: `scale(${1.04 + Math.sin(t * 1.6) * 0.035})` })),
-        floatLoop: m("Float Loop", "Loop / Idle", "Core", ({ t }) => ({ transform: `translateY(${Math.sin(t * 1.6) * 10}px)` })),
-        swayLoop: m("Sway Loop", "Loop / Idle", "Ext", ({ t }) => ({ transform: `rotate(${Math.sin(t * 1.2) * 5}deg)`, transformOrigin: "bottom center" })),
-        shimmerLoop: m("Shimmer", "Loop / Idle", "Ext", ({ t }) => ({ backgroundImage: "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)", backgroundSize: "220% 100%", backgroundPosition: `${((t * 0.4) % 1) * 240 - 60}% 0` })),
-        pulseGlow: m("Pulse Glow", "Loop / Idle", "Ext", ({ t }) => ({ filter: `drop-shadow(0 0 ${8 + Math.sin(t * 2) * 8}px rgba(255,210,150,0.8))` })),
-        grainLoop: m("Film Grain", "Loop / Idle", "Ext", ({ frame }) => ({ backgroundImage: GRAIN, opacity: 0.5, backgroundPosition: `${seededRandom(frame) * 100}% ${seededRandom(frame + 9) * 100}%`, mixBlendMode: "overlay" }), "overlay"),
-        // Beat-reactive
-        beatPulse: m("Beat Pulse", "Beat-reactive", "Core", ({ beat }) => ({ transform: `scale(${1.05 + beat * 0.22})` })),
-        beatFlash: m("Beat Flash", "Beat-reactive", "Core", ({ beat }) => ({ backgroundColor: "#fff", opacity: beat * 0.6 }), "overlay"),
-        beatShake: m("Beat Shake", "Beat-reactive", "Core", ({ beat, t }) => ({ transform: `translate(${Math.sin(t * 60) * beat * 8}px, ${Math.cos(t * 55) * beat * 6}px)` })),
-        beatColorCycle: m("Beat Color Cycle", "Beat-reactive", "Ext", ({ beat }) => ({ filter: `hue-rotate(${beat * 120}deg) saturate(${1 + beat})` })),
-        beatZoomCut: m("Beat Zoom Cut", "Beat-reactive", "Ext", ({ beat }) => ({ transform: `scale(${1 + (beat > 0.6 ? 0.15 : 0)})` })),
-        audioBars: m("Audio Bars", "Beat-reactive", "Ext", ({ beat }) => ({ transform: `scaleY(${0.3 + beat * 0.7})`, transformOrigin: "bottom" })),
-        waveform: m("Waveform", "Beat-reactive", "Ext", ({ t, beat }) => ({ transform: `scaleY(${0.5 + Math.abs(Math.sin(t * 6)) * 0.4 + beat * 0.2})`, transformOrigin: "center" })),
-        // Depth / 2.5D
-        dropShadowLift: m("Drop-shadow Lift", "Depth / 2.5D", "Core", ({ progress: p }) => ({ transform: `translateY(${-p * 14}px) scale(${lerp(1, 1.08, p)})`, filter: depthShadow(lerp(0.1, 0.9, p)) })),
-        bevelEmboss: m("Bevel Emboss", "Depth / 2.5D", "Core", ({ t }) => ({ boxShadow: "inset 3px 3px 0 rgba(255,255,255,0.45), inset -3px -3px 0 rgba(0,0,0,0.35), 0 6px 9px rgba(0,0,0,0.35)", transform: `translateY(${Math.sin(t * 1.2) * 2}px)` })),
-        parallaxDepth: m("Parallax Depth", "Depth / 2.5D", "Core", ({ progress: p, params }) => { const z = params.z ?? 0.5; return { transform: `translateX(${(0.5 - p) * 50 * z}px) scale(${lerp(0.82, 1.16, z)})`, filter: depthShadow(z) }; }),
-        floatShadow: m("Float + Ground Shadow", "Depth / 2.5D", "Core", ({ t }) => { const bob = Math.sin(t * 1.6); const up = Math.max(0, bob); return { transform: `translateY(${-bob * 10}px)`, filter: `drop-shadow(0px ${12 + up * 16}px ${6 + up * 12}px rgba(0,0,0,${(0.45 - up * 0.2).toFixed(2)}))` }; }),
-        tiltShadow: m("Tilt + Shadow", "Depth / 2.5D", "Ext", ({ t }) => { const ry = Math.sin(t * 1.2) * 12, rx = Math.cos(t * 1.0) * 7, sx = Math.sin(t * 1.2) * 18; return { transform: `perspective(700px) rotateY(${ry}deg) rotateX(${rx}deg)`, filter: `drop-shadow(${-sx}px 14px 14px rgba(0,0,0,0.4))` }; }),
-        popLayer: m("Pop Toward Camera", "Depth / 2.5D", "Ext", ({ beat: k }) => ({ transform: `scale(${1 + k * 0.18}) translateY(${-k * 10}px)`, filter: depthShadow(0.3 + k * 0.6) })),
-        // Pixel-art
-        pixelBob: m("Pixel Bob", "Pixel-art", "Core", ({ t }) => ({ transform: `translateY(${quantize(Math.sin(t * 2), 6) * -12}px)` })),
-        spriteBlink: m("Sprite Blink", "Pixel-art", "Ext", ({ frame, fps }) => { const period = fps * 1.3; const phase = (frame % period) / period; return { opacity: phase > 0.92 ? 0.15 : 1 }; }),
-        paletteCycle: m("Palette Cycle", "Pixel-art", "Ext", ({ t }) => ({ filter: `hue-rotate(${quantize((t * 0.15) % 1, 8) * 360}deg) saturate(1.2)` })),
-        pixelShake: m("Pixel Shake", "Pixel-art", "Core", ({ t }) => ({ transform: `translate(${Math.round(Math.sin(t * 30) * 2)}px, ${Math.round(Math.cos(t * 27) * 2)}px)` })),
-        crtScanlines: m("CRT Scanlines", "Pixel-art", "Ext", ({ t }) => ({ backgroundImage: "repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 1px, transparent 1px, transparent 3px)", opacity: 0.5 + Math.sin(t * 40) * 0.06, mixBlendMode: "multiply" }), "overlay"),
-        stepWalk: m("Step Walk", "Pixel-art", "Ext", ({ t }) => { const x = stepTime(t, 6) * 30; const hop = Math.round(Math.abs(Math.sin(t * 8))); return { transform: `translateX(${x % 120}px) translateY(${-hop * 2}px)` }; }),
-        // Retro / FX
-        neonGlow: m("Neon Glow", "Retro / FX", "Core", ({ t }) => ({ filter: `drop-shadow(0 0 ${6 + Math.sin(t * 4) * 4}px hsl(${(t * 80) % 360} 100% 60%)) drop-shadow(0 0 ${14 + Math.sin(t * 4) * 8}px hsl(${(t * 80 + 50) % 360} 100% 55%)) brightness(1.12)` })),
-        chromaPulse: m("Chroma Pulse", "Retro / FX", "Ext", ({ t }) => { const o = 3 + Math.sin(t * 5) * 3; return { filter: `drop-shadow(${o}px 0 0 rgba(255,0,80,0.7)) drop-shadow(${-o}px 0 0 rgba(0,255,255,0.7))` }; }),
-        vhsJitter: m("VHS Jitter", "Retro / FX", "Ext", ({ frame }) => { const j = Math.round((seededRandom(Math.floor(frame / 2)) - 0.5) * 6); const big = seededRandom(Math.floor(frame / 10)) > 0.9 ? Math.round((seededRandom(frame) - 0.5) * 16) : 0; return { transform: `translateX(${j + big}px)`, filter: "saturate(1.4) contrast(1.08)" }; }),
-        glitchSlice: m("Glitch Slice", "Retro / FX", "Ext", ({ frame }) => { const trig = seededRandom(Math.floor(frame / 4)) > 0.72; const dx = trig ? (seededRandom(frame) - 0.5) * 28 : 0; const sk = trig ? (seededRandom(frame + 3) - 0.5) * 8 : 0; return { transform: `translateX(${dx}px) skewX(${sk}deg)`, filter: trig ? `hue-rotate(${Math.round(seededRandom(frame + 7) * 360)}deg)` : "none" }; }),
-        hologram: m("Hologram", "Retro / FX", "Ext", ({ t }) => ({ opacity: 0.72 + Math.sin(t * 30) * 0.07, filter: "hue-rotate(150deg) saturate(2) brightness(1.2) drop-shadow(0 0 8px rgba(0,255,255,0.8))", transform: `skewX(${Math.sin(t * 2) * 2}deg)` })),
-        echoTrail: m("Echo Trail", "Retro / FX", "Ext", ({ t }) => { const dx = Math.sin(t * 2) * 30; return { transform: `translateX(${dx}px)`, filter: `drop-shadow(${-dx * 0.3}px 0 0 rgba(255,0,255,0.45)) drop-shadow(${-dx * 0.6}px 0 0 rgba(0,255,255,0.35)) drop-shadow(${-dx * 0.9}px 0 0 rgba(255,255,0,0.22))` }; }),
-        crtTurnOn: m("CRT Turn-on", "Retro / FX", "Core", ({ progress: p }) => { const a = clamp(p / 0.4), b = clamp((p - 0.4) / 0.6); return { transform: `scaleX(${0.2 + a * 0.8}) scaleY(${0.02 + b * 0.98})`, filter: `brightness(${1 + (1 - b) * 2.5})` }; }),
-        flameFlicker: m("Flame Flicker", "Retro / FX", "Ext", ({ t, frame }) => ({ transform: `translateY(${Math.sin(t * 8) * 2}px) scaleY(${1 + Math.sin(t * 12) * 0.04})`, filter: `hue-rotate(${-12 + seededRandom(frame) * 22}deg) brightness(${1.1 + seededRandom(frame) * 0.3}) saturate(1.6)` })),
-        rainbowCycle: m("Rainbow Cycle", "Retro / FX", "Core", ({ t }) => ({ filter: `hue-rotate(${(t * 120) % 360}deg) saturate(1.4)` })),
-        powerUp: m("Power-up", "Retro / FX", "Core", ({ beat }) => ({ transform: `scale(${1 + beat * 0.3})`, filter: `brightness(${1 + beat}) drop-shadow(0 0 ${beat * 22}px gold)` })),
-        arcadeHop: m("Arcade Hop", "Retro / FX", "Ext", ({ t }) => { const q = quantize(Math.abs(Math.sin(t * 6)), 4); return { transform: `translateY(${-q * 26}px) scaleY(${1 + q * 0.06}) scaleX(${1 - q * 0.04})` }; }),
-        wobbleVHS: m("VHS Wobble", "Retro / FX", "Ext", ({ t }) => ({ transform: `perspective(600px) rotateY(${Math.sin(t * 1.5) * 6}deg) skewX(${Math.sin(t * 3) * 2}deg)`, filter: `blur(${(1 + Math.sin(t * 9)) * 0.4}px)` })),
-        vignette: m("Vignette", "Retro / FX", "Ext", ({ t }) => ({ backgroundImage: `radial-gradient(circle at 50% 50%, transparent ${48 + Math.sin(t * 1.5) * 4}%, rgba(0,0,0,0.72) 100%)` }), "overlay"),
-        // Backgrounds (full-frame)
-        synthGrid: m("Synthwave Grid", "Backgrounds", "Core", ({ t }) => ({ backgroundColor: "#120025", backgroundImage: ["radial-gradient(circle at 50% 32%, #ff2e88 0, #ff6ec7 7%, rgba(255,110,199,0) 22%)", "repeating-linear-gradient(0deg, rgba(0,240,255,0) 0 38px, rgba(0,240,255,0.55) 38px 40px)", "repeating-linear-gradient(90deg, rgba(255,46,136,0) 0 38px, rgba(255,46,136,0.4) 38px 40px)"].join(", "), backgroundPosition: `0 0, 0 ${(t * 60) % 40}px, 0 0` }), "bg"),
-        starfield: m("Starfield", "Backgrounds", "Core", ({ t }) => ({ backgroundColor: "#03030f", backgroundImage: ["radial-gradient(1px 1px at 15% 20%, #fff, transparent 2px), radial-gradient(1px 1px at 80% 60%, #cde, transparent 2px), radial-gradient(1px 1px at 45% 85%, #fff, transparent 2px)", "radial-gradient(2px 2px at 60% 30%, #9cf, transparent 3px), radial-gradient(2px 2px at 30% 72%, #fff, transparent 3px)"].join(", "), backgroundSize: "300px 300px, 520px 520px", backgroundPosition: `0 ${(t * 40) % 300}px, 0 ${(t * 80) % 520}px` }), "bg"),
-        crtRoom: m("CRT Room", "Backgrounds", "Ext", ({ frame }) => ({ backgroundColor: "#0a0a0f", backgroundImage: "repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0 1px, transparent 1px 3px), radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.85) 100%)", filter: `brightness(${0.97 + seededRandom(frame) * 0.06})` }), "bg"),
-      };
+      // ===== motions: built from the generated bundle (zero formulas declared here) =====
+      // Backgrounds -> bg layer; these specific ids -> overlay; everything else -> sprite.
+      const OVERLAY_IDS = new Set(["beatFlash", "crtScanlines", "grainLoop", "vignette"]);
+      const layerOf = (id, cat) => (cat === "Backgrounds" ? "bg" : OVERLAY_IDS.has(id) ? "overlay" : "sprite");
+      const MOTIONS = {};
+      for (const id in SE.MOTION_FORMULAS) {
+        const meta = SE.MOTION_META[id] || { name: id, category: "", tier: "" };
+        MOTIONS[id] = { name: meta.name, cat: meta.category, tier: meta.tier, layer: layerOf(id, meta.category), fn: SE.MOTION_FORMULAS[id] };
+      }
 
       // ===== TRANSITIONS (a = exiting scene, b = entering scene, o = overlay) =====
       const HEART = "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50,32 C50,12 18,12 18,38 C18,60 50,74 50,90 C50,74 82,60 82,38 C82,12 50,12 50,32 Z' fill='black'/%3E%3C/svg%3E\")";
@@ -357,20 +243,7 @@
 
       // ===== compose: stack multiple motion styles =====
       const RESET = ["transform", "filter", "opacity", "clipPath", "webkitClipPath", "maskImage", "webkitMaskImage", "maskSize", "webkitMaskSize", "maskRepeat", "webkitMaskRepeat", "maskPosition", "webkitMaskPosition", "backgroundImage", "backgroundColor", "backgroundPosition", "backgroundSize", "boxShadow", "mixBlendMode", "transformOrigin", "left", "top"];
-      function composeStyles(list) {
-        const out = {}; const tf = []; const fl = []; let op = 1; let hasOp = false;
-        for (const s of list) for (const k in s) {
-          const v = s[k];
-          if (k === "transform") tf.push(v);
-          else if (k === "filter") { if (v && v !== "none") fl.push(v); }
-          else if (k === "opacity") { op *= v; hasOp = true; }
-          else out[k] = v;
-        }
-        if (tf.length) out.transform = tf.join(" ");
-        if (fl.length) out.filter = fl.join(" ");
-        if (hasOp) out.opacity = op;
-        return out;
-      }
+      // composeStyles is provided by the bundle (declared above as `const composeStyles = SE.composeStyles`).
       function applyStyle(el, style, baseTransform) {
         for (const p of RESET) el.style[p] = "";
         const s = Object.assign({}, style);

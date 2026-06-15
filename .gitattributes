@@ -1,0 +1,4 @@
+# Generated portal bundle: force LF so the byte-for-byte drift guard
+# (`npm run check:portal`) stays stable on Windows, where core.autocrlf=true
+# would otherwise rewrite the committed bundle to CRLF and break the compare.
+public/portal/effects.bundle.js text eol=lf

@@ -25,17 +25,18 @@ const ClipContent: React.FC<{ clip: Clip }> = ({ clip }) => {
   const { fps } = useVideoConfig();
   const progress = clamp(frame / clip.durationInFrames);
   const t = frame / fps;
-  const motionStyle = clip.motion
-    ? getMotion(clip.motion)({ progress, frame, fps, t, beat: beatKick(t), z: 0, params: clip.motionParams ?? {} })
-    : {};
+  const motionStyle =
+    clip.motion && clip.motion !== "none"
+      ? getMotion(clip.motion)({ progress, frame, fps, t, beat: beatKick(t), z: 0, params: {} })
+      : {};
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <div style={{ width: "100%", height: "100%", ...motionStyle }}>
         {clip.type === "video" ? (
           <OffthreadVideo
             src={resolveSrc(clip.src)}
-            trimBefore={clip.trimBefore}
-            trimAfter={clip.trimAfter}
+            trimBefore={clip.trimBefore || undefined}
+            trimAfter={clip.trimAfter || undefined}
             volume={clip.volume ?? 1}
             style={FILL}
           />
@@ -57,12 +58,12 @@ const ClipTrack: React.FC<{ clips: Clip[] }> = ({ clips }) => {
         <ClipContent clip={clip} />
       </TransitionSeries.Sequence>,
     );
-    if (clip.transitionToNext && i < clips.length - 1) {
+    if (clip.transitionToNext && clip.transitionToNext !== "none" && i < clips.length - 1) {
       items.push(
         <TransitionSeries.Transition
           key={`tr-${i}`}
-          presentation={getTransitionPresentation(clip.transitionToNext.id)}
-          timing={linearTiming({ durationInFrames: clip.transitionToNext.durationInFrames })}
+          presentation={getTransitionPresentation(clip.transitionToNext)}
+          timing={linearTiming({ durationInFrames: clip.transitionDurationInFrames })}
         />,
       );
     }
@@ -78,10 +79,10 @@ const OverlayLayer: React.FC<{ overlay: Overlay }> = ({ overlay: o }) => {
         style={{
           fontSize: o.fontSize ?? 80,
           color: o.color ?? "#fff",
-          fontFamily: o.fontFamily ?? "monospace",
+          fontFamily: "monospace",
           fontWeight: 700,
           whiteSpace: "nowrap",
-          textShadow: o.glow ?? "none",
+          textShadow: o.glow || "none",
         }}
       >
         {o.text}
@@ -99,7 +100,6 @@ const OverlayLayer: React.FC<{ overlay: Overlay }> = ({ overlay: o }) => {
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}
       centered
-      params={o.motionParams ?? {}}
       style={{ left: `${o.x ?? 50}%`, top: `${o.y ?? 50}%`, opacity: o.opacity ?? 1 }}
     >
       {content}
@@ -112,7 +112,7 @@ const BackgroundLayer: React.FC<{ background: Background }> = ({ background: bg 
   if (bg.type === "color") return <AbsoluteFill style={{ backgroundColor: bg.color ?? "#000" }} />;
   if (bg.type === "gradient")
     return <AbsoluteFill style={{ backgroundImage: bg.gradient ?? "linear-gradient(#000,#111)" }} />;
-  if (bg.type === "motion" && bg.motion)
+  if (bg.type === "motion" && bg.motion && bg.motion !== "none")
     return <Layer motionId={bg.motion} style={{ inset: 0, width: "100%", height: "100%" }} />;
   return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
 };
@@ -128,13 +128,14 @@ export const Timeline: React.FC<Project> = ({ background, clips, overlays }) => 
   </AbsoluteFill>
 );
 
-/** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
+/** Total length = ΣclipDurations − Σtransitions(with a next clip), covering all overlays. */
 export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => {
   const clips = props.clips ?? [];
   const overlays = props.overlays ?? [];
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);
   const transTotal = clips.reduce(
-    (s, c, i) => s + (i < clips.length - 1 ? (c.transitionToNext?.durationInFrames ?? 0) : 0),
+    (s, c, i) =>
+      s + (i < clips.length - 1 && c.transitionToNext && c.transitionToNext !== "none" ? c.transitionDurationInFrames : 0),
     0,
   );
   const overlayEnd = overlays.reduce((m, o) => Math.max(m, (o.from ?? 0) + o.durationInFrames), 0);

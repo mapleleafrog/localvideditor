@@ -1,7 +1,14 @@
 {
   "background": { "type": "motion", "motion": "starfield" },
   "clips": [
-    { "type": "image", "src": "clip-a.svg", "durationInFrames": 60, "motion": "panLR" }
+    {
+      "type": "image",
+      "src": "clip-a.svg",
+      "durationInFrames": 60,
+      "motion": "panLR",
+      "transitionToNext": "none",
+      "transitionDurationInFrames": 20
+    }
   ],
   "overlays": [
     {

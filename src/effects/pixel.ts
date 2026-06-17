@@ -4,7 +4,11 @@ import { MOTION_FORMULAS } from "./portable";
 
 // Pixel-art motion formulas now live in `portable.ts` (single source). This file
 // keeps the catalog-wiring record consumed by motions.ts' merge loop.
-const PIXEL_IDS = ["pixelBob", "spriteBlink", "paletteCycle", "pixelShake", "crtScanlines", "stepWalk"] as const;
+const PIXEL_IDS = [
+  "pixelBob", "spriteBlink", "paletteCycle", "pixelShake", "crtScanlines", "stepWalk",
+  // pack: more pixel motions
+  "eightBitHop", "spriteFlash", "pixelWindSway", "ditherFadeIn", "pixelPop",
+] as const;
 
 export const pixelStyles: Record<string, (ctx: MotionCtx) => CSSProperties> = Object.fromEntries(
   PIXEL_IDS.map((id) => [id, MOTION_FORMULAS[id]]),

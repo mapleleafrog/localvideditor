@@ -13,10 +13,16 @@ const newClip = (): Clip => ({
   type: "image", src: "clip-a.svg", durationInFrames: 60, motion: "none",
   transitionToNext: "none", transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1,
 });
-const newOverlay = (type: "text" | "image", from: number): Overlay => ({
-  type, text: type === "text" ? "New text" : "Title", src: "orange-mush.gif",
-  from, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0, opacity: 1,
-  motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width: 200,
+const newOverlay = (type: "text" | "image" | "fx", from: number): Overlay => ({
+  type,
+  text: type === "text" ? "New text" : "Title",
+  src: "orange-mush.gif",
+  from,
+  durationInFrames: type === "fx" ? 120 : 60,
+  x: 50, y: 50, scale: 1, rotation: 0, opacity: 1,
+  // FX layers start with a romantic atmospheric so the new layer is visibly doing something.
+  motions: type === "fx" ? ["weddingPetals"] : [],
+  z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width: 200,
 });
 
 const Playhead: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; zoom: number }> = ({ playerRef, zoom }) => {
@@ -79,6 +85,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
         <button onClick={() => addClip(newClip())}>+ Clip</button>
         <button onClick={() => addOverlay(newOverlay("text", 0))}>+ Text</button>
         <button onClick={() => addOverlay(newOverlay("image", 0))}>+ Image</button>
+        <button onClick={() => addOverlay(newOverlay("fx", 0))} title="Full-frame effect layer (petals, bokeh, light-leaks…)">+ FX</button>
         <span className="sep" />
         <button onClick={() => setZoom(Math.max(1, zoom - 1))}>−</button>
         <span className="muted">zoom</span>
@@ -100,7 +107,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
               title="Click to select layer"
             >
               <span className="ovl-label">
-                {o.type === "text" ? "T" : "▦"} {o.type === "text" ? (o.text || "text").slice(0, 8) : "image"}
+                {o.type === "text" ? "T" : o.type === "fx" ? "✦" : "▦"}{" "}
+                {o.type === "text" ? (o.text || "text").slice(0, 8) : o.type === "fx" ? "fx" : "image"}
               </span>
               <span className="ovl-reorder">
                 <button
@@ -190,7 +198,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                         )
                       }
                     />
-                    <span className="tl-block-label">{o.type === "text" ? o.text || "text" : o.src}</span>
+                    <span className="tl-block-label">{o.type === "text" ? o.text || "text" : o.type === "fx" ? `fx · ${o.motions[0] ?? "empty"}` : o.src}</span>
                     <span
                       className="tl-handle right"
                       onPointerDown={(e) =>

@@ -21,6 +21,14 @@ const RETRO_IDS = [
   "starfield",
   "crtRoom",
   "vignette",
+  // pack: more cyber motions + backdrops
+  "rgbSplitHeavy",
+  "dataGlitchBlocks",
+  "neonBorderPulse",
+  "vaporTint",
+  "scanlineFlicker",
+  "synthSunset",
+  "gridRunner",
 ] as const;
 
 export const retroStyles: Record<string, (ctx: MotionCtx) => CSSProperties> = Object.fromEntries(

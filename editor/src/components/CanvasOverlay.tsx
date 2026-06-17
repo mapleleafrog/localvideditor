@@ -80,7 +80,9 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
   }, [playerRef]);
 
   const isVisible = (o: Overlay) => frame >= (o.from ?? 0) && frame < (o.from ?? 0) + o.durationInFrames;
-  const visible = overlays.map((o, i) => ({ o, i })).filter(({ o }) => isVisible(o));
+  // fx layers are full-frame — no on-canvas drag/scale/rotate handles (edit them in the Inspector).
+  const canTransform = (o: Overlay) => o.type !== "fx";
+  const visible = overlays.map((o, i) => ({ o, i })).filter(({ o }) => isVisible(o) && canTransform(o));
   const visibleSig = visible.map((v) => v.i).join(",");
   const contentSig = useMemo(() => overlays.map(sig).join("||"), [overlays]);
 
@@ -134,7 +136,7 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
 
   const selIndex = selection?.kind === "overlay" ? selection.index : -1;
   const selOverlay = selIndex >= 0 ? overlays[selIndex] : null;
-  const selVisible = selOverlay ? isVisible(selOverlay) : false;
+  const selVisible = selOverlay ? isVisible(selOverlay) && canTransform(selOverlay) : false;
 
   return (
     <div className="canvas-ovl" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>

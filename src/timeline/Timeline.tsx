@@ -73,6 +73,20 @@ const ClipTrack: React.FC<{ clips: Clip[] }> = ({ clips }) => {
 
 // --- a positioned overlay with stacked effects ---
 const OverlayLayer: React.FC<{ overlay: Overlay; index?: number }> = ({ overlay: o, index }) => {
+  // Full-frame effect layer: fills the frame, no text/image, no centering/scale — just stacked
+  // full-frame motions (petals, bokeh, light-leaks, scanlines). Composites on top of the clips.
+  if (o.type === "fx") {
+    return (
+      <Layer
+        motionIds={o.motions ?? []}
+        from={o.from ?? 0}
+        durationInFrames={o.durationInFrames}
+        windowInFrames={o.windowInFrames}
+        dataIndex={index}
+        style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
+      />
+    );
+  }
   const content =
     o.type === "text" ? (
       <div

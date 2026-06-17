@@ -50,6 +50,7 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
 |---|---|
 | Add a photo/clip | **+ Clip** (timeline) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
 | Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
+| Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
 | Retime an element | Drag its timeline block; drag edges to change duration |
 | Move/scale/rotate on screen | Select it → drag / corner-handle / rotate-handle on the canvas |
 | Stack effects | Select an overlay → click effects in the Library (or the Inspector "+ add effect") |

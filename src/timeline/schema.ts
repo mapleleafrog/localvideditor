@@ -42,7 +42,9 @@ const clipSchema = z.object({
 });
 
 const overlaySchema = z.object({
-  type: z.enum(["text", "image"]).default("text"),
+  // "fx" = a full-frame effect layer (no text/image content) — stack full-frame motions
+  // like weddingPetals/bokehLights on top of footage; alpha-exports cleanly for compositing.
+  type: z.enum(["text", "image", "fx"]).default("text"),
   /** Used when type = text. */
   text: z.string().default("Title"),
   /** Used when type = image — a file in public/ or public/media/. */

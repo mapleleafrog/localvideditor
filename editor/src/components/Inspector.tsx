@@ -99,36 +99,50 @@ export const Inspector: React.FC = () => {
   const i = selection.index;
   return (
     <div className="insp">
-      <div className="insp-head">{o.type === "text" ? "Text" : "Image"} layer <button className="del" onClick={removeSelected}>Delete</button></div>
+      <div className="insp-head">{o.type === "text" ? "Text" : o.type === "image" ? "Image" : "FX"} layer <button className="del" onClick={removeSelected}>Delete</button></div>
       <Field label="Type">
-        <select value={o.type} onChange={(e) => patchOverlay(i, { type: e.target.value as "text" | "image" })}>
+        <select value={o.type} onChange={(e) => patchOverlay(i, { type: e.target.value as "text" | "image" | "fx" })}>
           <option value="text">text</option>
           <option value="image">image</option>
+          <option value="fx">fx (full-frame)</option>
         </select>
       </Field>
-      {o.type === "text" ? (
+      {o.type === "text" && (
         <>
           <Field label="Text"><input value={o.text} onChange={(e) => patchOverlay(i, { text: e.target.value })} /></Field>
           <Field label="Font size"><input type="number" min={8} value={o.fontSize} onChange={(e) => patchOverlay(i, { fontSize: +e.target.value })} /></Field>
           <Field label="Color"><input type="color" value={o.color} onChange={(e) => patchOverlay(i, { color: e.target.value })} /></Field>
           <Field label="Glow (CSS shadow)"><input value={o.glow} onChange={(e) => patchOverlay(i, { glow: e.target.value })} placeholder="0 0 18px #ff2e88" /></Field>
         </>
-      ) : (
+      )}
+      {o.type === "image" && (
         <>
           <Field label="Source"><input value={o.src} onChange={(e) => patchOverlay(i, { src: e.target.value })} /></Field>
           <Field label="Width (px)"><input type="number" min={1} value={o.width} onChange={(e) => patchOverlay(i, { width: +e.target.value })} /></Field>
         </>
       )}
+      {o.type === "fx" && (
+        <div className="muted" style={{ fontSize: 11 }}>
+          Full-frame effect layer — fills the frame and renders on top of the clips. Stack motions below
+          (petals, bokeh, light-leaks, scanlines…). Alpha-exports cleanly for compositing.
+        </div>
+      )}
       <div className="insp-sub">Timing</div>
       <Field label="Start (frame)"><input type="number" min={0} value={o.from} onChange={(e) => patchOverlay(i, { from: Math.max(0, +e.target.value) })} /></Field>
       <Field label="Duration (frames)"><input type="number" min={1} value={o.durationInFrames} onChange={(e) => patchOverlay(i, { durationInFrames: Math.max(1, +e.target.value) })} /></Field>
-      <div className="insp-sub">Transform</div>
-      <Field label="X (%)"><Slider value={o.x} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { x: v })} /></Field>
-      <Field label="Y (%)"><Slider value={o.y} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
-      <Field label="Scale"><Slider value={o.scale} min={0.1} max={4} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
-      <Field label="Rotation"><Slider value={o.rotation} min={-180} max={180} step={1} onChange={(v) => patchOverlay(i, { rotation: v })} suffix="°" /></Field>
+      <div className="insp-sub">{o.type === "fx" ? "Layer" : "Transform"}</div>
+      {o.type !== "fx" && (
+        <>
+          <Field label="X (%)"><Slider value={o.x} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { x: v })} /></Field>
+          <Field label="Y (%)"><Slider value={o.y} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
+          <Field label="Scale"><Slider value={o.scale} min={0.1} max={4} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
+          <Field label="Rotation"><Slider value={o.rotation} min={-180} max={180} step={1} onChange={(v) => patchOverlay(i, { rotation: v })} suffix="°" /></Field>
+        </>
+      )}
       <Field label="Opacity"><Slider value={o.opacity} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { opacity: v })} /></Field>
-      <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
+      {o.type !== "fx" && (
+        <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
+      )}
       <div className="insp-sub">Effects (stacked)</div>
       <div className="chips">
         {o.motions.map((m, mi) => (

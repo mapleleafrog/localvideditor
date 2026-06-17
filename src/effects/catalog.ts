@@ -216,6 +216,36 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "starfield", name: "Parallax Starfield", category: "Backgrounds", engine: "css", tier: "Core", status: "todo", tags: ["retro", "space", "background"] },
   { kind: "motion", id: "crtRoom", name: "CRT Room (scanlines + vignette)", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt", "background"] },
 
+  // --- Pixel-art (pack: more pixel motions) ---
+  { kind: "motion", id: "eightBitHop", name: "8-bit Hop", category: "Pixel-art", engine: "css", tier: "Core", status: "todo", tags: ["pixel", "game", "playful"] },
+  { kind: "motion", id: "spriteFlash", name: "Sprite Hit-flash", category: "Pixel-art", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "BPM", "energetic"] },
+  { kind: "motion", id: "pixelWindSway", name: "Stepped Wind Sway", category: "Pixel-art", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "idle"] },
+  { kind: "motion", id: "ditherFadeIn", name: "Dither Fade-in", category: "Pixel-art", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "8-bit", "reveal"] },
+  { kind: "motion", id: "pixelPop", name: "Stepped Spring Pop", category: "Pixel-art", engine: "css", tier: "Core", status: "todo", tags: ["pixel", "titles", "playful"] },
+
+  // --- Retro / FX (pack: more cyber motions) ---
+  { kind: "motion", id: "rgbSplitHeavy", name: "Heavy RGB Split", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "cyber"] },
+  { kind: "motion", id: "dataGlitchBlocks", name: "Datamosh Blocks", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "cyber"] },
+  { kind: "motion", id: "neonBorderPulse", name: "Neon Border Pulse", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "neon", "cyber"] },
+  { kind: "motion", id: "vaporTint", name: "Vaporwave Duotone", category: "Retro / FX", engine: "css", tier: "Core", status: "todo", tags: ["retro", "vaporwave"] },
+  { kind: "motion", id: "scanlineFlicker", name: "Scanline Flicker", category: "Retro / FX", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt"] },
+
+  // --- Backgrounds (pack: more retro backdrops) ---
+  { kind: "motion", id: "synthSunset", name: "Synthwave Sunset", category: "Backgrounds", engine: "css", tier: "Core", status: "todo", tags: ["retro", "synthwave", "background"] },
+  { kind: "motion", id: "gridRunner", name: "Neon Grid Runner", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "synthwave", "background"] },
+
+  // --- Wedding (pack: romantic overlays — glow/grade + full-frame atmospherics) ---
+  { kind: "motion", id: "goldenHour", name: "Golden Hour Grade", category: "Wedding", engine: "css", tier: "Core", status: "todo", tags: ["wedding", "warm", "romantic"] },
+  { kind: "motion", id: "dreamGlow", name: "Dreamy Bloom", category: "Wedding", engine: "css", tier: "Core", status: "todo", tags: ["wedding", "glow", "romantic"] },
+  { kind: "motion", id: "romanticGlow", name: "Rose Glow Pulse", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "glow", "romantic"] },
+  { kind: "motion", id: "softFocusBreath", name: "Soft-focus Breath", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "dreamy", "idle"] },
+  { kind: "motion", id: "sparkleGlow", name: "Sparkle Glints", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "sparkle", "glam"] },
+  { kind: "motion", id: "weddingPetals", name: "Falling Petals", category: "Wedding", engine: "css", tier: "Core", status: "todo", tags: ["wedding", "atmosphere", "fullframe"] },
+  { kind: "motion", id: "confettiRain", name: "Confetti Rain", category: "Wedding", engine: "css", tier: "Core", status: "todo", tags: ["wedding", "celebration", "fullframe"] },
+  { kind: "motion", id: "bokehLights", name: "Bokeh Lights", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "atmosphere", "fullframe"] },
+  { kind: "motion", id: "lightLeakWarm", name: "Warm Light Leak", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "atmosphere", "fullframe"] },
+  { kind: "motion", id: "sparkleField", name: "Sparkle Field", category: "Wedding", engine: "css", tier: "Ext", status: "todo", tags: ["wedding", "sparkle", "fullframe"] },
+
   // --- Retro transitions (NEW — custom CSS, preview-safe) ---
   { kind: "transition", id: "crtOn", name: "CRT Power-on", category: "Retro", engine: "css", tier: "Core", status: "todo", tags: ["retro", "crt"], license: "write-own" },
   { kind: "transition", id: "glitchCut", name: "Glitch Cut", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "energetic"], license: "write-own" },

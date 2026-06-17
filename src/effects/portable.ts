@@ -415,6 +415,153 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
   vignette: ({ t }) => ({
     backgroundImage: `radial-gradient(circle at 50% 50%, transparent ${48 + Math.sin(t * 1.5) * 4}%, rgba(0,0,0,0.72) 100%)`,
   }),
+
+  // ======================= PACK: Pixel-art (more) =======================
+  eightBitHop: ({ t }) => {
+    const q = quantize(Math.abs(Math.sin(t * 5)), 3);
+    return { transform: `translateY(${-q * 22}px) scaleY(${1 + q * 0.05})`, transformOrigin: "bottom center" };
+  },
+  spriteFlash: ({ beat }) => ({ filter: `brightness(${1 + beat * 1.8}) saturate(${1 + beat})` }),
+  pixelWindSway: ({ t }) => ({
+    transform: `rotate(${quantize(Math.sin(t * 1.4), 5) * 6}deg)`,
+    transformOrigin: "bottom center",
+  }),
+  ditherFadeIn: ({ progress: p }) => ({ opacity: quantize(clamp(p * 1.1), 6) }),
+  pixelPop: ({ progress: p }) => ({ transform: `scale(${quantize(springy(p), 6)})` }),
+
+  // ======================= PACK: Retro / Cyber (more) =======================
+  rgbSplitHeavy: ({ t }) => {
+    const o = 5 + Math.abs(Math.sin(t * 3)) * 7;
+    return {
+      filter:
+        `drop-shadow(${o}px 0 0 rgba(255,0,90,0.75)) ` +
+        `drop-shadow(${-o}px 0 0 rgba(0,225,255,0.75)) ` +
+        `drop-shadow(0 ${o * 0.4}px 0 rgba(70,255,130,0.35))`,
+    };
+  },
+  dataGlitchBlocks: ({ frame }) => {
+    const on = seededRandom(Math.floor(frame / 3)) > 0.7;
+    const dx = on ? Math.round((seededRandom(frame) - 0.5) * 22) : 0;
+    const sk = on ? (seededRandom(frame + 4) - 0.5) * 10 : 0;
+    return {
+      transform: `translateX(${dx}px) skewX(${sk}deg)`,
+      filter: on ? `hue-rotate(${Math.round(seededRandom(frame + 2) * 300)}deg) saturate(1.5) contrast(1.2)` : "none",
+    };
+  },
+  neonBorderPulse: ({ t }) => {
+    const g = 6 + Math.sin(t * 3) * 5;
+    const hue = (t * 60) % 360;
+    return {
+      boxShadow: `0 0 ${g}px hsl(${hue} 100% 60%), inset 0 0 ${g}px hsl(${(hue + 40) % 360} 100% 60%)`,
+      borderRadius: "6px",
+    };
+  },
+  vaporTint: ({ t }) => ({
+    filter: `saturate(1.5) hue-rotate(${280 + Math.sin(t * 0.8) * 20}deg) contrast(1.05) brightness(1.05)`,
+  }),
+  scanlineFlicker: ({ t }) => ({
+    backgroundImage: SCANLINE_GRADIENT,
+    filter: `brightness(${1.05 + Math.sin(t * 45) * 0.05}) contrast(1.05)`,
+  }),
+
+  // ======================= PACK: Retro backdrops (full-frame) =======================
+  synthSunset: ({ t }) => ({
+    backgroundColor: "#1a0533",
+    backgroundImage: [
+      "radial-gradient(circle at 50% 78%, #ffd36e 0, #ff7eb3 12%, #ff2e88 20%, rgba(255,46,136,0) 42%)",
+      "linear-gradient(180deg, #2b0a4a 0%, #6a1e6b 45%, #ff5e8a 75%, #ffd36e 100%)",
+    ].join(", "),
+    backgroundPosition: `0 ${Math.sin(t * 0.4) * 6}px, 0 0`,
+  }),
+  gridRunner: ({ t }) => ({
+    backgroundColor: "#06001a",
+    backgroundImage: [
+      "linear-gradient(180deg, rgba(6,0,26,0) 40%, #06001a 75%)",
+      "repeating-linear-gradient(0deg, rgba(0,240,255,0.55) 0 2px, rgba(0,240,255,0) 2px 44px)",
+      "repeating-linear-gradient(90deg, rgba(255,46,136,0.5) 0 2px, rgba(255,46,136,0) 2px 60px)",
+    ].join(", "),
+    backgroundPosition: `0 0, 0 ${(t * 80) % 44}px, 0 0`,
+  }),
+
+  // ======================= PACK: Wedding — element glow/grade (overlay) =======================
+  goldenHour: ({ t }) => ({
+    filter: `sepia(0.28) saturate(1.3) brightness(${1.05 + Math.sin(t * 1.2) * 0.02}) hue-rotate(-8deg) drop-shadow(0 0 14px rgba(255,196,120,0.55))`,
+  }),
+  dreamGlow: ({ t }) => ({
+    filter: `brightness(1.08) saturate(1.1) drop-shadow(0 0 ${10 + Math.sin(t * 1.6) * 6}px rgba(255,255,255,0.85)) drop-shadow(0 0 26px rgba(255,220,235,0.5))`,
+  }),
+  romanticGlow: ({ t }) => ({
+    filter:
+      `drop-shadow(0 0 ${8 + Math.sin(t * 2) * 6}px rgba(255,120,170,0.85)) ` +
+      `drop-shadow(0 0 ${18 + Math.sin(t * 2) * 10}px rgba(255,170,140,0.55)) brightness(1.05)`,
+  }),
+  softFocusBreath: ({ t }) => ({
+    transform: `scale(${1.01 + Math.sin(t * 1.1) * 0.015})`,
+    filter: `blur(${0.6 + (1 + Math.sin(t * 1.1)) * 0.5}px) brightness(1.05)`,
+  }),
+  sparkleGlow: ({ t, frame }) => {
+    const tw = 0.5 + seededRandom(Math.floor(frame / 4)) * 0.5;
+    return {
+      filter:
+        `drop-shadow(${Math.sin(t * 2) * 6}px ${Math.cos(t * 2.3) * 6}px 0 rgba(255,255,255,${tw.toFixed(2)})) ` +
+        `drop-shadow(${Math.cos(t * 1.7) * 8}px ${Math.sin(t * 2.1) * 8}px 1px rgba(255,240,180,${(tw * 0.7).toFixed(2)})) brightness(1.08)`,
+    };
+  },
+
+  // ======================= PACK: Wedding — full-frame atmospherics (FX overlay) =======================
+  weddingPetals: ({ t }) => {
+    const petal = (seed: number, xBase: number, size: number, speed: number, drift: number) => {
+      const y = ((t * speed + seed * 21) % 122) - 11;
+      const x = xBase + Math.sin(t * drift + seed) * 7;
+      return `radial-gradient(ellipse ${size}px ${size * 0.62}px at ${x}% ${y}%, rgba(255,${188 + seed * 6},214,0.92), rgba(255,188,214,0) 72%)`;
+    };
+    return {
+      backgroundImage: [
+        petal(0, 16, 9, 15, 0.6),
+        petal(1, 38, 7, 21, 0.8),
+        petal(2, 58, 10, 18, 0.5),
+        petal(3, 77, 6, 25, 0.7),
+        petal(4, 30, 8, 29, 0.9),
+        petal(5, 88, 9, 20, 0.6),
+      ].join(", "),
+    };
+  },
+  confettiRain: ({ t }) => {
+    const colors = ["#ff5e8a", "#ffd36e", "#5ee1ff", "#9b8cff", "#7cffb0"];
+    const bit = (seed: number, xBase: number, speed: number) => {
+      const y = ((t * speed + seed * 17) % 122) - 11;
+      const x = xBase + Math.sin(t * (0.5 + seed * 0.1)) * 5;
+      const c = colors[seed % colors.length];
+      return `radial-gradient(circle 4px at ${x}% ${y}%, ${c}, ${c} 55%, rgba(0,0,0,0) 60%)`;
+    };
+    return { backgroundImage: Array.from({ length: 9 }, (_, i) => bit(i, 8 + i * 10, 24 + (i % 3) * 10)).join(", ") };
+  },
+  bokehLights: ({ t }) => {
+    const orb = (seed: number, xb: number, yb: number, size: number, sp: number) => {
+      const x = xb + Math.sin(t * sp + seed) * 10;
+      const y = yb + Math.cos(t * sp * 0.8 + seed) * 8;
+      return `radial-gradient(circle ${size}px at ${x}% ${y}%, rgba(255,240,210,${(0.18 + (seed % 3) * 0.05).toFixed(2)}), rgba(255,240,210,0) 70%)`;
+    };
+    return {
+      backgroundImage: [orb(0, 20, 30, 70, 0.3), orb(1, 70, 25, 90, 0.25), orb(2, 45, 65, 60, 0.35), orb(3, 82, 70, 80, 0.2), orb(4, 30, 80, 50, 0.4)].join(", "),
+      filter: "blur(2px)",
+    };
+  },
+  lightLeakWarm: ({ t }) => {
+    const p = (Math.sin(t * 0.5) + 1) / 2;
+    return {
+      backgroundImage: `linear-gradient(${60 + Math.sin(t * 0.3) * 20}deg, rgba(255,120,60,0) ${10 + p * 30}%, rgba(255,170,90,0.55) ${35 + p * 30}%, rgba(255,90,140,0.35) ${55 + p * 30}%, rgba(255,120,60,0) ${85 + p * 10}%)`,
+      mixBlendMode: "screen",
+    };
+  },
+  sparkleField: ({ t }) => {
+    const star = (seed: number, x: number, y: number) => {
+      const tw = Math.max(0, Math.sin(t * (2 + (seed % 3)) + seed));
+      return `radial-gradient(circle 2px at ${x}% ${y}%, rgba(255,255,245,${(tw * 0.9).toFixed(2)}), rgba(255,255,245,0) 60%)`;
+    };
+    const pts: [number, number][] = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40]];
+    return { backgroundImage: pts.map(([x, y], i) => star(i, x, y)).join(", ") };
+  },
 };
 
 // ===== motion display metadata for the portal (derived from the catalog) =====

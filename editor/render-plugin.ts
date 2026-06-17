@@ -51,31 +51,54 @@ const stamp = () => {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 };
 
-/** Render the current project to MP4 with the SAME composition/renderer the CLI uses, streaming
- *  newline-delimited JSON progress. POST body = the project (Timeline inputProps). */
+/** Render the current project with the SAME composition/renderer the CLI uses, streaming NDJSON
+ *  progress. POST body = { project, options } (or a bare project for back-compat).
+ *  options.transparent → ProRes 4444 .mov with an alpha channel (background forced to none) for
+ *  compositing in DaVinci/Premiere. options.overlaysOnly → also drops clips, so you export just the
+ *  animated overlays/VFX/titles as transparent elements. */
 async function handleRender(req: IncomingMessage, res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" });
   const send = (msg: unknown) => res.write(JSON.stringify(msg) + "\n");
   try {
-    const project = await readJsonBody(req);
+    const body = await readJsonBody(req);
+    const project = body?.project ?? body;
+    const options = body?.options ?? {};
+    const overlaysOnly = !!options.overlaysOnly;
+    const transparent = !!options.transparent || overlaysOnly; // overlays-only is for compositing → alpha
+
+    // Build the render-time inputProps (never persisted): transparent strips the background so the
+    // root renders with alpha; overlaysOnly also empties the clip track.
+    let inputProps = project;
+    if (transparent) inputProps = { ...inputProps, background: { ...(project.background ?? {}), type: "none" } };
+    if (overlaysOnly) inputProps = { ...inputProps, clips: [] };
+
     const { selectComposition, renderMedia, ensureBrowser } = await import("@remotion/renderer");
     send({ type: "status", message: "Preparing browser…" });
     await ensureBrowser();
     send({ type: "status", message: "Bundling composition…" });
     const serveUrl = await getBundle();
     send({ type: "status", message: "Resolving composition…" });
-    const composition = await selectComposition({ serveUrl, id: "Timeline", inputProps: project });
+    const composition = await selectComposition({ serveUrl, id: "Timeline", inputProps });
     await fs.mkdir(OUT_DIR, { recursive: true });
-    const fileName = `timeline-${stamp()}.mp4`;
+    const ext = transparent ? "mov" : "mp4";
+    const tag = overlaysOnly ? "overlays" : transparent ? "alpha" : "video";
+    const fileName = `timeline-${tag}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
-    send({ type: "status", message: `Rendering ${composition.durationInFrames} frames…`, durationInFrames: composition.durationInFrames });
+    const kind = transparent ? "transparent ProRes" : "H.264";
+    send({
+      type: "status",
+      message: `Rendering ${composition.durationInFrames} frames (${kind})…`,
+      durationInFrames: composition.durationInFrames,
+    });
     await renderMedia({
       composition,
       serveUrl,
-      codec: "h264",
       outputLocation,
-      inputProps: project,
+      inputProps,
       onProgress: ({ progress }) => send({ type: "progress", progress }),
+      ...(transparent
+        ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
+        : { codec: "h264" as const }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {

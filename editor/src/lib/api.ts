@@ -6,12 +6,23 @@ export type RenderMsg =
   | { type: "done"; file: string; fileName: string }
   | { type: "error"; message: string };
 
-/** POST the project to the dev-server render endpoint and stream newline-delimited JSON progress. */
-export async function renderVideo(project: Project, onMsg: (m: RenderMsg) => void): Promise<void> {
+export interface RenderOptions {
+  /** ProRes 4444 .mov with an alpha channel (background forced to none) — for DaVinci/Premiere. */
+  transparent?: boolean;
+  /** Drop the clip track and render only the overlays/VFX/titles (implies transparent). */
+  overlaysOnly?: boolean;
+}
+
+/** POST the project + render options to the dev-server endpoint and stream NDJSON progress. */
+export async function renderVideo(
+  project: Project,
+  options: RenderOptions,
+  onMsg: (m: RenderMsg) => void,
+): Promise<void> {
   const res = await fetch("/api/render", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(project),
+    body: JSON.stringify({ project, options }),
   });
   if (!res.body) {
     onMsg({ type: "error", message: "No response stream" });

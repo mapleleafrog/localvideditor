@@ -56,7 +56,7 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
 | Set a transition | Select a clip → pick one in the Library Transitions tab (or Inspector) |
 | Layer order (z) | ▲/▼ on the overlay's timeline lane |
 | Play / pause | Spacebar, or the ▶/⏸ button |
-| Render the video | **⏺ Render MP4** (top right) → writes `out/timeline-<timestamp>.mp4` with a live progress bar |
+| Render the video | Pick a format (MP4 / ProRes-alpha / overlays-only) then **⏺ Render** (top right) → writes to `out/` with a live progress bar |
 | Save the project | **💾 Save** → `projects/<name>.json` (round-trips with Studio + the CLI) |
 | Back up / share | **⭳ Export** (download JSON) / **⭱ Import** (load JSON) |
 | Start over | **⟲ Reset** (reloads the sample, clears autosave) |
@@ -83,6 +83,19 @@ The project **autosaves to `localStorage`** as you work and is restored on reloa
 ```bash
 npx remotion render Timeline out/video.mp4 --props=./projects/your.json
 ```
+
+Pick the output with the format dropdown next to the button:
+
+| Mode | Output | Use |
+|---|---|---|
+| **Full video · MP4** | `out/timeline-video-<ts>.mp4` (H.264) | A finished, shareable cut |
+| **Full video · ProRes (alpha)** | `out/timeline-alpha-<ts>.mov` | Whole comp on transparency (ProRes 4444, `yuva444p10le`) |
+| **Overlays only · ProRes (alpha)** | `out/timeline-overlays-<ts>.mov` | **Just the animated overlays/VFX/titles** on alpha — layer over real footage in DaVinci/Premiere |
+
+The alpha modes set `background: none` (and overlays-only also empties the clip track), then render
+ProRes 4444 with PNG frames so the file carries a real alpha channel. **DaVinci workflow:** export
+*Overlays only · ProRes*, layer the `.mov` over your footage, then cut to the beat / grade / mix in
+the NLE — Remotion makes the elements, DaVinci makes the cut.
 
 The composition is bundled once per dev session and reused; restart `npm run editor` after changing
 composition/effect code to pick it up.

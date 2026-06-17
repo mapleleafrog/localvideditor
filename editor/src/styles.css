@@ -172,3 +172,5 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .render-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); transition: width 0.15s; }
 .render-ok { font-size: 11px; color: #6ee7a8; }
 .render-err { font-size: 11px; color: #ff8fa3; }
+
+.render-mode { font-size: 11px; padding: 4px 6px; max-width: 190px; }

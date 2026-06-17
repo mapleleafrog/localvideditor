@@ -118,9 +118,12 @@ const BackgroundLayer: React.FC<{ background: Background }> = ({ background: bg 
   return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
 };
 
-/** The generic, config-driven video composition. */
+/** The generic, config-driven video composition.
+ *  `background.type === "none"` yields a TRANSPARENT root (no black fill) so the render can carry an
+ *  alpha channel (ProRes 4444 / VP8) for compositing in DaVinci/Premiere. The render plugin sets
+ *  `background:none` (and optionally empties `clips`) for its transparent / overlays-only export modes. */
 export const Timeline: React.FC<Project> = ({ background, clips, overlays }) => (
-  <AbsoluteFill style={{ backgroundColor: "#000" }}>
+  <AbsoluteFill style={{ backgroundColor: background?.type === "none" ? "transparent" : "#000" }}>
     <BackgroundLayer background={background} />
     <ClipTrack clips={clips ?? []} />
     {(overlays ?? []).map((o, i) => (

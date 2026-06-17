@@ -12,6 +12,7 @@ export const Topbar: React.FC = () => {
   const project = useEditor((s) => s.project);
   const setProject = useEditor((s) => s.setProject);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
+  const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
   const [note, setNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -22,8 +23,9 @@ export const Topbar: React.FC = () => {
 
   const onRender = async () => {
     setRender({ phase: "running", message: "Starting…", progress: 0 });
+    const options = { transparent: mode !== "mp4", overlaysOnly: mode === "overlays" };
     try {
-      await renderVideo(project, (msg) => {
+      await renderVideo(project, options, (msg) => {
         if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
         else if (msg.type === "progress")
           setRender({ phase: "running", message: "Rendering…", progress: msg.progress });
@@ -102,8 +104,19 @@ export const Topbar: React.FC = () => {
       {render.phase === "error" && <span className="render-err" title={render.message}>✕ render failed</span>}
       {note && <span className="muted">{note}</span>}
 
+      <select
+        className="render-mode"
+        value={mode}
+        onChange={(e) => setMode(e.target.value as "mp4" | "alpha" | "overlays")}
+        disabled={render.phase === "running"}
+        title="Export format — ProRes carries an alpha channel for compositing in DaVinci"
+      >
+        <option value="mp4">Full video · MP4</option>
+        <option value="alpha">Full video · ProRes (alpha)</option>
+        <option value="overlays">Overlays only · ProRes (alpha)</option>
+      </select>
       <button className="primary" onClick={onRender} disabled={render.phase === "running"}>
-        {render.phase === "running" ? "Rendering…" : "⏺ Render MP4"}
+        {render.phase === "running" ? "Rendering…" : mode === "mp4" ? "⏺ Render MP4" : "⏺ Render .mov"}
       </button>
     </header>
   );

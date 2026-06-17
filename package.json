@@ -10,6 +10,7 @@
     "@remotion/gif": "4.0.472",
     "@remotion/media-utils": "4.0.472",
     "@remotion/paths": "4.0.472",
+    "@remotion/player": "4.0.472",
     "@remotion/shapes": "4.0.472",
     "@remotion/transitions": "4.0.472",
     "react": "19.2.3",
@@ -17,13 +18,22 @@
     "remotion": "4.0.472"
   },
   "devDependencies": {
+    "@dnd-kit/core": "6.3.1",
+    "@dnd-kit/utilities": "3.2.2",
     "@remotion/eslint-config-flat": "4.0.472",
-    "esbuild": "0.28.0",
     "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
+    "@vitejs/plugin-react": "6.0.2",
+    "esbuild": "0.28.0",
     "eslint": "9.19.0",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "react-moveable": "0.56.0",
+    "selecto": "1.26.3",
+    "typescript": "5.9.3",
+    "vite": "8.0.16",
+    "zundo": "2.3.0",
+    "zustand": "5.0.14"
   },
   "scripts": {
     "predev": "node scripts/gen-portal.mjs",
@@ -35,6 +45,8 @@
     "credits": "node scripts/gen-credits.mjs",
     "gen:portal": "node scripts/gen-portal.mjs",
     "check:portal": "node scripts/gen-portal.mjs --check",
+    "editor": "vite --config editor/vite.config.ts",
+    "editor:build": "vite build --config editor/vite.config.ts",
     "typecheck": "tsc",
     "lint": "eslint src && tsc",
     "upgrade": "remotion upgrade"

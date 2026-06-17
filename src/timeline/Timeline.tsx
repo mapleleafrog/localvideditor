@@ -72,7 +72,7 @@ const ClipTrack: React.FC<{ clips: Clip[] }> = ({ clips }) => {
 };
 
 // --- a positioned overlay with stacked effects ---
-const OverlayLayer: React.FC<{ overlay: Overlay }> = ({ overlay: o }) => {
+const OverlayLayer: React.FC<{ overlay: Overlay; index?: number }> = ({ overlay: o, index }) => {
   const content =
     o.type === "text" ? (
       <div
@@ -99,6 +99,7 @@ const OverlayLayer: React.FC<{ overlay: Overlay }> = ({ overlay: o }) => {
       z={o.z}
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}
+      dataIndex={index}
       centered
       style={{ left: `${o.x ?? 50}%`, top: `${o.y ?? 50}%`, opacity: o.opacity ?? 1 }}
     >
@@ -123,7 +124,7 @@ export const Timeline: React.FC<Project> = ({ background, clips, overlays }) => 
     <BackgroundLayer background={background} />
     <ClipTrack clips={clips ?? []} />
     {(overlays ?? []).map((o, i) => (
-      <OverlayLayer key={i} overlay={o} />
+      <OverlayLayer key={i} overlay={o} index={i} />
     ))}
   </AbsoluteFill>
 );

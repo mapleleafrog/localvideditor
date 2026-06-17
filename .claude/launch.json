@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": [".claude/static-server.mjs"],
       "port": 4173
+    },
+    {
+      "name": "editor",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "editor"],
+      "port": 5173
     }
   ]
 }

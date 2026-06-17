@@ -24,6 +24,8 @@ interface LayerProps {
   /** Base rotation in degrees folded into the transform. */
   rotation?: number;
   params?: Record<string, number>;
+  /** Editor-only: stamps `data-ovl-index` so the canvas editor can find/measure this node. Ignored by render. */
+  dataIndex?: number;
   style?: React.CSSProperties;
   children?: React.ReactNode;
 }
@@ -46,6 +48,7 @@ export const Layer: React.FC<LayerProps> = ({
   scale,
   rotation,
   params = {},
+  dataIndex,
   style,
   children,
 }) => {
@@ -75,6 +78,7 @@ export const Layer: React.FC<LayerProps> = ({
 
   return (
     <div
+      {...(dataIndex != null ? { "data-ovl-index": dataIndex } : {})}
       style={{
         position: "absolute",
         willChange: "transform, opacity",

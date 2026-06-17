@@ -51,7 +51,16 @@ The `Timeline` composition renders ANY video from a `project` config (Zod-schema
 - **Edit:** `npm run dev` → Studio opens `Timeline` with a live props form + scrubber (or hand-edit a `projects/*.json`). Drop photos/clips in `public/media/`, reference as `media/<file>`.
 - **Render:** `npm run render:timeline` (sample) or `npx remotion render Timeline out/video.mp4 --props=./projects/your.json`.
 - Duration is computed from the config (`calculateTimelineMetadata`: Σclips − Σtransitions, covering overlays). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
-- Stage 2 (next): a `@remotion/player` drag-drop visual editor on the same schema + `<Audio>` soundtrack with real beat-sync.
+- **Two ways to edit the same `project` schema:** the Studio props form (`npm run dev`) **or** the drag-and-drop editor below (`npm run editor`). Both render via the same `Timeline` composition + CLI pipeline.
+
+## Soranji Studio — the drag-and-drop editor (`editor/`, `npm run editor`)
+A real timeline NLE (Canva/CapCut-style) built on `@remotion/player`, hosted by a Vite app in `editor/`. **The live preview IS the `Timeline` composition** that renders to MP4 — exact WYSIWYG. **Registry-driven:** every effect/transition picker reads `src/effects` via `editor/src/lib/effects-bridge.ts`, so a motion added to `portable.ts`+`catalog.ts` appears in the editor with zero editor edits (the whole point — scales with the library). Full how-to in `EDITOR_GUIDE.md`.
+- **Layout:** Topbar (undo/redo · Save/Export/Import/Reset · ⏺ Render) · Library (Effects/Transitions/Assets) · Preview (Player + on-canvas drag/scale/rotate + click-select) · Inspector (per-item props incl. effect multi-select) · Timeline (clip track + per-overlay lanes, drag-retime/resize, scrub, ▲▼ reorder = z-order).
+- **Canvas transform** (`editor/src/components/CanvasOverlay.tsx`): the Player fills an exact composition-aspect box so screen↔composition mapping is uniform (`editor/src/lib/coords.ts`); `react-moveable` drives `patchOverlay` (drag→x/y, **scalable** corner→scale, rotate→rotation — all center-anchored to match the composition). Overlay nodes are tagged `data-ovl-index` in `Layer.tsx` (render-safe) for measuring. Edits flow store→Player live.
+- **State:** zustand + zundo (`editor/src/store.ts`) — only `project` is undoable; autosaves to `localStorage`, seeded from `projects/sample.json`.
+- **In-app render + persistence** (`editor/render-plugin.ts`, a Vite dev-server plugin): `POST /api/render` (bundle once → `selectComposition` → `renderMedia` → `out/timeline-<ts>.mp4`, streamed NDJSON progress) · `POST /api/save-project` (→ `projects/*.json`) · `GET /api/media` (scans `public/` + `public/media/`). Same renderer/output as `npx remotion render Timeline --props=<json>`.
+- **Editor has its own tsconfig** (`editor/tsconfig.json`, ESNext/Bundler) — the root `tsconfig.json` excludes `editor/`. Typecheck the editor with `npx tsc -p editor/tsconfig.json`. Editor-only deps (`@remotion/player`, `react-moveable`, `selecto`, `zustand`, `zundo`, `vite`, `@vitejs/plugin-react`, `@types/react-dom`) are pinned in `package.json`.
+- **Not yet:** multi-track/marquee multi-select, keyframes, `<Audio>` + real beat-sync. (Single-selection model; selecto deferred in favor of click-select + reorder.)
 
 ## No-npm Retro Portal (`index.html`)
 A self-contained synthwave/arcade playground at the project root — **double-click to open, no npm, no server**. It is a live preview/composer (CSS driven by `requestAnimationFrame`), NOT the render pipeline. **The portal's motion effects + `composeStyles` are SINGLE-SOURCED**: it loads `public/portal/effects.bundle.js` (generated from `src/effects/portable.ts` by `npm run gen:portal`) and drives its MOTIONS tab + stacking from `window.SoranjiEffects` — it declares zero motion formulas of its own, so a formula added to `portable.ts` shows up here and in the render with no hand-mirroring. `npm run check:portal` (or `check-portal.bat`) guards against a stale bundle, and `predev`/`prerender:timeline` regenerate it automatically. Stack multiple motions at once (transforms + filters concatenated, opacity multiplied). Tabs: MOTIONS (multi-select stacking), BACKDROP (synthGrid/starfield/CRT), TRANSITIONS (A↔B loop + "play all"). Sprite loads from `public/orange-mush.gif` (sibling), with an inlined base64 fallback. The TRANSITIONS tab keeps its own CSS approximations (⚡) inline (transitions are out of the single-source scope). (`.claude/launch.json` + `.claude/static-server.mjs` are a dev-only static server for previewing it.)
@@ -63,8 +72,10 @@ A self-contained synthwave/arcade playground at the project root — **double-cl
 
 ## Commands
 - `npm run dev` — Remotion Studio
-- `npm run build` / `npx remotion bundle` — bundle; `npm run typecheck` (`tsc`) for types
+- `npm run editor` — Soranji Studio drag-and-drop editor (Vite, :5173); `npm run editor:build` to bundle it
+- `npm run build` / `npx remotion bundle` — bundle; `npm run typecheck` (`tsc`) for types; `npx tsc -p editor/tsconfig.json` for the editor
 - `npm run render` — export SoranjiSample to `out/soranji-sample.mp4`
+- `npm run render:timeline` — export `Timeline` (sample) to `out/timeline.mp4`
 - `npm run credits` — regenerate CREDITS.md
 
 ## Stage roadmap

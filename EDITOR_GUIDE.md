@@ -44,11 +44,25 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
   block to retime (`from`), drag its edges to resize (`durationInFrames`), drag the ruler to scrub. The
   per-lane ▲/▼ buttons reorder overlays = **compositing z-order**.
 
+## Storyboard tab
+
+Toggle **Edit | Storyboard** in the top bar. The Storyboard is a **card board of your clips** — each card
+*is* a clip on the timeline, so it's a planning surface that becomes the actual video. Per card: the footage
+thumbnail (image / video first-frame, or a dashed placeholder for shots not filmed yet), an editable
+**duration**, a **Label**, a **Notes** textarea, and the clip **source**. Drag the picture to reorder (or use
+◀ ▶), set the **→ next** transition between shots, **+ Add shot** to append, **×** to delete, and click a card
+to select that clip (it carries into the Edit tab). Changes here are the same data as the Edit timeline —
+arrange + annotate your shots in Storyboard, then switch to Edit to layer effects/titles/transitions and render.
+(Overlays/titles/fx are edited in the Edit tab, not shown as storyboard cards.)
+
 ## Common workflows
 
 | Goal | How |
 |---|---|
-| Add a photo/clip | **+ Clip** (timeline) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
+| Plan the shot order | **Storyboard** tab → drag cards to sequence, set each shot's duration, label + note it |
+| Add a photo/clip | **+ Clip** (timeline / Storyboard **+ Add shot**) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
+| Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
+| Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
 | Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
 | Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
 | Retime an element | Drag its timeline block; drag edges to change duration |

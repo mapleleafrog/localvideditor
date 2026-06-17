@@ -11,6 +11,8 @@ type RenderState =
 export const Topbar: React.FC = () => {
   const project = useEditor((s) => s.project);
   const setProject = useEditor((s) => s.setProject);
+  const view = useEditor((s) => s.view);
+  const setView = useEditor((s) => s.setView);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
   const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
   const [note, setNote] = useState<string | null>(null);
@@ -77,7 +79,11 @@ export const Topbar: React.FC = () => {
   return (
     <header className="topbar">
       <strong className="brand">Soranji&nbsp;Studio</strong>
-      <span className="muted">exact-preview video editor</span>
+
+      <span className="view-toggle">
+        <button className={view === "edit" ? "on" : ""} onClick={() => setView("edit")}>Edit</button>
+        <button className={view === "storyboard" ? "on" : ""} onClick={() => setView("storyboard")}>Storyboard</button>
+      </span>
 
       <span className="sep" />
       <button onClick={() => useTemporal.getState().undo()} title="Undo (Ctrl+Z)">↶</button>

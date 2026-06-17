@@ -39,6 +39,10 @@ const clipSchema = z.object({
   trimBefore: z.number().int().nonnegative().default(0),
   trimAfter: z.number().int().nonnegative().default(0),
   volume: z.number().min(0).max(1).default(1),
+  /** Storyboard-only: a short shot title + free notes. Optional so existing clip literals
+   *  (Root.tsx defaultProps, projects/*.json) stay valid; the render ignores these. */
+  label: z.string().optional(),
+  note: z.string().optional(),
 });
 
 const overlaySchema = z.object({

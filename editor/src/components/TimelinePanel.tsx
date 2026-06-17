@@ -12,6 +12,7 @@ const LANE_H = 40;
 const newClip = (): Clip => ({
   type: "image", src: "clip-a.svg", durationInFrames: 60, motion: "none",
   transitionToNext: "none", transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1,
+  label: "", note: "",
 });
 const newOverlay = (type: "text" | "image" | "fx", from: number): Overlay => ({
   type,

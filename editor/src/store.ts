@@ -10,6 +10,7 @@ export interface EditorState {
   selection: Selection;
   playhead: number; // frame
   zoom: number; // px per frame
+  view: "edit" | "storyboard";
   // mutations (project edits are tracked by zundo for undo/redo)
   setProject: (p: Project) => void;
   patchClip: (i: number, patch: Partial<Clip>) => void;
@@ -18,7 +19,9 @@ export interface EditorState {
   addOverlay: (o: Overlay) => void;
   removeSelected: () => void;
   reorderOverlay: (from: number, to: number) => void;
+  reorderClip: (from: number, to: number) => void;
   // transient UI state (not undone)
+  setView: (v: "edit" | "storyboard") => void;
   select: (s: Selection) => void;
   setPlayhead: (f: number) => void;
   setZoom: (z: number) => void;
@@ -47,6 +50,7 @@ export const useEditor = create<EditorState>()(
       selection: null,
       playhead: 0,
       zoom: 4,
+      view: "edit",
 
       setProject: (project) => set({ project, selection: null }),
 
@@ -91,6 +95,15 @@ export const useEditor = create<EditorState>()(
           return { project: { ...s.project, overlays: arr } };
         }),
 
+      reorderClip: (from, to) =>
+        set((s) => {
+          const arr = [...s.project.clips];
+          const [moved] = arr.splice(from, 1);
+          arr.splice(to, 0, moved);
+          return { project: { ...s.project, clips: arr } };
+        }),
+
+      setView: (view) => set({ view }),
       select: (selection) => set({ selection }),
       setPlayhead: (playhead) => set({ playhead }),
       setZoom: (zoom) => set({ zoom }),

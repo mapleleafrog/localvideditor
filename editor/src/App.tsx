@@ -5,10 +5,12 @@ import { TimelinePanel } from "./components/TimelinePanel";
 import { Library } from "./components/Library";
 import { Inspector } from "./components/Inspector";
 import { Topbar } from "./components/Topbar";
+import { Storyboard } from "./components/Storyboard";
 import { useEditor, useTemporal } from "./store";
 
 export const App: React.FC = () => {
   const playerRef = useRef<PlayerRef>(null);
+  const view = useEditor((s) => s.view);
 
   // Global shortcuts: undo/redo, delete selection, space = play/pause (suppressed while typing).
   useEffect(() => {
@@ -39,27 +41,35 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="app">
+    <div className={"app" + (view === "storyboard" ? " app-board" : "")}>
       <Topbar />
 
-      <aside className="left panel left-rail">
-        <Library />
-      </aside>
+      {view === "storyboard" ? (
+        <main className="board-main">
+          <Storyboard />
+        </main>
+      ) : (
+        <>
+          <aside className="left panel left-rail">
+            <Library />
+          </aside>
 
-      <main className="stage">
-        <div className="player-wrap">
-          <Preview playerRef={playerRef} />
-        </div>
-      </main>
+          <main className="stage">
+            <div className="player-wrap">
+              <Preview playerRef={playerRef} />
+            </div>
+          </main>
 
-      <aside className="right panel">
-        <div className="panel-title">Inspector</div>
-        <Inspector />
-      </aside>
+          <aside className="right panel">
+            <div className="panel-title">Inspector</div>
+            <Inspector />
+          </aside>
 
-      <footer className="timeline">
-        <TimelinePanel playerRef={playerRef} />
-      </footer>
+          <footer className="timeline">
+            <TimelinePanel playerRef={playerRef} />
+          </footer>
+        </>
+      )}
     </div>
   );
 };

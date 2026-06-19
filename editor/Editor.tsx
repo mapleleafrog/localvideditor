@@ -1,19 +1,23 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getVideoMetadata } from "@remotion/media-utils";
 import type { AudioTrack, Background, Clip, Overlay, Project } from "../src/timeline/schema";
 import { SAMPLE_PROJECT } from "../src/timeline/schema";
 import { downloadProject, parseProject, readFileText, serializeProject } from "../src/timeline/projectIO";
-import { listProjects, loadProjectFromDisk, saveProjectToDisk } from "./api";
+import { listProjects, loadProjectFromDisk, outputUrl, renderProject, saveProjectToDisk } from "./api";
 import { BG_MOTION_OPTIONS } from "./options";
 import {
   basename,
   emptyProject,
+  isVideoSrc,
   move,
   newAudioTrack,
   newClip,
   newImageOverlay,
   newTextOverlay,
+  resolveMediaUrl,
   type Selection,
 } from "./model";
+import { useHistory } from "./useHistory";
 import { Preview } from "./Preview";
 import { MediaLibrary } from "./MediaLibrary";
 import { AudioPanel } from "./AudioPanel";
@@ -50,11 +54,14 @@ const BackgroundEditor: React.FC<{ value: Background; onChange: (b: Background) 
 );
 
 export const Editor: React.FC = () => {
-  const [project, setProject] = useState<Project>(SAMPLE_PROJECT);
+  const { state: project, set: setProject, reset: resetProject, undo, redo, canUndo, canRedo } = useHistory<Project>(SAMPLE_PROJECT);
   const [sel, setSel] = useState<Selection>(null);
   const [name, setName] = useState("my-video");
   const [toast, setToast] = useState<Toast>(null);
   const [diskProjects, setDiskProjects] = useState<string[]>([]);
+  const [rendering, setRendering] = useState(false);
+  const [renderLog, setRenderLog] = useState("");
+  const [renderOut, setRenderOut] = useState<string | null>(null);
 
   const notify = useCallback((kind: "ok" | "err", msg: string) => setToast({ kind, msg }), []);
   const refreshProjects = useCallback(() => {
@@ -62,28 +69,67 @@ export const Editor: React.FC = () => {
   }, []);
   useEffect(refreshProjects, [refreshProjects]);
 
+  // Undo/redo keyboard shortcuts (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
   // --- mutations ---
-  const addClip = useCallback((src: string) => {
-    setProject((p) => {
-      const clips = [...p.clips, newClip(src)];
-      setSel({ kind: "clip", index: clips.length - 1 });
-      return { ...p, clips };
-    });
-  }, []);
-  const addImageOverlay = useCallback((src: string) => {
-    setProject((p) => {
-      const overlays = [...p.overlays, newImageOverlay(src)];
-      setSel({ kind: "overlay", index: overlays.length - 1 });
-      return { ...p, overlays };
-    });
-  }, []);
+  const addClip = useCallback(
+    (src: string) => {
+      let index = 0;
+      setProject((p) => {
+        index = p.clips.length;
+        setSel({ kind: "clip", index });
+        return { ...p, clips: [...p.clips, newClip(src)] };
+      });
+      // Auto-set duration from the actual video length (images keep the default).
+      if (isVideoSrc(src)) {
+        getVideoMetadata(resolveMediaUrl(src))
+          .then((m) =>
+            setProject((p) => ({
+              ...p,
+              clips: p.clips.map((c, i) =>
+                i === index && c.src === src
+                  ? { ...c, durationInFrames: Math.max(1, Math.round(m.durationInSeconds * p.fps)) }
+                  : c,
+              ),
+            })),
+          )
+          .catch(() => undefined);
+      }
+    },
+    [setProject],
+  );
+  const addImageOverlay = useCallback(
+    (src: string) => {
+      setProject((p) => {
+        setSel({ kind: "overlay", index: p.overlays.length });
+        return { ...p, overlays: [...p.overlays, newImageOverlay(src)] };
+      });
+    },
+    [setProject],
+  );
   const addTextOverlay = useCallback(() => {
     setProject((p) => {
-      const overlays = [...p.overlays, newTextOverlay()];
-      setSel({ kind: "overlay", index: overlays.length - 1 });
-      return { ...p, overlays };
+      setSel({ kind: "overlay", index: p.overlays.length });
+      return { ...p, overlays: [...p.overlays, newTextOverlay()] };
     });
-  }, []);
+  }, [setProject]);
 
   const updateClip = (i: number, c: Clip) =>
     setProject((p) => ({ ...p, clips: p.clips.map((x, idx) => (idx === i ? c : x)) }));
@@ -98,14 +144,14 @@ export const Editor: React.FC = () => {
 
   const updateOverlay = (i: number, o: Overlay) =>
     setProject((p) => ({ ...p, overlays: p.overlays.map((x, idx) => (idx === i ? o : x)) }));
+  const moveOverlay = (i: number, x: number, y: number) =>
+    setProject((p) => ({ ...p, overlays: p.overlays.map((o, idx) => (idx === i ? { ...o, x, y } : o)) }));
   const deleteOverlay = (i: number) => {
     setProject((p) => ({ ...p, overlays: p.overlays.filter((_, idx) => idx !== i) }));
     setSel(null);
   };
 
-  const addAudio = useCallback((src: string) => {
-    setProject((p) => ({ ...p, audio: [...p.audio, newAudioTrack(src)] }));
-  }, []);
+  const addAudio = useCallback((src: string) => setProject((p) => ({ ...p, audio: [...p.audio, newAudioTrack(src)] })), [setProject]);
   const updateAudio = (i: number, a: AudioTrack) =>
     setProject((p) => ({ ...p, audio: p.audio.map((x, idx) => (idx === i ? a : x)) }));
   const deleteAudio = (i: number) =>
@@ -113,7 +159,7 @@ export const Editor: React.FC = () => {
 
   // --- project io ---
   const onNew = () => {
-    setProject(emptyProject());
+    resetProject(emptyProject());
     setSel(null);
     notify("ok", "New empty project");
   };
@@ -137,7 +183,7 @@ export const Editor: React.FC = () => {
   const applyJson = (text: string, label: string) => {
     const parsed = parseProject(text);
     if (!parsed.ok) return notify("err", parsed.error);
-    setProject(parsed.project);
+    resetProject(parsed.project);
     setSel(null);
     notify("ok", `Loaded ${label}`);
   };
@@ -156,6 +202,26 @@ export const Editor: React.FC = () => {
     applyJson(await readFileText(f), f.name);
   };
 
+  const onRender = async () => {
+    setRendering(true);
+    setRenderLog("");
+    setRenderOut(null);
+    try {
+      const log = await renderProject(name, serializeProject(project), setRenderLog);
+      const done = log.match(/__DONE__ (.+\.mp4)/);
+      if (done) {
+        setRenderOut(done[1].trim());
+        notify("ok", "Render complete");
+      } else {
+        notify("err", "Render failed — see log");
+      }
+    } catch (e) {
+      notify("err", (e as Error).message);
+    } finally {
+      setRendering(false);
+    }
+  };
+
   const selClip = sel?.kind === "clip" ? project.clips[sel.index] : undefined;
   const selOverlay = sel?.kind === "overlay" ? project.overlays[sel.index] : undefined;
 
@@ -163,9 +229,15 @@ export const Editor: React.FC = () => {
     <div className="app">
       <div className="topbar">
         <span className="brand">SORANJI ◆ EDITOR</span>
-        <input style={{ width: 160 }} value={name} onChange={(e) => setName(e.target.value)} title="Project name" />
+        <input style={{ width: 150 }} value={name} onChange={(e) => setName(e.target.value)} title="Project name" />
         <button className="ghost" type="button" onClick={onNew}>
           New
+        </button>
+        <button className="ghost" type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)">
+          ↶
+        </button>
+        <button className="ghost" type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
+          ↷
         </button>
         <select value="" onChange={(e) => onLoadDisk(e.target.value)} style={{ width: "auto" }} title="Open from projects/">
           <option value="">Open…</option>
@@ -183,8 +255,11 @@ export const Editor: React.FC = () => {
         <button className="ghost" type="button" onClick={onDownload}>
           ⬇ Download
         </button>
-        <button className="primary" type="button" onClick={onSaveDisk}>
-          💾 Save to projects/
+        <button className="ghost" type="button" onClick={onSaveDisk}>
+          💾 Save
+        </button>
+        <button className="primary" type="button" onClick={onRender} disabled={rendering}>
+          {rendering ? "⏳ Rendering…" : "🎬 Render MP4"}
         </button>
       </div>
 
@@ -204,9 +279,7 @@ export const Editor: React.FC = () => {
                 className={`ov-item ${sel?.kind === "overlay" && sel.index === i ? "selected" : ""}`}
                 onClick={() => setSel({ kind: "overlay", index: i })}
               >
-                <span className="grow">
-                  {o.type === "text" ? `“${o.text}”` : basename(o.src)}
-                </span>
+                <span className="grow">{o.type === "text" ? `“${o.text}”` : basename(o.src)}</span>
                 <button
                   className="ghost"
                   type="button"
@@ -226,7 +299,12 @@ export const Editor: React.FC = () => {
         </div>
 
         <div className="col center">
-          <Preview project={project} />
+          <Preview
+            project={project}
+            selectedOverlay={sel?.kind === "overlay" ? sel.index : null}
+            onSelectOverlay={(i) => setSel({ kind: "overlay", index: i })}
+            onMoveOverlay={moveOverlay}
+          />
           <ClipTrack
             clips={project.clips}
             selected={sel?.kind === "clip" ? sel.index : null}
@@ -243,15 +321,22 @@ export const Editor: React.FC = () => {
           {selOverlay && sel?.kind === "overlay" ? (
             <OverlayInspector overlay={selOverlay} onChange={(o) => updateOverlay(sel.index, o)} />
           ) : null}
-          {!sel ? <div className="hint">Select a clip or overlay to edit its properties.</div> : null}
+          {!sel ? <div className="hint">Select a clip or overlay to edit it. Drag overlay handles on the preview to reposition.</div> : null}
           <BackgroundEditor value={project.background} onChange={(background) => setProject((p) => ({ ...p, background }))} />
           <div className="section">
             <h3>Render</h3>
-            <div className="hint">
-              Save to projects/, then run:
-              <br />
-              <code>npx remotion render Timeline out/{name}.mp4 --props=./projects/{name}.json</code>
-            </div>
+            {renderLog ? <pre className="renderlog">{renderLog.slice(-1600)}</pre> : null}
+            {renderOut ? (
+              <a className="chip" href={outputUrl(renderOut)} download>
+                ⬇ Download {renderOut}
+              </a>
+            ) : (
+              <div className="hint">
+                “🎬 Render MP4” renders server-side to <code>out/{name}.mp4</code>. Or run:
+                <br />
+                <code>npx remotion render Timeline out/{name}.mp4 --props=./projects/{name}.json</code>
+              </div>
+            )}
           </div>
         </div>
       </div>

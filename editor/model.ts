@@ -69,3 +69,8 @@ export const move = <T>(arr: T[], from: number, to: number): T[] => {
 };
 
 export const basename = (p: string) => p.split("/").pop() ?? p;
+
+/** Browser URL for a media src (http(s) passes through; else served from public/). */
+export const resolveMediaUrl = (s: string) => (/^https?:\/\//.test(s) ? s : `/${s}`);
+
+export const clampPct = (v: number) => Math.max(0, Math.min(100, v));

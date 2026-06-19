@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { listMedia, uploadMedia } from "./api";
-import { basename, isVideoSrc } from "./model";
+import { basename, isAudioSrc, isVideoSrc } from "./model";
 
 /** Import footage into public/media/ and add it to the timeline as a clip. */
 export const MediaLibrary: React.FC<{
@@ -13,7 +13,9 @@ export const MediaLibrary: React.FC<{
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
-    listMedia().then(setFiles).catch(() => setFiles([]));
+    listMedia()
+      .then((all) => setFiles(all.filter((f) => !isAudioSrc(f))))
+      .catch(() => setFiles([]));
   }, []);
   useEffect(refresh, [refresh]);
 

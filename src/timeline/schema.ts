@@ -87,6 +87,20 @@ export const imageOverlaySchema = z.object({
 
 export const overlaySchema = z.discriminatedUnion("type", [textOverlaySchema, imageOverlaySchema]);
 
+// --- audio: soundtrack / extra tracks layered under the whole timeline ---
+export const audioTrackSchema = z.object({
+  /** Audio file in public/media/ (e.g. "media/soranji.mp3") or an http(s) URL. */
+  src: z.string(),
+  volume: z.number().min(0).max(1).default(1),
+  /** Timeline frame at which this track starts playing. */
+  from: z.number().int().nonnegative().default(0),
+  /** Trim INTO the source file (frames) before playback. */
+  trimBefore: z.number().int().nonnegative().optional(),
+  /** Stop at this source frame. */
+  trimAfter: z.number().int().positive().optional(),
+  loop: z.boolean().default(false),
+});
+
 export const projectSchema = z.object({
   fps: z.number().default(30),
   width: z.number().default(1920),
@@ -94,12 +108,14 @@ export const projectSchema = z.object({
   background: backgroundSchema.default({ type: "none" }),
   clips: z.array(clipSchema).default([]),
   overlays: z.array(overlaySchema).default([]),
+  audio: z.array(audioTrackSchema).default([]),
 });
 
 export type Project = z.infer<typeof projectSchema>;
 export type Clip = z.infer<typeof clipSchema>;
 export type Overlay = z.infer<typeof overlaySchema>;
 export type Background = z.infer<typeof backgroundSchema>;
+export type AudioTrack = z.infer<typeof audioTrackSchema>;
 
 /** A ready-to-render sample wedding-ish project using existing public/ assets. */
 export const SAMPLE_PROJECT: Project = projectSchema.parse({

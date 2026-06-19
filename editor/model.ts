@@ -1,9 +1,11 @@
-import type { Clip, Overlay, Project } from "../src/timeline/schema";
+import type { AudioTrack, Clip, Overlay, Project } from "../src/timeline/schema";
 
 export type Selection = { kind: "clip" | "overlay"; index: number } | null;
 
 export const VIDEO_RE = /\.(mp4|webm|mov|m4v)$/i;
+export const AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg|flac)$/i;
 export const isVideoSrc = (s: string) => VIDEO_RE.test(s);
+export const isAudioSrc = (s: string) => AUDIO_RE.test(s);
 
 /** A blank project to start editing from. */
 export const emptyProject = (): Project => ({
@@ -13,6 +15,7 @@ export const emptyProject = (): Project => ({
   background: { type: "none" },
   clips: [],
   overlays: [],
+  audio: [],
 });
 
 export const newClip = (src: string): Clip =>
@@ -48,6 +51,13 @@ export const newImageOverlay = (src: string): Overlay => ({
   rotation: 0,
   opacity: 1,
   motions: [],
+});
+
+export const newAudioTrack = (src: string): AudioTrack => ({
+  src,
+  volume: 1,
+  from: 0,
+  loop: false,
 });
 
 /** Immutably reorder an array element from `from` to `to`. */

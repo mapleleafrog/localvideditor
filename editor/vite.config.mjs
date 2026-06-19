@@ -10,7 +10,7 @@ const publicDir = path.join(projectRoot, "public");
 const mediaDir = path.join(publicDir, "media");
 const projectsDir = path.join(projectRoot, "projects");
 
-const MEDIA_RE = /\.(mp4|webm|mov|m4v|gif|png|jpe?g|webp|svg|avif)$/i;
+const MEDIA_RE = /\.(mp4|webm|mov|m4v|gif|png|jpe?g|webp|svg|avif|mp3|wav|m4a|aac|ogg|flac)$/i;
 const safeName = (name) => path.basename(String(name || "")).replace(/[^\w.\-]+/g, "_");
 
 const readBody = (req) =>

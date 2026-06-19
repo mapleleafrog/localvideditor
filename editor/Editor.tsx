@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import type { Background, Clip, Overlay, Project } from "../src/timeline/schema";
+import type { AudioTrack, Background, Clip, Overlay, Project } from "../src/timeline/schema";
 import { SAMPLE_PROJECT } from "../src/timeline/schema";
 import { downloadProject, parseProject, readFileText, serializeProject } from "../src/timeline/projectIO";
 import { listProjects, loadProjectFromDisk, saveProjectToDisk } from "./api";
@@ -8,6 +8,7 @@ import {
   basename,
   emptyProject,
   move,
+  newAudioTrack,
   newClip,
   newImageOverlay,
   newTextOverlay,
@@ -15,6 +16,7 @@ import {
 } from "./model";
 import { Preview } from "./Preview";
 import { MediaLibrary } from "./MediaLibrary";
+import { AudioPanel } from "./AudioPanel";
 import { ClipTrack } from "./ClipTrack";
 import { ClipInspector, OverlayInspector } from "./Inspector";
 import { ColorField, SelectField, TextField } from "./ui";
@@ -100,6 +102,14 @@ export const Editor: React.FC = () => {
     setProject((p) => ({ ...p, overlays: p.overlays.filter((_, idx) => idx !== i) }));
     setSel(null);
   };
+
+  const addAudio = useCallback((src: string) => {
+    setProject((p) => ({ ...p, audio: [...p.audio, newAudioTrack(src)] }));
+  }, []);
+  const updateAudio = (i: number, a: AudioTrack) =>
+    setProject((p) => ({ ...p, audio: p.audio.map((x, idx) => (idx === i ? a : x)) }));
+  const deleteAudio = (i: number) =>
+    setProject((p) => ({ ...p, audio: p.audio.filter((_, idx) => idx !== i) }));
 
   // --- project io ---
   const onNew = () => {
@@ -211,6 +221,7 @@ export const Editor: React.FC = () => {
             ))}
             {!project.overlays.length ? <div className="hint">No overlays. Shift-click media to add an image overlay.</div> : null}
           </div>
+          <AudioPanel tracks={project.audio} onAdd={addAudio} onUpdate={updateAudio} onDelete={deleteAudio} notify={notify} />
           {toast ? <div className={`toast ${toast.kind}`}>{toast.msg}</div> : null}
         </div>
 

@@ -1,8 +1,10 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   OffthreadVideo,
+  Sequence,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
@@ -13,7 +15,7 @@ import { getMotion, getTransitionPresentation } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import { ProjectToolbar } from "./ProjectToolbar";
-import type { Project, Clip, Overlay, Background } from "./schema";
+import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 
@@ -118,9 +120,26 @@ const BackgroundLayer: React.FC<{ background: Background }> = ({ background: bg 
   return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
 };
 
+// --- soundtrack: audio tracks layered (and time-positioned) under everything ---
+const SoundtrackLayer: React.FC<{ tracks: AudioTrack[] }> = ({ tracks }) => (
+  <>
+    {tracks.map((a, i) => (
+      <Sequence key={i} from={a.from} name={`audio-${i}`}>
+        <Audio
+          src={resolveSrc(a.src)}
+          volume={() => a.volume}
+          trimBefore={a.trimBefore}
+          trimAfter={a.trimAfter}
+          loop={a.loop}
+        />
+      </Sequence>
+    ))}
+  </>
+);
+
 /** The generic, config-driven video composition. */
 export const Timeline: React.FC<Project> = (props) => {
-  const { background, clips, overlays } = props;
+  const { background, clips, overlays, audio } = props;
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <BackgroundLayer background={background} />
@@ -128,6 +147,7 @@ export const Timeline: React.FC<Project> = (props) => {
       {(overlays ?? []).map((o, i) => (
         <OverlayLayer key={i} overlay={o} />
       ))}
+      <SoundtrackLayer tracks={audio ?? []} />
       {/* Studio-only Save/Load aid — returns null during render. */}
       <ProjectToolbar project={props} />
     </AbsoluteFill>

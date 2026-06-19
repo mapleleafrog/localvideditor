@@ -11,6 +11,7 @@
     "@remotion/media-utils": "4.0.472",
     "@remotion/paths": "4.0.472",
     "@remotion/shapes": "4.0.472",
+    "@remotion/studio": "4.0.472",
     "@remotion/transitions": "4.0.472",
     "react": "19.2.3",
     "react-dom": "19.2.3",

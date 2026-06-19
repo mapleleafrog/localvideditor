@@ -134,20 +134,23 @@ export const Timeline: React.FC<Project> = (props) => {
   );
 };
 
-/** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
-export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => {
-  const clips = props.clips ?? [];
-  const overlays = props.overlays ?? [];
+/** Total play length in frames: ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
+export const computeTimelineDuration = (project: Pick<Project, "clips" | "overlays">): number => {
+  const clips = project.clips ?? [];
+  const overlays = project.overlays ?? [];
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);
   const transTotal = clips.reduce(
     (s, c, i) => s + (i < clips.length - 1 ? (c.transitionToNext?.durationInFrames ?? 0) : 0),
     0,
   );
   const overlayEnd = overlays.reduce((m, o) => Math.max(m, (o.from ?? 0) + o.durationInFrames), 0);
-  return {
-    durationInFrames: Math.max(clipsTotal - transTotal, overlayEnd, 1),
-    fps: props.fps ?? 30,
-    width: props.width ?? 1920,
-    height: props.height ?? 1080,
-  };
+  return Math.max(clipsTotal - transTotal, overlayEnd, 1);
 };
+
+/** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
+export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => ({
+  durationInFrames: computeTimelineDuration(props),
+  fps: props.fps ?? 30,
+  width: props.width ?? 1920,
+  height: props.height ?? 1080,
+});

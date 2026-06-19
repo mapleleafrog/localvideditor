@@ -10,6 +10,7 @@
     "@remotion/gif": "4.0.472",
     "@remotion/media-utils": "4.0.472",
     "@remotion/paths": "4.0.472",
+    "@remotion/player": "4.0.472",
     "@remotion/shapes": "4.0.472",
     "@remotion/studio": "4.0.472",
     "@remotion/transitions": "4.0.472",
@@ -20,13 +21,18 @@
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.472",
     "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
+    "@vitejs/plugin-react": "5.0.4",
     "eslint": "9.19.0",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
   },
   "scripts": {
     "dev": "remotion studio",
+    "editor": "vite --config editor/vite.config.mjs",
+    "editor:build": "vite build --config editor/vite.config.mjs",
     "build": "remotion bundle",
     "render": "remotion render SoranjiSample out/soranji-sample.mp4",
     "render:timeline": "remotion render Timeline out/timeline.mp4",

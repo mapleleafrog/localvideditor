@@ -12,6 +12,7 @@ import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { getMotion, getTransitionPresentation } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
+import { ProjectToolbar } from "./ProjectToolbar";
 import type { Project, Clip, Overlay, Background } from "./schema";
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
@@ -118,15 +119,20 @@ const BackgroundLayer: React.FC<{ background: Background }> = ({ background: bg 
 };
 
 /** The generic, config-driven video composition. */
-export const Timeline: React.FC<Project> = ({ background, clips, overlays }) => (
-  <AbsoluteFill style={{ backgroundColor: "#000" }}>
-    <BackgroundLayer background={background} />
-    <ClipTrack clips={clips ?? []} />
-    {(overlays ?? []).map((o, i) => (
-      <OverlayLayer key={i} overlay={o} />
-    ))}
-  </AbsoluteFill>
-);
+export const Timeline: React.FC<Project> = (props) => {
+  const { background, clips, overlays } = props;
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#000" }}>
+      <BackgroundLayer background={background} />
+      <ClipTrack clips={clips ?? []} />
+      {(overlays ?? []).map((o, i) => (
+        <OverlayLayer key={i} overlay={o} />
+      ))}
+      {/* Studio-only Save/Load aid — returns null during render. */}
+      <ProjectToolbar project={props} />
+    </AbsoluteFill>
+  );
+};
 
 /** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
 export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => {

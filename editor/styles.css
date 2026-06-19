@@ -352,3 +352,57 @@ textarea {
   border-color: var(--pink);
   color: var(--pink);
 }
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* preview stage + draggable overlay handles */
+.stage {
+  margin: 0 auto;
+}
+
+.stage-handles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ov-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(40, 224, 214, 0.35);
+  border: 2px solid var(--cyan);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.ov-handle.sel {
+  background: rgba(255, 46, 136, 0.45);
+  border-color: var(--pink);
+  box-shadow: 0 0 0 4px rgba(255, 46, 136, 0.2);
+}
+
+.ov-handle:active {
+  cursor: grabbing;
+}
+
+.renderlog {
+  background: #06070d;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 8px;
+}

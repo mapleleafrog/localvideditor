@@ -42,3 +42,33 @@ export const loadProjectFromDisk = async (name: string): Promise<string> => {
 };
 
 export const toOpts = (names: string[]): Opt[] => names.map((n) => ({ value: n, label: n }));
+
+/**
+ * Render the project to out/<name>.mp4 server-side (spawns `remotion render`),
+ * streaming the CLI log back. `onChunk` receives the accumulated log so far.
+ * Returns the full log; look for "__DONE__ <file>" / "__FAILED__" markers.
+ */
+export const renderProject = async (
+  name: string,
+  json: string,
+  onChunk: (log: string) => void,
+): Promise<string> => {
+  const r = await fetch(`/api/render?name=${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: json,
+  });
+  if (!r.body) throw new Error("render stream unavailable");
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += dec.decode(value, { stream: true });
+    onChunk(out);
+  }
+  return out;
+};
+
+export const outputUrl = (file: string) => `/api/output?name=${encodeURIComponent(file)}`;

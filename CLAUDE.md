@@ -48,10 +48,20 @@ The 7 shader presentations are `engine:"webgl"` (HTML-in-canvas). They **render 
 
 ## Make a video (Timeline)
 The `Timeline` composition renders ANY video from a `project` config (Zod-schema'd props): a **clip track** (image/video clips joined by transitions) + positioned **overlays** (text/image with stacked effects) + a **background**. Effect ids resolve against `src/effects`, so new effects work immediately — one registry, exact preview, render-grade. Files: `src/timeline/schema.ts` (`projectSchema`, `SAMPLE_PROJECT`), `src/timeline/Timeline.tsx`; sample configs in `projects/`.
-- **Edit:** `npm run dev` → Studio opens `Timeline` with a live props form + scrubber (or hand-edit a `projects/*.json`). Drop photos/clips in `public/media/`, reference as `media/<file>`.
+- **Edit (visual editor — preferred):** `npm run editor` → opens the `@remotion/player` drag-drop editor (see below). Or `npm run dev` → Studio opens `Timeline` with a live props form + scrubber. Or hand-edit a `projects/*.json`. Drop photos/clips in `public/media/`, reference as `media/<file>`.
 - **Render:** `npm run render:timeline` (sample) or `npx remotion render Timeline out/video.mp4 --props=./projects/your.json`.
-- Duration is computed from the config (`calculateTimelineMetadata`: Σclips − Σtransitions, covering overlays). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
-- Stage 2 (next): a `@remotion/player` drag-drop visual editor on the same schema + `<Audio>` soundtrack with real beat-sync.
+- Duration is computed from the config (`computeTimelineDuration`, used by both `calculateTimelineMetadata` and the editor's Player: Σclips − Σtransitions, covering overlays). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
+
+## Visual editor (`npm run editor`)
+A Vite-hosted, `@remotion/player`-based drag-drop editor on the SAME `projectSchema` + `src/effects` registry, so its preview is the exact `Timeline` the CLI renders (WYSIWYG). Lives in `editor/` (typechecked by the root `tsc`; build config `editor/vite.config.mjs` is `.mjs` so tsc skips it). It is the only place that does direct disk I/O, via a tiny dev-server plugin in the vite config:
+- **Import footage:** drag-drop / file-pick → `POST /api/upload` writes into `public/media/` (served via Vite `publicDir=public`, so `staticFile("media/x")` resolves in both preview and render). Click a media tile to add a clip; shift-click to add an image overlay.
+- **Arrange/edit:** clip track with drag-reorder, select, delete; right-panel inspector for clip props (duration, motion, per-clip transition + length, video trim/volume) and overlay props (text/image fields, position/scale/opacity/depth, stacked effect chips); background editor.
+- **Audio/music:** `AudioPanel` imports music into `public/media/` and adds `audio[]` tracks (volume, start frame, trim-in, loop) rendered as Remotion `<Audio>` (see below). Audio files are filtered out of the visual media list.
+- **Save/Load:** `💾 Save to projects/` → `POST /api/save` writes `projects/<name>.json` (validated as JSON server-side); `⬇ Download` uses the browser; `Open…` lists/loads `projects/*.json` via `/api/projects` + `/api/load`; `Import .json` loads an arbitrary file. All round-trips go through `src/timeline/projectIO.ts` (`serializeProject`/`parseProject` — schema-validated, never throws).
+- Editor files: `editor/{Editor,Preview,MediaLibrary,ClipTrack,Inspector,AudioPanel,ui}.tsx`, `editor/{model,options,api}.ts`, `editor/vite.config.mjs`. WebGL shader transitions are labeled `(shader*)` since their Player preview needs the Chrome flag (they still render).
+
+## Audio (soundtrack)
+`projectSchema.audio` is an array of tracks (`src`, `volume`, `from`, `trimBefore`, `trimAfter`, `loop`); `Timeline.tsx`'s `SoundtrackLayer` renders each as `<Audio>` inside a `<Sequence from={track.from}>` so music plays under the whole video (preview + render). Volume uses the callback form (`volume={() => a.volume}`) per Remotion's lint rule. **Audio extends the timeline:** `calculateTimelineMetadata` (async) reads each non-looping track's length via `getAudioDurationInSeconds` (runs in Studio/Chromium; degrades to no-extend if unavailable) and `audioEndFrames()` so the video lasts as long as the song — `duration = max(clip/overlay content, audioEnd, 1)`. The editor's `Preview` mirrors this in the browser to size the `<Player>`. Looping tracks fill the timeline and never define it. Beat-reactive motions are still on the synthetic 120 BPM clock (`beatKick`); real audio-reactive beat-sync (`@remotion/media-utils` `useAudioData`/`visualizeAudio`) remains Stage 3.
 
 ## No-npm Retro Portal (`index.html`)
 A self-contained synthwave/arcade playground at the project root — **double-click to open, no npm, no server**. It is a live preview/composer (CSS driven by `requestAnimationFrame`), NOT the render pipeline. Its inline JS mirrors `src/effects` formulas (helpers, MOTIONS, TRANSITIONS) plus a `composeStyles()` engine so you can **stack multiple motions at once** (transforms + filters concatenated, opacity multiplied). Tabs: MOTIONS (multi-select stacking), BACKDROP (synthGrid/starfield/CRT), TRANSITIONS (A↔B loop + "play all"). Sprite loads from `public/orange-mush.gif` (sibling), with an inlined base64 fallback. Shader transitions appear as CSS approximations (⚡) since the browser has no Remotion/WebGL pipeline. Keep portal effects in sync with `src/effects` when you add new ones. (`.claude/launch.json` + `.claude/static-server.mjs` are a dev-only static server for previewing it.)
@@ -63,6 +73,7 @@ A self-contained synthwave/arcade playground at the project root — **double-cl
 
 ## Commands
 - `npm run dev` — Remotion Studio
+- `npm run editor` — Vite visual editor (drag-drop); `npm run editor:build` to bundle it
 - `npm run build` / `npx remotion bundle` — bundle; `npm run typecheck` (`tsc`) for types
 - `npm run render` — export SoranjiSample to `out/soranji-sample.mp4`
 - `npm run credits` — regenerate CREDITS.md

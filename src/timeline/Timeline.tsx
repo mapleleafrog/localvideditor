@@ -1,19 +1,22 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   OffthreadVideo,
+  Sequence,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
   type CalculateMetadataFunction,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { getMotion, getTransitionPresentation } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import { ProjectToolbar } from "./ProjectToolbar";
-import type { Project, Clip, Overlay, Background } from "./schema";
+import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 
@@ -118,9 +121,26 @@ const BackgroundLayer: React.FC<{ background: Background }> = ({ background: bg 
   return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
 };
 
+// --- soundtrack: audio tracks layered (and time-positioned) under everything ---
+const SoundtrackLayer: React.FC<{ tracks: AudioTrack[] }> = ({ tracks }) => (
+  <>
+    {tracks.map((a, i) => (
+      <Sequence key={i} from={a.from} name={`audio-${i}`}>
+        <Audio
+          src={resolveSrc(a.src)}
+          volume={() => a.volume}
+          trimBefore={a.trimBefore}
+          trimAfter={a.trimAfter}
+          loop={a.loop}
+        />
+      </Sequence>
+    ))}
+  </>
+);
+
 /** The generic, config-driven video composition. */
 export const Timeline: React.FC<Project> = (props) => {
-  const { background, clips, overlays } = props;
+  const { background, clips, overlays, audio } = props;
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <BackgroundLayer background={background} />
@@ -128,25 +148,63 @@ export const Timeline: React.FC<Project> = (props) => {
       {(overlays ?? []).map((o, i) => (
         <OverlayLayer key={i} overlay={o} />
       ))}
+      <SoundtrackLayer tracks={audio ?? []} />
       {/* Studio-only Save/Load aid — returns null during render. */}
       <ProjectToolbar project={props} />
     </AbsoluteFill>
   );
 };
 
-/** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
-export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => {
-  const clips = props.clips ?? [];
-  const overlays = props.overlays ?? [];
+/** Frame at which content (clips − transitions, or the latest overlay) ends. */
+export const computeTimelineDuration = (
+  project: Pick<Project, "clips" | "overlays">,
+  audioEnd = 0,
+): number => {
+  const clips = project.clips ?? [];
+  const overlays = project.overlays ?? [];
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);
   const transTotal = clips.reduce(
     (s, c, i) => s + (i < clips.length - 1 ? (c.transitionToNext?.durationInFrames ?? 0) : 0),
     0,
   );
   const overlayEnd = overlays.reduce((m, o) => Math.max(m, (o.from ?? 0) + o.durationInFrames), 0);
+  return Math.max(clipsTotal - transTotal, overlayEnd, audioEnd, 1);
+};
+
+/**
+ * Latest frame any NON-looping audio track plays to (so the song can drive the
+ * video length). `durationOf(src)` returns the source length in FRAMES, or
+ * undefined if not yet known; looping tracks fill the timeline, never define it.
+ */
+export const audioEndFrames = (
+  audio: AudioTrack[],
+  durationOf: (src: string) => number | undefined,
+): number =>
+  audio.reduce((end, a) => {
+    if (a.loop) return end;
+    const srcFrames = durationOf(a.src);
+    if (srcFrames == null) return end;
+    const playable = (a.trimAfter ?? srcFrames) - (a.trimBefore ?? 0);
+    return Math.max(end, a.from + Math.max(0, playable));
+  }, 0);
+
+/** Total length = clip/overlay content, extended to cover any non-looping audio (the song). */
+export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = async ({ props }) => {
+  const fps = props.fps ?? 30;
+  const durations = new Map<string, number>();
+  for (const a of props.audio ?? []) {
+    if (a.loop || durations.has(a.src)) continue;
+    try {
+      const secs = await getAudioDurationInSeconds(resolveSrc(a.src));
+      durations.set(a.src, Math.round(secs * fps));
+    } catch {
+      // Unresolvable / undecodable src — just don't let it drive duration.
+    }
+  }
+  const audioEnd = audioEndFrames(props.audio ?? [], (src) => durations.get(src));
   return {
-    durationInFrames: Math.max(clipsTotal - transTotal, overlayEnd, 1),
-    fps: props.fps ?? 30,
+    durationInFrames: computeTimelineDuration(props, audioEnd),
+    fps,
     width: props.width ?? 1920,
     height: props.height ?? 1080,
   };

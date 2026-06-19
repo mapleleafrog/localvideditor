@@ -11,6 +11,7 @@ import {
   type CalculateMetadataFunction,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { getMotion, getTransitionPresentation } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
@@ -154,8 +155,11 @@ export const Timeline: React.FC<Project> = (props) => {
   );
 };
 
-/** Total play length in frames: ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
-export const computeTimelineDuration = (project: Pick<Project, "clips" | "overlays">): number => {
+/** Frame at which content (clips − transitions, or the latest overlay) ends. */
+export const computeTimelineDuration = (
+  project: Pick<Project, "clips" | "overlays">,
+  audioEnd = 0,
+): number => {
   const clips = project.clips ?? [];
   const overlays = project.overlays ?? [];
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);
@@ -164,13 +168,44 @@ export const computeTimelineDuration = (project: Pick<Project, "clips" | "overla
     0,
   );
   const overlayEnd = overlays.reduce((m, o) => Math.max(m, (o.from ?? 0) + o.durationInFrames), 0);
-  return Math.max(clipsTotal - transTotal, overlayEnd, 1);
+  return Math.max(clipsTotal - transTotal, overlayEnd, audioEnd, 1);
 };
 
-/** Total length = ΣclipDurations − Σtransitions(with a next clip), at least covering all overlays. */
-export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = ({ props }) => ({
-  durationInFrames: computeTimelineDuration(props),
-  fps: props.fps ?? 30,
-  width: props.width ?? 1920,
-  height: props.height ?? 1080,
-});
+/**
+ * Latest frame any NON-looping audio track plays to (so the song can drive the
+ * video length). `durationOf(src)` returns the source length in FRAMES, or
+ * undefined if not yet known; looping tracks fill the timeline, never define it.
+ */
+export const audioEndFrames = (
+  audio: AudioTrack[],
+  durationOf: (src: string) => number | undefined,
+): number =>
+  audio.reduce((end, a) => {
+    if (a.loop) return end;
+    const srcFrames = durationOf(a.src);
+    if (srcFrames == null) return end;
+    const playable = (a.trimAfter ?? srcFrames) - (a.trimBefore ?? 0);
+    return Math.max(end, a.from + Math.max(0, playable));
+  }, 0);
+
+/** Total length = clip/overlay content, extended to cover any non-looping audio (the song). */
+export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = async ({ props }) => {
+  const fps = props.fps ?? 30;
+  const durations = new Map<string, number>();
+  for (const a of props.audio ?? []) {
+    if (a.loop || durations.has(a.src)) continue;
+    try {
+      const secs = await getAudioDurationInSeconds(resolveSrc(a.src));
+      durations.set(a.src, Math.round(secs * fps));
+    } catch {
+      // Unresolvable / undecodable src — just don't let it drive duration.
+    }
+  }
+  const audioEnd = audioEndFrames(props.audio ?? [], (src) => durations.get(src));
+  return {
+    durationInFrames: computeTimelineDuration(props, audioEnd),
+    fps,
+    width: props.width ?? 1920,
+    height: props.height ?? 1080,
+  };
+};

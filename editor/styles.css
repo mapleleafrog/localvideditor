@@ -404,5 +404,62 @@ button:disabled {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  margin: 0 0 8px;
+  margin: 6px 0 0;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin: 6px 0;
+}
+
+.progress .bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--pink));
+  transition: width 0.2s linear;
+}
+
+/* selected-overlay scale + rotate gizmo */
+.ov-gizmo {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.ov-gizmo .giz {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 3px;
+  background: rgba(255, 46, 136, 0.5);
+  border: 2px solid var(--pink);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.ov-gizmo .giz.scale {
+  transform: translate(-50%, -50%) translate(30px, 30px);
+  cursor: nwse-resize;
+}
+
+.ov-gizmo .giz.rotate {
+  transform: translate(-50%, -50%) translate(0, -46px);
+  border-radius: 50%;
+  cursor: grab;
+}
+
+/* clip-track thumbnails */
+.clip-thumb {
+  width: 100%;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #000;
+  display: block;
+  margin-bottom: 4px;
 }

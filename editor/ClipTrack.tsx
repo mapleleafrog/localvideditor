@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Clip } from "../src/timeline/schema";
-import { basename } from "./model";
+import { basename, isVideoSrc, resolveMediaUrl } from "./model";
 
 /** The horizontal clip track: drag to reorder, click to select, × to delete. */
 export const ClipTrack: React.FC<{
@@ -47,10 +47,14 @@ export const ClipTrack: React.FC<{
             >
               ×
             </button>
+            {isVideoSrc(c.src) ? (
+              <video className="clip-thumb" src={resolveMediaUrl(c.src)} muted preload="metadata" />
+            ) : (
+              <img className="clip-thumb" src={resolveMediaUrl(c.src)} alt="" />
+            )}
             <div className="title">
               {i + 1}. {basename(c.src)}
             </div>
-            <div className="meta">{c.type.toUpperCase()}</div>
             <div className="meta">{c.durationInFrames}f{c.motion ? ` · ${c.motion}` : ""}</div>
           </div>
           {c.transitionToNext && i < clips.length - 1 ? (

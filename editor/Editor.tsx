@@ -18,7 +18,8 @@ import {
   type Selection,
 } from "./model";
 import { useHistory } from "./useHistory";
-import { Preview } from "./Preview";
+import { parseRenderLog } from "./renderLog";
+import { Preview, type OverlayGeom } from "./Preview";
 import { MediaLibrary } from "./MediaLibrary";
 import { AudioPanel } from "./AudioPanel";
 import { ClipTrack } from "./ClipTrack";
@@ -61,7 +62,6 @@ export const Editor: React.FC = () => {
   const [diskProjects, setDiskProjects] = useState<string[]>([]);
   const [rendering, setRendering] = useState(false);
   const [renderLog, setRenderLog] = useState("");
-  const [renderOut, setRenderOut] = useState<string | null>(null);
 
   const notify = useCallback((kind: "ok" | "err", msg: string) => setToast({ kind, msg }), []);
   const refreshProjects = useCallback(() => {
@@ -144,8 +144,8 @@ export const Editor: React.FC = () => {
 
   const updateOverlay = (i: number, o: Overlay) =>
     setProject((p) => ({ ...p, overlays: p.overlays.map((x, idx) => (idx === i ? o : x)) }));
-  const moveOverlay = (i: number, x: number, y: number) =>
-    setProject((p) => ({ ...p, overlays: p.overlays.map((o, idx) => (idx === i ? { ...o, x, y } : o)) }));
+  const setOverlayGeom = (i: number, patch: OverlayGeom) =>
+    setProject((p) => ({ ...p, overlays: p.overlays.map((o, idx) => (idx === i ? { ...o, ...patch } : o)) }));
   const deleteOverlay = (i: number) => {
     setProject((p) => ({ ...p, overlays: p.overlays.filter((_, idx) => idx !== i) }));
     setSel(null);
@@ -204,23 +204,20 @@ export const Editor: React.FC = () => {
 
   const onRender = async () => {
     setRendering(true);
-    setRenderLog("");
-    setRenderOut(null);
+    setRenderLog("Starting render…\n");
     try {
       const log = await renderProject(name, serializeProject(project), setRenderLog);
-      const done = log.match(/__DONE__ (.+\.mp4)/);
-      if (done) {
-        setRenderOut(done[1].trim());
-        notify("ok", "Render complete");
-      } else {
-        notify("err", "Render failed — see log");
-      }
+      const s = parseRenderLog(log);
+      notify(s.done ? "ok" : "err", s.done ? "Render complete" : (s.error ?? "Render failed"));
     } catch (e) {
+      setRenderLog((l) => `${l}\n${(e as Error).message}`);
       notify("err", (e as Error).message);
     } finally {
       setRendering(false);
     }
   };
+
+  const render = parseRenderLog(renderLog);
 
   const selClip = sel?.kind === "clip" ? project.clips[sel.index] : undefined;
   const selOverlay = sel?.kind === "overlay" ? project.overlays[sel.index] : undefined;
@@ -303,7 +300,7 @@ export const Editor: React.FC = () => {
             project={project}
             selectedOverlay={sel?.kind === "overlay" ? sel.index : null}
             onSelectOverlay={(i) => setSel({ kind: "overlay", index: i })}
-            onMoveOverlay={moveOverlay}
+            onOverlayGeom={setOverlayGeom}
           />
           <ClipTrack
             clips={project.clips}
@@ -325,11 +322,28 @@ export const Editor: React.FC = () => {
           <BackgroundEditor value={project.background} onChange={(background) => setProject((p) => ({ ...p, background }))} />
           <div className="section">
             <h3>Render</h3>
-            {renderLog ? <pre className="renderlog">{renderLog.slice(-1600)}</pre> : null}
-            {renderOut ? (
-              <a className="chip" href={outputUrl(renderOut)} download>
-                ⬇ Download {renderOut}
-              </a>
+            {rendering || renderLog ? (
+              <>
+                <div className="hint">
+                  {render.phase}
+                  {render.progress != null ? ` · ${Math.round(render.progress * 100)}%` : ""}
+                </div>
+                {render.progress != null ? (
+                  <div className="progress">
+                    <div className="bar" style={{ width: `${Math.round(render.progress * 100)}%` }} />
+                  </div>
+                ) : null}
+                {render.error ? <div className="toast err">{render.error}</div> : null}
+                {render.done ? (
+                  <a className="chip" href={outputUrl(render.done)} download>
+                    ⬇ Download {render.done}
+                  </a>
+                ) : null}
+                <details>
+                  <summary className="hint">log</summary>
+                  <pre className="renderlog">{renderLog.slice(-4000)}</pre>
+                </details>
+              </>
             ) : (
               <div className="hint">
                 “🎬 Render MP4” renders server-side to <code>out/{name}.mp4</code>. Or run:

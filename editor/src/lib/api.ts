@@ -67,3 +67,14 @@ export async function listMedia(): Promise<string[]> {
     return [];
   }
 }
+
+/** Audio files dropped in public/media/ (or public/) — for the soundtrack picker. */
+export async function listAudio(): Promise<string[]> {
+  try {
+    const res = await fetch("/api/media");
+    const data = await res.json();
+    return Array.isArray(data.audio) ? data.audio : [];
+  } catch {
+    return [];
+  }
+}

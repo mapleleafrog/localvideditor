@@ -74,6 +74,20 @@ const overlaySchema = z.object({
   width: z.number().default(200),
 });
 
+// A soundtrack / sfx track layered under the whole timeline (rendered as <Audio>).
+const audioTrackSchema = z.object({
+  /** Audio file in public/ or public/media/ (e.g. "media/soranji.mp3") or an http(s) URL. */
+  src: z.string().default("media/song.mp3"),
+  volume: z.number().min(0).max(1).default(1),
+  /** Timeline frame at which this track starts playing. */
+  from: z.number().int().nonnegative().default(0),
+  /** Trim INTO the source (frames) before playback; 0 = from the start. */
+  trimBefore: z.number().int().nonnegative().default(0),
+  /** Stop at this source frame; 0 = play to the end. */
+  trimAfter: z.number().int().nonnegative().default(0),
+  loop: z.boolean().default(false),
+});
+
 export const projectSchema = z.object({
   background: z
     .object({
@@ -85,6 +99,12 @@ export const projectSchema = z.object({
     .default({ type: "motion", color: "#0c1322", gradient: "linear-gradient(#1b2a6b, #0e3b4d)", motion: "synthGrid" }),
   clips: z.array(clipSchema).default([]),
   overlays: z.array(overlaySchema).default([]),
+  /** Soundtrack — music/sfx tracks played under the whole video. */
+  audio: z.array(audioTrackSchema).default([]),
+  /** Tempo for the beat-reactive motions (beatPulse, beatShake, …). Set to your song's BPM. */
+  bpm: z.number().positive().default(120),
+  /** Shift the beat grid so the downbeat lands on the song's first beat (in frames). */
+  beatOffsetInFrames: z.number().int().default(0),
   fps: z.number().int().positive().default(30),
   width: z.number().int().positive().default(1920),
   height: z.number().int().positive().default(1080),
@@ -93,4 +113,5 @@ export const projectSchema = z.object({
 export type Project = z.infer<typeof projectSchema>;
 export type Clip = z.infer<typeof clipSchema>;
 export type Overlay = z.infer<typeof overlaySchema>;
+export type AudioTrack = z.infer<typeof audioTrackSchema>;
 export type Background = z.infer<typeof projectSchema>["background"];

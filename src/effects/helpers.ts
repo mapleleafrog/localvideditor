@@ -43,15 +43,18 @@ export const elasticOut = (p: number) => {
   return Math.pow(2, -10 * p) * Math.sin((p * 10 - 0.75) * c4) + 1;
 };
 
-/** Decaying beat kick. frame-derived t keeps it deterministic; exp = sharpness. */
-export const beatKick = (t: number, bpm = 120, exp = 6) => {
+/** Decaying beat kick. frame-derived t keeps it deterministic; exp = sharpness.
+ *  `offsetSec` shifts the downbeat so the metronome can be aligned to a real song. */
+export const beatKick = (t: number, bpm = 120, exp = 6, offsetSec = 0) => {
   const spb = 60 / bpm;
-  const ph = (t % spb) / spb;
+  // Positive modulo so a negative (t - offset) still lands in [0, spb).
+  const ph = ((((t - offsetSec) % spb) + spb) % spb) / spb;
   return Math.pow(1 - ph, exp);
 };
 
-/** Integer beat index since t=0, for "trigger on every Nth beat" logic. */
-export const beatIndex = (t: number, bpm = 120) => Math.floor(t / (60 / bpm));
+/** Integer beat index since t=0 (after the downbeat offset), for "every Nth beat" logic. */
+export const beatIndex = (t: number, bpm = 120, offsetSec = 0) =>
+  Math.floor((t - offsetSec) / (60 / bpm));
 
 /** Cubic bezier point at t for [x,y] control points. */
 export const bez = (

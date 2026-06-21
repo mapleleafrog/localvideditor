@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
-import type { Project, Clip, Overlay } from "../../src/timeline/schema";
+import type { Project, Clip, Overlay, AudioTrack } from "../../src/timeline/schema";
 import sampleProject from "../../projects/sample.json";
 
 export type Selection = { kind: "clip" | "overlay"; index: number } | null;
@@ -13,10 +13,16 @@ export interface EditorState {
   view: "edit" | "storyboard";
   // mutations (project edits are tracked by zundo for undo/redo)
   setProject: (p: Project) => void;
+  /** Merge top-level project fields (bpm, beatOffsetInFrames, background, …). */
+  patchProject: (patch: Partial<Project>) => void;
   patchClip: (i: number, patch: Partial<Clip>) => void;
   patchOverlay: (i: number, patch: Partial<Overlay>) => void;
   addClip: (clip: Clip) => void;
   addOverlay: (o: Overlay) => void;
+  // soundtrack tracks
+  addAudio: (track: AudioTrack) => void;
+  patchAudio: (i: number, patch: Partial<AudioTrack>) => void;
+  removeAudio: (i: number) => void;
   removeSelected: () => void;
   reorderOverlay: (from: number, to: number) => void;
   reorderClip: (from: number, to: number) => void;
@@ -53,6 +59,19 @@ export const useEditor = create<EditorState>()(
       view: "edit",
 
       setProject: (project) => set({ project, selection: null }),
+
+      patchProject: (patch) => set((s) => ({ project: { ...s.project, ...patch } })),
+
+      addAudio: (track) =>
+        set((s) => ({ project: { ...s.project, audio: [...(s.project.audio ?? []), track] } })),
+
+      patchAudio: (i, patch) =>
+        set((s) => ({
+          project: { ...s.project, audio: (s.project.audio ?? []).map((a, idx) => (idx === i ? { ...a, ...patch } : a)) },
+        })),
+
+      removeAudio: (i) =>
+        set((s) => ({ project: { ...s.project, audio: (s.project.audio ?? []).filter((_, idx) => idx !== i) } })),
 
       patchClip: (i, patch) =>
         set((s) => ({

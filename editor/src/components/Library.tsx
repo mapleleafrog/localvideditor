@@ -3,6 +3,7 @@ import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 import { listMedia } from "../lib/api";
+import { AudioPanel } from "./AudioPanel";
 
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
@@ -12,7 +13,7 @@ const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-m
 
 export const Library: React.FC = () => {
   const { project, selection, patchOverlay, patchClip, addOverlay } = useEditor();
-  const [tab, setTab] = useState<"effects" | "transitions" | "assets">("effects");
+  const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio">("effects");
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export const Library: React.FC = () => {
         <button className={tab === "effects" ? "on" : ""} onClick={() => setTab("effects")}>Effects</button>
         <button className={tab === "transitions" ? "on" : ""} onClick={() => setTab("transitions")}>Transitions</button>
         <button className={tab === "assets" ? "on" : ""} onClick={() => setTab("assets")}>Assets</button>
+        <button className={tab === "audio" ? "on" : ""} onClick={() => setTab("audio")}>Audio</button>
       </div>
       <div className="lib-body">
         {tab === "effects" && (
@@ -92,6 +94,7 @@ export const Library: React.FC = () => {
             </div>
           </>
         )}
+        {tab === "audio" && <AudioPanel />}
       </div>
     </div>
   );

@@ -122,23 +122,29 @@ async function handleSaveProject(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
-/** List drop-in media (public/media/*) + the known root public assets for the Asset browser. */
+/** List drop-in media (public/media/* + root public/) split into visual assets and audio tracks. */
 async function handleMedia(_req: IncomingMessage, res: ServerResponse) {
-  const isMedia = (f: string) => /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)$/i.test(f);
-  const out: string[] = [];
+  const isVisual = (f: string) => /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)$/i.test(f);
+  const isAudio = (f: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f);
+  const assets: string[] = [];
+  const audio: string[] = [];
+  const sort = (name: string, ref: string) => {
+    if (isVisual(name)) assets.push(ref);
+    else if (isAudio(name)) audio.push(ref);
+  };
   try {
     const media = await fs.readdir(MEDIA_DIR);
-    media.filter(isMedia).forEach((f) => out.push(`media/${f}`));
+    media.forEach((f) => sort(f, `media/${f}`));
   } catch {
     /* no media dir yet */
   }
   try {
     const root = await fs.readdir(PUBLIC_DIR, { withFileTypes: true });
-    root.filter((d) => d.isFile() && isMedia(d.name)).forEach((d) => out.push(d.name));
+    root.filter((d) => d.isFile()).forEach((d) => sort(d.name, d.name));
   } catch {
     /* ignore */
   }
-  sendJson(res, 200, { assets: out });
+  sendJson(res, 200, { assets, audio });
 }
 
 export function renderApiPlugin(): Plugin {

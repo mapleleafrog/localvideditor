@@ -1,9 +1,39 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
+import { staticFile } from "remotion";
+import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { Timeline } from "../../../src/timeline/Timeline";
+import type { AudioTrack } from "../../../src/timeline/schema";
 import { useEditor } from "../store";
-import { computeDuration } from "../lib/timeline-utils";
+import { audioEndFrames, computeDuration } from "../lib/timeline-utils";
 import { CanvasOverlay } from "./CanvasOverlay";
+
+const resolveSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
+
+/** Read each non-looping track's length (frames) in the browser so the Player is sized to the song. */
+function useAudioEnd(audio: AudioTrack[], fps: number): number {
+  const [frames, setFrames] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const missing = (audio ?? []).filter((a) => !a.loop && frames[a.src] === undefined);
+    if (!missing.length) return;
+    Promise.all(
+      missing.map(async (a) => {
+        try {
+          return [a.src, Math.round((await getAudioDurationInSeconds(resolveSrc(a.src))) * fps)] as const;
+        } catch {
+          return [a.src, 0] as const;
+        }
+      }),
+    ).then((pairs) => {
+      if (!cancelled) setFrames((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [audio, fps, frames]);
+  return audioEndFrames(audio ?? [], (src) => frames[src]);
+}
 
 /** contain-fit: largest aw:ah box that fits the container -> exact composition aspect (no letterbox). */
 function useContainFit(ref: React.RefObject<HTMLDivElement | null>, aw: number, ah: number) {
@@ -30,7 +60,8 @@ function useContainFit(ref: React.RefObject<HTMLDivElement | null>, aw: number, 
  *  transform tools (CanvasOverlay) can map screen px <-> composition coordinates 1:1. */
 export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
   const project = useEditor((s) => s.project);
-  const duration = computeDuration(project);
+  const audioEnd = useAudioEnd(project.audio ?? [], project.fps ?? 30);
+  const duration = computeDuration(project, audioEnd);
   const compW = project.width ?? 1920;
   const compH = project.height ?? 1080;
   const wrapRef = useRef<HTMLDivElement>(null);

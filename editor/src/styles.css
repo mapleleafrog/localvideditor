@@ -159,6 +159,13 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .lib-item { font-size: 11px; padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ===== audio / beat-sync panel ===== */
+.audio-panel .fld { margin-bottom: 6px; }
+.audio-panel input[type="checkbox"] { width: auto; align-self: flex-start; }
+.audio-track { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-bottom: 8px; background: var(--panel-2); }
+.audio-track-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.audio-name { font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* overlay lane reorder (z-order) */
 .tl-gutter-row .ovl-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ovl-reorder { display: flex; flex-direction: column; gap: 1px; }

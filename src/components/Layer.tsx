@@ -15,6 +15,8 @@ interface LayerProps {
   /** Progress normalization window for entrance-style motions (defaults to 1s). */
   windowInFrames?: number;
   bpm?: number;
+  /** Shift the beat grid (in frames) so the kick aligns to a real song's downbeat. */
+  beatOffsetInFrames?: number;
   /** Depth 0=far .. 1=near. Adds a base drop-shadow; read by depth motions via ctx.z. */
   z?: number;
   /** When true, prepend translate(-50%,-50%) so the layer centers on its left/top anchor. */
@@ -43,6 +45,7 @@ export const Layer: React.FC<LayerProps> = ({
   durationInFrames,
   windowInFrames,
   bpm = 120,
+  beatOffsetInFrames = 0,
   z,
   centered = false,
   scale,
@@ -62,7 +65,7 @@ export const Layer: React.FC<LayerProps> = ({
   const f = frame - from;
   const t = frame / fps;
   const progress = windowInFrames ? clamp(f / windowInFrames) : clamp(f / fps);
-  const beat = beatKick(t, bpm, 6);
+  const beat = beatKick(t, bpm, 6, beatOffsetInFrames / fps);
   const zz = z ?? 0;
 
   const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];

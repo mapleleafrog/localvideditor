@@ -9,7 +9,7 @@ A Remotion (React → MP4) VFX pipeline for a wedding walk-in video set to "Sora
 ## Stack (pinned, identical versions — no `^`)
 - remotion + @remotion/cli + @remotion/transitions + @remotion/media-utils + @remotion/paths + @remotion/shapes + @remotion/gif — all **4.0.472**
 - React 19, TypeScript. No UI/state libraries (Tailwind was stripped from the scaffold).
-- `@remotion/media-utils` is installed for future audio-reactive work; NOT wired yet (beat is frame-derived).
+- `@remotion/media-utils` is wired for audio **duration** (`getAudioDurationInSeconds`, sizes the timeline to the song). Beat is still a frame-derived metronome (configurable BPM/offset) — true FFT audio-reactive (`useAudioData`/`visualizeAudio`) is still `todo`.
 
 ## Architecture
 - `src/effects/` is a data-driven registry grouped by category.
@@ -29,7 +29,7 @@ A Remotion (React → MP4) VFX pipeline for a wedding walk-in video set to "Sora
 - Time-window layers by mount-gating in `Layer` (return null outside range). Do NOT wrap beat-reactive layers in a frame-rebasing `<Sequence>` — it desyncs the beat.
 - `t` is ABSOLUTE composition seconds so loops + beat stay on the song grid.
 - All assets via `staticFile()`. No remote URLs in components.
-- BPM via `helpers.ts#beatKick` only. v1 derives beat from frame count; no audio analysis yet.
+- BPM via `helpers.ts#beatKick(t, bpm, exp, offsetSec)` only — beat is frame-derived (no FFT). `project.bpm` + `project.beatOffsetInFrames` set the metronome; `Layer`/`Timeline` thread them into every `beatKick` call so beat-reactive motions lock to the song's tempo/downbeat.
 - New effects = catalog entry + (if ready) an implementation override. Scenes reference effects by id.
 - Composition length must equal footage content (transitions overlap; total = ΣsequenceDurations − Σtransitions).
 
@@ -50,8 +50,13 @@ The 7 shader presentations are `engine:"webgl"` (HTML-in-canvas). They **render 
 The `Timeline` composition renders ANY video from a `project` config (Zod-schema'd props): a **clip track** (image/video clips joined by transitions) + positioned **overlays** (text/image with stacked effects) + a **background**. Effect ids resolve against `src/effects`, so new effects work immediately — one registry, exact preview, render-grade. Files: `src/timeline/schema.ts` (`projectSchema`, `SAMPLE_PROJECT`), `src/timeline/Timeline.tsx`; sample configs in `projects/`.
 - **Edit:** `npm run dev` → Studio opens `Timeline` with a live props form + scrubber (or hand-edit a `projects/*.json`). Drop photos/clips in `public/media/`, reference as `media/<file>`.
 - **Render:** `npm run render:timeline` (sample) or `npx remotion render Timeline out/video.mp4 --props=./projects/your.json`.
-- Duration is computed from the config (`calculateTimelineMetadata`: Σclips − Σtransitions, covering overlays). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
+- Duration is computed from the config (`calculateTimelineMetadata`, async: max(Σclips − Σtransitions, overlay end, **audio end** via `audioEndFrames`), so the video lasts as long as the song). Overlays take `motions: string[]`, composed via `composeStyles` (`src/effects/compose.ts`).
 - **Two ways to edit the same `project` schema:** the Studio props form (`npm run dev`) **or** the drag-and-drop editor below (`npm run editor`). Both render via the same `Timeline` composition + CLI pipeline.
+
+### Audio & beat-sync
+- `projectSchema.audio` is an array of soundtrack tracks (`src`, `volume`, `from`, `trimBefore`, `trimAfter`, `loop`); `Timeline.tsx`'s `SoundtrackLayer` renders each as `<Audio>` inside a `<Sequence from={track.from}>` (preview + render). Non-looping tracks **extend** the timeline via `audioEndFrames`; looping tracks fill it and never define it.
+- **Beat-sync (not FFT):** `project.bpm` + `project.beatOffsetInFrames` drive the synthetic beat clock. Apply a beat-reactive motion (`beatPulse`/`beatShake`/`beatFlash`/`beatColorCycle`/`beatZoomCut`) to any clip/overlay and it pulses on that tempo — set BPM to the song and nudge the offset so the kick lands on the downbeat. Drop `.mp3/.wav/.m4a` in `public/media/`. Real waveform-reactive beat (bass/loudness) is still `todo` (`bassWarp`, `audioBars`, `waveform`).
+- **Editor:** the Library **Audio tab** (`editor/src/components/AudioPanel.tsx`) sets BPM/offset and adds/edits soundtrack tracks; `/api/media` now returns `{ assets, audio }` (audio split out of the visual list); `Preview` reads audio lengths in-browser to size the `<Player>`.
 
 ## Soranji Studio — the drag-and-drop editor (`editor/`, `npm run editor`)
 A real timeline NLE (Canva/CapCut-style) built on `@remotion/player`, hosted by a Vite app in `editor/`. **The live preview IS the `Timeline` composition** that renders to MP4 — exact WYSIWYG. **Registry-driven:** every effect/transition picker reads `src/effects` via `editor/src/lib/effects-bridge.ts`, so a motion added to `portable.ts`+`catalog.ts` appears in the editor with zero editor edits (the whole point — scales with the library). Full how-to in `EDITOR_GUIDE.md`.

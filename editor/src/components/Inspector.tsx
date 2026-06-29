@@ -1,6 +1,17 @@
 import React from "react";
 import { useEditor } from "../store";
+import type { Overlay } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
+
+const IO_OPTS: [Overlay["enter"], string][] = [
+  ["none", "none"],
+  ["fade", "Fade"],
+  ["slideLeft", "Slide from left"],
+  ["slideRight", "Slide from right"],
+  ["slideUp", "Slide from top"],
+  ["slideDown", "Slide from bottom"],
+  ["zoom", "Zoom"],
+];
 
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
@@ -130,6 +141,25 @@ export const Inspector: React.FC = () => {
       <div className="insp-sub">Timing</div>
       <Field label="Start (frame)"><input type="number" min={0} value={o.from} onChange={(e) => patchOverlay(i, { from: Math.max(0, +e.target.value) })} /></Field>
       <Field label="Duration (frames)"><input type="number" min={1} value={o.durationInFrames} onChange={(e) => patchOverlay(i, { durationInFrames: Math.max(1, +e.target.value) })} /></Field>
+
+      <div className="insp-sub">Transitions</div>
+      <Field label="Enter">
+        <select value={o.enter ?? "none"} onChange={(e) => patchOverlay(i, { enter: e.target.value as Overlay["enter"] })}>
+          {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </Field>
+      {(o.enter ?? "none") !== "none" && (
+        <Field label="Enter length (frames)"><input type="number" min={1} value={o.enterDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { enterDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+      )}
+      <Field label="Exit">
+        <select value={o.exit ?? "none"} onChange={(e) => patchOverlay(i, { exit: e.target.value as Overlay["exit"] })}>
+          {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </Field>
+      {(o.exit ?? "none") !== "none" && (
+        <Field label="Exit length (frames)"><input type="number" min={1} value={o.exitDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { exitDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+      )}
+
       <div className="insp-sub">{o.type === "fx" ? "Layer" : "Transform"}</div>
       {o.type !== "fx" && (
         <>

@@ -67,6 +67,11 @@ const overlaySchema = z.object({
   z: z.number().min(0).max(1).default(0.4),
   /** Progress window for entrance effects. */
   windowInFrames: z.number().int().positive().default(30),
+  /** Enter / exit transition for this layer (fade / slide / zoom in & out). */
+  enter: z.enum(["none", "fade", "slideLeft", "slideRight", "slideUp", "slideDown", "zoom"]).default("none"),
+  exit: z.enum(["none", "fade", "slideLeft", "slideRight", "slideUp", "slideDown", "zoom"]).default("none"),
+  enterDurationInFrames: z.number().int().nonnegative().default(15),
+  exitDurationInFrames: z.number().int().nonnegative().default(15),
   /** Text only. */
   fontSize: z.number().default(80),
   color: z.string().default("#ffffff"),

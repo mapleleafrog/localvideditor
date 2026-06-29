@@ -108,6 +108,10 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         windowInFrames={o.windowInFrames}
         bpm={bpm}
         beatOffsetInFrames={beatOffsetInFrames}
+        enter={o.enter}
+        exit={o.exit}
+        enterDurationInFrames={o.enterDurationInFrames}
+        exitDurationInFrames={o.exitDurationInFrames}
         dataIndex={index}
         style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
       />
@@ -138,6 +142,10 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       windowInFrames={o.windowInFrames}
       bpm={bpm}
       beatOffsetInFrames={beatOffsetInFrames}
+      enter={o.enter}
+      exit={o.exit}
+      enterDurationInFrames={o.enterDurationInFrames}
+      exitDurationInFrames={o.exitDurationInFrames}
       z={o.z}
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}

@@ -18,7 +18,8 @@ const clampPct = (v: number) => Math.max(-20, Math.min(120, v));
 
 const imageOverlay = (src: string, width: number, x: number, y: number): Overlay => ({
   type: "image", text: "", src, from: 0, durationInFrames: 60, x, y, scale: 1, rotation: 0,
-  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
+  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, enter: "none", exit: "none",
+  enterDurationInFrames: 15, exitDurationInFrames: 15, fontSize: 80, color: "#ffffff", glow: "", width,
 });
 const videoClip = (src: string): Clip => ({
   type: "video", src, durationInFrames: 60, motion: "none", transitionToNext: "none",

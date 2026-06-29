@@ -14,7 +14,8 @@ const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref
 
 const imageOverlay = (src: string, width: number): Overlay => ({
   type: "image", text: "", src, from: 0, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0,
-  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
+  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, enter: "none", exit: "none",
+  enterDurationInFrames: 15, exitDurationInFrames: 15, fontSize: 80, color: "#ffffff", glow: "", width,
 });
 
 /** Asset browser: drag-drop / pick files to import into public/media/, preview thumbnails, and

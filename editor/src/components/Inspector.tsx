@@ -11,6 +11,14 @@ const IO_OPTS: [Overlay["enter"], string][] = [
   ["slideUp", "Slide from top"],
   ["slideDown", "Slide from bottom"],
   ["zoom", "Zoom"],
+  ["pop", "Pop / bounce"],
+  ["rotateIn", "Rotate in"],
+  ["spin", "Spin in"],
+  ["blurIn", "Blur in"],
+  ["flash", "Flash"],
+  ["wipe", "Wipe (reveal)"],
+  ["iris", "Iris / circle"],
+  ["typewriter", "Typewriter (text)"],
 ];
 
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));

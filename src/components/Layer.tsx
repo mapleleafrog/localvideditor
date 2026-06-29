@@ -1,14 +1,55 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import { getMotion, depthShadow, composeStyles } from "../effects";
-import { beatKick, clamp, smooth, lerp } from "../effects/helpers";
+import { beatKick, clamp, smooth, lerp, quantize } from "../effects/helpers";
 
-export type TransitionKind = "none" | "fade" | "slideLeft" | "slideRight" | "slideUp" | "slideDown" | "zoom";
+export type TransitionKind =
+  | "none"
+  | "fade"
+  | "slideLeft"
+  | "slideRight"
+  | "slideUp"
+  | "slideDown"
+  | "zoom"
+  | "pop"
+  | "rotateIn"
+  | "spin"
+  | "blurIn"
+  | "flash"
+  | "wipe"
+  | "iris"
+  | "typewriter";
+
 const SLIDE_FRAC = 0.2; // slide distance as a fraction of the frame
-const dirSign = (k: TransitionKind): { sx: number; sy: number } => ({
-  sx: k === "slideLeft" ? -1 : k === "slideRight" ? 1 : 0,
-  sy: k === "slideUp" ? -1 : k === "slideDown" ? 1 : 0,
-});
+// ease-out-back: overshoots slightly past 1 then settles — the "pop".
+const backOut = (p: number) => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+};
+
+type IoPart = { opacity?: number; tx?: number; ty?: number; scale?: number; rotate?: number; blur?: number; brightness?: number; clip?: string };
+/** Element-scoped transition contribution at progress p (1 = fully present, 0 = hidden). */
+const ioPart = (k: TransitionKind, p: number, w: number, h: number): IoPart => {
+  const inv = 1 - p;
+  switch (k) {
+    case "fade": return { opacity: p };
+    case "slideLeft": return { opacity: p, tx: -inv * w * SLIDE_FRAC };
+    case "slideRight": return { opacity: p, tx: inv * w * SLIDE_FRAC };
+    case "slideUp": return { opacity: p, ty: -inv * h * SLIDE_FRAC };
+    case "slideDown": return { opacity: p, ty: inv * h * SLIDE_FRAC };
+    case "zoom": return { opacity: p, scale: lerp(0.7, 1, p) };
+    case "pop": return { opacity: clamp(p * 1.5), scale: backOut(p) };
+    case "rotateIn": return { opacity: p, rotate: inv * -90, scale: lerp(0.6, 1, p) };
+    case "spin": return { opacity: p, rotate: inv * 360, scale: lerp(0.3, 1, p) };
+    case "blurIn": return { opacity: p, blur: inv * 16 };
+    case "flash": return { opacity: p, brightness: lerp(3, 1, p) };
+    case "wipe": return { clip: `inset(0 ${inv * 100}% 0 0)` };
+    case "iris": return { clip: `circle(${lerp(0, 150, p)}% at 50% 50%)` };
+    case "typewriter": return { clip: `inset(0 ${(1 - quantize(p, 14)) * 100}% 0 0)` };
+    default: return {};
+  }
+};
 
 interface LayerProps {
   /** Single motion id (back-compat). Ignored if `motionIds` is given. */
@@ -86,34 +127,32 @@ export const Layer: React.FC<LayerProps> = ({
 
   const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];
   const ctx = { progress, frame, fps, t, beat, z: zz, params };
-  const { transform: motionTransform, opacity: motionOpacity, ...motionRest } = composeStyles(ids.map((id) => getMotion(id)(ctx)));
+  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = composeStyles(
+    ids.map((id) => getMotion(id)(ctx)),
+  );
 
-  // --- enter / exit transition (fade / slide / zoom in & out) ---
-  let ioOpacity = 1;
-  let ioTx = 0;
-  let ioTy = 0;
-  let ioScale = 1;
-  if (enter !== "none") {
-    const a = smooth(clamp(f / Math.max(1, enterDurationInFrames)));
-    ioOpacity *= a;
-    const d = dirSign(enter);
-    ioTx += d.sx * (1 - a) * width * SLIDE_FRAC;
-    ioTy += d.sy * (1 - a) * height * SLIDE_FRAC;
-    if (enter === "zoom") ioScale *= lerp(0.7, 1, a);
-  }
-  if (exit !== "none" && durationInFrames != null) {
-    const b = smooth(clamp((durationInFrames - f) / Math.max(1, exitDurationInFrames)));
-    ioOpacity *= b;
-    const d = dirSign(exit);
-    ioTx += d.sx * (1 - b) * width * SLIDE_FRAC;
-    ioTy += d.sy * (1 - b) * height * SLIDE_FRAC;
-    if (exit === "zoom") ioScale *= lerp(0.7, 1, b);
-  }
+  // --- enter / exit transitions (element-scoped: fade / slide / zoom / pop / rotate / spin / blur / flash / wipe / iris / typewriter) ---
+  const eP = enter !== "none" ? ioPart(enter, smooth(clamp(f / Math.max(1, enterDurationInFrames))), width, height) : {};
+  const xP =
+    exit !== "none" && durationInFrames != null
+      ? ioPart(exit, smooth(clamp((durationInFrames - f) / Math.max(1, exitDurationInFrames))), width, height)
+      : {};
+  const ioOpacity = (eP.opacity ?? 1) * (xP.opacity ?? 1);
+  const ioTx = (eP.tx ?? 0) + (xP.tx ?? 0);
+  const ioTy = (eP.ty ?? 0) + (xP.ty ?? 0);
+  const ioScale = (eP.scale ?? 1) * (xP.scale ?? 1);
+  const ioRotate = (eP.rotate ?? 0) + (xP.rotate ?? 0);
+  const ioBlur = (eP.blur ?? 0) + (xP.blur ?? 0);
+  const ioBrightness = (eP.brightness ?? 1) * (xP.brightness ?? 1);
+  // Only one clip-path can apply — use the exit's while it's mid-flight, else the enter's.
+  const exitActive = exit !== "none" && durationInFrames != null && durationInFrames - f < exitDurationInFrames;
+  const ioClip = exitActive ? xP.clip : eP.clip ?? xP.clip;
 
   const baseParts: string[] = [];
   if (centered) baseParts.push("translate(-50%, -50%)");
   if (ioTx || ioTy) baseParts.push(`translate(${ioTx}px, ${ioTy}px)`);
   if (ioScale !== 1) baseParts.push(`scale(${ioScale})`);
+  if (ioRotate) baseParts.push(`rotate(${ioRotate}deg)`);
   if (scale != null && scale !== 1) baseParts.push(`scale(${scale})`);
   if (rotation) baseParts.push(`rotate(${rotation}deg)`);
   if (motionTransform) baseParts.push(String(motionTransform));
@@ -123,16 +162,25 @@ export const Layer: React.FC<LayerProps> = ({
   const { opacity: styleOpacity, ...styleRest } = style ?? {};
   const finalOpacity = Number(styleOpacity ?? 1) * Number(motionOpacity ?? 1) * ioOpacity;
 
+  // Combine filters (depth shadow · motion filter · enter/exit blur/brightness) — CSS allows only one.
+  const filters: string[] = [];
+  if (z != null) filters.push(depthShadow(zz));
+  if (motionFilter) filters.push(String(motionFilter));
+  if (ioBlur) filters.push(`blur(${ioBlur}px)`);
+  if (ioBrightness !== 1) filters.push(`brightness(${ioBrightness})`);
+  const filter = filters.length ? filters.join(" ") : undefined;
+
   return (
     <div
       {...(dataIndex != null ? { "data-ovl-index": dataIndex } : {})}
       style={{
         position: "absolute",
         willChange: "transform, opacity",
-        ...(z != null ? { filter: depthShadow(zz) } : {}),
         ...styleRest,
         ...motionRest,
         opacity: finalOpacity,
+        ...(filter ? { filter } : {}),
+        ...(ioClip ? { clipPath: ioClip } : {}),
         ...(transform ? { transform } : {}),
       }}
     >

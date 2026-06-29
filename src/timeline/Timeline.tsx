@@ -12,7 +12,7 @@ import {
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
-import { getMotion, getTransitionPresentation, scaleStrength } from "../effects";
+import { getMotion, getTransitionPresentation, scaleStrength, EASINGS } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
@@ -85,7 +85,7 @@ const ClipTrack: React.FC<{ clips: Clip[]; bpm: number; beatOffsetInFrames: numb
         <TransitionSeries.Transition
           key={`tr-${i}`}
           presentation={getTransitionPresentation(clip.transitionToNext)}
-          timing={linearTiming({ durationInFrames: clip.transitionDurationInFrames })}
+          timing={linearTiming({ durationInFrames: clip.transitionDurationInFrames, easing: EASINGS[clip.transitionEasing ?? "linear"] })}
         />,
       );
     }
@@ -115,8 +115,11 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         exit={o.exit}
         enterDurationInFrames={o.enterDurationInFrames}
         exitDurationInFrames={o.exitDurationInFrames}
+        enterEasing={o.enterEasing}
+        exitEasing={o.exitEasing}
         loop={o.loop}
         strength={o.strength}
+        motionParams={o.motionParams}
         dataIndex={index}
         style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
       />
@@ -156,8 +159,11 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       exit={o.exit}
       enterDurationInFrames={o.enterDurationInFrames}
       exitDurationInFrames={o.exitDurationInFrames}
+      enterEasing={o.enterEasing}
+      exitEasing={o.exitEasing}
       loop={o.loop}
       strength={o.strength}
+      motionParams={o.motionParams}
       z={o.z}
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}

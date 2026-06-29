@@ -190,6 +190,12 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 /* timeline drop-to-add-clip highlight */
 .tl-scroll.dropping { outline: 2px dashed var(--accent); outline-offset: -3px; }
 
+/* per-effect settings block in the Inspector */
+.fx-item { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-bottom: 8px; background: var(--panel-2); }
+.fx-item-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.fx-name { font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-item input[type="checkbox"] { width: auto; }
+
 /* right-click layer context menu */
 .ctx-menu {
   position: fixed; z-index: 100; min-width: 150px;

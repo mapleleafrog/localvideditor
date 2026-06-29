@@ -1,7 +1,10 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { getMotion, depthShadow, composeStyles, scaleStrength } from "../effects";
-import { beatKick, clamp, smooth, lerp, quantize } from "../effects/helpers";
+import { getMotion, depthShadow, composeStyles, scaleStrength, ease, type EasingName } from "../effects";
+import { beatKick, clamp, lerp, quantize } from "../effects/helpers";
+
+/** Per-effect settings (index-aligned with the motion ids). */
+export type MotionParam = { loop?: boolean; strength?: number; easing?: EasingName };
 
 export type TransitionKind =
   | "none"
@@ -70,10 +73,15 @@ interface LayerProps {
   exit?: TransitionKind;
   enterDurationInFrames?: number;
   exitDurationInFrames?: number;
-  /** Loop the motion's progress over the window instead of running once. */
+  /** Easing curves for the enter / exit ramps (default easeInOut). */
+  enterEasing?: EasingName;
+  exitEasing?: EasingName;
+  /** Per-layer fallback loop/strength (applied to every effect lacking a per-effect override). */
   loop?: boolean;
   /** Effect strength multiplier (1 = normal; 0 = off; >1 = exaggerated). */
   strength?: number;
+  /** Per-effect settings, index-aligned with `motionIds` (loop / strength / easing each). */
+  motionParams?: MotionParam[];
   /** Depth 0=far .. 1=near. Adds a base drop-shadow; read by depth motions via ctx.z. */
   z?: number;
   /** When true, prepend translate(-50%,-50%) so the layer centers on its left/top anchor. */
@@ -107,8 +115,11 @@ export const Layer: React.FC<LayerProps> = ({
   exit = "none",
   enterDurationInFrames = 15,
   exitDurationInFrames = 15,
+  enterEasing = "easeInOut",
+  exitEasing = "easeInOut",
   loop = false,
   strength = 1,
+  motionParams,
   z,
   centered = false,
   scale,
@@ -128,22 +139,25 @@ export const Layer: React.FC<LayerProps> = ({
   const f = frame - from;
   const t = frame / fps;
   const win = windowInFrames || fps;
-  const progress = loop ? f / win - Math.floor(f / win) : clamp(f / win);
   const beat = beatKick(t, bpm, 6, beatOffsetInFrames / fps);
   const zz = z ?? 0;
 
   const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];
-  const ctx = { progress, frame, fps, t, beat, z: zz, params };
-  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = scaleStrength(
-    composeStyles(ids.map((id) => getMotion(id)(ctx))),
-    strength,
-  );
+  // Per-effect: each motion gets its own loop (progress sawtooth), easing (progress curve), and
+  // strength (magnitude). A per-effect value falls back to the layer-level loop/strength.
+  const perEffect = ids.map((id, i) => {
+    const p = motionParams?.[i];
+    const looped = (p?.loop ?? loop) ? f / win - Math.floor(f / win) : clamp(f / win);
+    const progress = ease(p?.easing ?? "linear", looped);
+    return scaleStrength(getMotion(id)({ progress, frame, fps, t, beat, z: zz, params }), p?.strength ?? strength);
+  });
+  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = composeStyles(perEffect);
 
   // --- enter / exit transitions (element-scoped: fade / slide / zoom / pop / rotate / spin / blur / flash / wipe / iris / typewriter) ---
-  const eP = enter !== "none" ? ioPart(enter, smooth(clamp(f / Math.max(1, enterDurationInFrames))), width, height) : {};
+  const eP = enter !== "none" ? ioPart(enter, ease(enterEasing, clamp(f / Math.max(1, enterDurationInFrames))), width, height) : {};
   const xP =
     exit !== "none" && durationInFrames != null
-      ? ioPart(exit, smooth(clamp((durationInFrames - f) / Math.max(1, exitDurationInFrames))), width, height)
+      ? ioPart(exit, ease(exitEasing, clamp((durationInFrames - f) / Math.max(1, exitDurationInFrames))), width, height)
       : {};
   const ioOpacity = (eP.opacity ?? 1) * (xP.opacity ?? 1);
   const ioTx = (eP.tx ?? 0) + (xP.tx ?? 0);

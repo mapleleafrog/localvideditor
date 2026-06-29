@@ -5,3 +5,7 @@ dist
 
 # Ignore the output video from Git but not videos you import into src/.
 out
+
+# Media imported via the editor's drag-and-drop (stays local; keep the folder).
+public/media/*
+!public/media/.gitkeep

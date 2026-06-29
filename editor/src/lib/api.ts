@@ -68,6 +68,16 @@ export async function listMedia(): Promise<string[]> {
   }
 }
 
+/** Import a dropped/picked file into public/media/. Returns the ref (e.g. "media/photo.jpg"). */
+export async function uploadMedia(file: File): Promise<{ ok: boolean; ref?: string; message?: string }> {
+  try {
+    const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+    return await res.json();
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Audio files dropped in public/media/ (or public/) — for the soundtrack picker. */
 export async function listAudio(): Promise<string[]> {
   try {

@@ -1,26 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useEditor } from "../store";
-import type { Overlay } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
-import { listMedia } from "../lib/api";
 import { AudioPanel } from "./AudioPanel";
+import { CanvasPanel } from "./CanvasPanel";
+import { AssetsPanel } from "./AssetsPanel";
 
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
-// Fallback list until /api/media responds (the dev server scans public/ + public/media/).
-const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
 
 export const Library: React.FC = () => {
-  const { project, selection, patchOverlay, patchClip, addOverlay } = useEditor();
-  const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio">("effects");
-  const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
-
-  useEffect(() => {
-    listMedia().then((a) => {
-      if (a.length) setAssets(a);
-    });
-  }, []);
+  const { project, selection, patchOverlay, patchClip } = useEditor();
+  const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio" | "canvas">("effects");
 
   const applyEffect = (id: string) => {
     if (!selection) return;
@@ -34,13 +25,6 @@ export const Library: React.FC = () => {
   const applyTransition = (id: string) => {
     if (selection?.kind === "clip") patchClip(selection.index, { transitionToNext: id });
   };
-  const addAsset = (src: string) => {
-    const o: Overlay = {
-      type: "image", text: "", src, from: 0, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0,
-      opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width: 240,
-    };
-    addOverlay(o);
-  };
 
   return (
     <div className="lib">
@@ -49,6 +33,7 @@ export const Library: React.FC = () => {
         <button className={tab === "transitions" ? "on" : ""} onClick={() => setTab("transitions")}>Transitions</button>
         <button className={tab === "assets" ? "on" : ""} onClick={() => setTab("assets")}>Assets</button>
         <button className={tab === "audio" ? "on" : ""} onClick={() => setTab("audio")}>Audio</button>
+        <button className={tab === "canvas" ? "on" : ""} onClick={() => setTab("canvas")}>Canvas</button>
       </div>
       <div className="lib-body">
         {tab === "effects" && (
@@ -84,17 +69,9 @@ export const Library: React.FC = () => {
             </div>
           </>
         )}
-        {tab === "assets" && (
-          <>
-            <div className="lib-hint">Click to add as an image layer. Drop more files in public/media/.</div>
-            <div className="lib-grid">
-              {assets.map((a) => (
-                <button key={a} className="lib-item" onClick={() => addAsset(a)}>{a}</button>
-              ))}
-            </div>
-          </>
-        )}
+        {tab === "assets" && <AssetsPanel />}
         {tab === "audio" && <AudioPanel />}
+        {tab === "canvas" && <CanvasPanel />}
       </div>
     </div>
   );

@@ -150,8 +150,9 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 
 /* ===== library ===== */
 .lib { display: flex; flex-direction: column; height: 100%; }
-.lib-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex: none; }
-.lib-tabs button { flex: 1; font-size: 11px; padding: 5px; }
+.lib-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex: none; }
+.lib-tabs button { flex: 1 1 auto; min-width: 64px; font-size: 11px; padding: 5px; }
+.canvas-swap { width: 100%; text-align: center; margin-top: 4px; }
 .lib-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .lib-body { padding: 10px; overflow: auto; flex: 1; min-height: 0; }
 .lib-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }

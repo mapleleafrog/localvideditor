@@ -2,8 +2,11 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import type { Project, Clip, Overlay, AudioTrack } from "../../src/timeline/schema";
 import sampleProject from "../../projects/sample.json";
+import { clipStarts } from "./lib/timeline-utils";
 
 export type Selection = { kind: "clip" | "overlay"; index: number } | null;
+/** Cut/copied item, held in memory for paste (transient — not undone or persisted). */
+export type Clipboard = { kind: "clip"; item: Clip } | { kind: "overlay"; item: Overlay } | null;
 
 export interface EditorState {
   project: Project;
@@ -29,7 +32,22 @@ export interface EditorState {
   removeSelected: () => void;
   reorderOverlay: (from: number, to: number) => void;
   reorderClip: (from: number, to: number) => void;
+  /** Blade: split the selected item (or the clip under the playhead) at `frame`. */
+  splitSelected: (frame: number) => void;
+  /** Copy the selection right after itself (a new lane for overlays). */
+  duplicateSelected: () => void;
+  /** Stash the selection on the clipboard. */
+  copySelected: () => void;
+  /** Paste the clipboard — overlays land at `frame`, clips append to the track. */
+  pasteAt: (frame: number) => void;
   // transient UI state (not undone)
+  clipboard: Clipboard;
+  /** Transient status toast (keyboard ops, save). `n` forces a re-fire of the same message. */
+  toast: { msg: string; n: number } | null;
+  flash: (msg: string) => void;
+  /** Keyboard cheat-sheet overlay. */
+  showShortcuts: boolean;
+  toggleShortcuts: (v?: boolean) => void;
   setView: (v: "edit" | "storyboard") => void;
   select: (s: Selection) => void;
   setPlayhead: (f: number) => void;
@@ -61,6 +79,9 @@ function loadName(): string {
 
 const seed = loadSeed();
 
+// Monotonic nonce so re-flashing the SAME toast message still re-triggers its auto-dismiss timer.
+let toastN = 0;
+
 // Leading-edge throttle for zundo's history recording: a continuous gesture (canvas/timeline drag,
 // slider scrub, fast typing) records ONE history entry (the pre-gesture state) per window instead
 // of one per pointer-move — so Ctrl+Z reverts the whole motion, not a few pixels.
@@ -84,6 +105,9 @@ export const useEditor = create<EditorState>()(
       playhead: 0,
       zoom: 4,
       view: "edit",
+      clipboard: null,
+      toast: null,
+      showShortcuts: false,
 
       setProject: (project) => set({ project, selection: null }),
       setProjectName: (projectName) => set({ projectName }),
@@ -149,6 +173,140 @@ export const useEditor = create<EditorState>()(
           arr.splice(to, 0, moved);
           return { project: { ...s.project, clips: arr } };
         }),
+
+      splitSelected: (frame) =>
+        set((s) => {
+          const sel = s.selection;
+          // Overlay: split the timed lane at the absolute playhead frame.
+          if (sel?.kind === "overlay") {
+            const o = s.project.overlays[sel.index];
+            if (!o) return {};
+            const rel = frame - (o.from ?? 0);
+            if (rel <= 0 || rel >= o.durationInFrames) return {};
+            const first: Overlay = { ...o, durationInFrames: rel, exit: "none" };
+            const second: Overlay = {
+              ...o,
+              from: (o.from ?? 0) + rel,
+              durationInFrames: o.durationInFrames - rel,
+              enter: "none",
+              motions: [...(o.motions ?? [])],
+              motionParams: o.motionParams ? o.motionParams.map((p) => ({ ...p })) : undefined,
+            };
+            const overlays = [...s.project.overlays];
+            overlays.splice(sel.index, 1, first, second);
+            return {
+              project: { ...s.project, overlays },
+              selection: { kind: "overlay", index: sel.index + 1 },
+              toast: { msg: "Split layer", n: ++toastN },
+            };
+          }
+          // Clip: split the selected clip, else whichever clip sits under the playhead.
+          const starts = clipStarts(s.project);
+          let ci = sel?.kind === "clip" ? sel.index : -1;
+          if (ci < 0)
+            ci = s.project.clips.findIndex((c, i) => frame > starts[i] && frame < starts[i] + c.durationInFrames);
+          const c = s.project.clips[ci];
+          if (!c) return {};
+          const rel = frame - starts[ci];
+          if (rel <= 0 || rel >= c.durationInFrames) return {};
+          // No transition between the two halves; the second half inherits the original outgoing one.
+          const first: Clip = { ...c, durationInFrames: rel, transitionToNext: "none" };
+          const second: Clip = {
+            ...c,
+            durationInFrames: c.durationInFrames - rel,
+            // Video continues from where the first half left off; images ignore trim.
+            trimBefore: c.type === "video" ? (c.trimBefore || 0) + rel : c.trimBefore,
+          };
+          const clips = [...s.project.clips];
+          clips.splice(ci, 1, first, second);
+          return {
+            project: { ...s.project, clips },
+            selection: { kind: "clip", index: ci + 1 },
+            toast: { msg: "Split clip", n: ++toastN },
+          };
+        }),
+
+      duplicateSelected: () =>
+        set((s) => {
+          const sel = s.selection;
+          if (!sel) return {};
+          if (sel.kind === "clip") {
+            const c = s.project.clips[sel.index];
+            if (!c) return {};
+            const clips = [...s.project.clips];
+            clips.splice(sel.index + 1, 0, { ...c });
+            return {
+              project: { ...s.project, clips },
+              selection: { kind: "clip", index: sel.index + 1 },
+              toast: { msg: "Duplicated clip", n: ++toastN },
+            };
+          }
+          const o = s.project.overlays[sel.index];
+          if (!o) return {};
+          const copy: Overlay = {
+            ...o,
+            motions: [...(o.motions ?? [])],
+            motionParams: o.motionParams ? o.motionParams.map((p) => ({ ...p })) : undefined,
+          };
+          const overlays = [...s.project.overlays];
+          overlays.splice(sel.index + 1, 0, copy);
+          return {
+            project: { ...s.project, overlays },
+            selection: { kind: "overlay", index: sel.index + 1 },
+            toast: { msg: "Duplicated layer", n: ++toastN },
+          };
+        }),
+
+      copySelected: () =>
+        set((s) => {
+          const sel = s.selection;
+          if (!sel) return {};
+          if (sel.kind === "clip") {
+            const c = s.project.clips[sel.index];
+            return c ? { clipboard: { kind: "clip", item: { ...c } }, toast: { msg: "Copied clip", n: ++toastN } } : {};
+          }
+          const o = s.project.overlays[sel.index];
+          return o
+            ? {
+                clipboard: {
+                  kind: "overlay",
+                  item: { ...o, motions: [...(o.motions ?? [])], motionParams: o.motionParams ? o.motionParams.map((p) => ({ ...p })) : undefined },
+                },
+                toast: { msg: "Copied layer", n: ++toastN },
+              }
+            : {};
+        }),
+
+      pasteAt: (frame) =>
+        set((s) => {
+          const cb = s.clipboard;
+          if (!cb) return {};
+          // Clips are sequential — paste appends to the end of the track.
+          if (cb.kind === "clip") {
+            const clips = [...s.project.clips, { ...cb.item }];
+            return {
+              project: { ...s.project, clips },
+              selection: { kind: "clip", index: clips.length - 1 },
+              toast: { msg: "Pasted clip", n: ++toastN },
+            };
+          }
+          // Overlays are free-floating — paste at the playhead on a fresh lane.
+          const copy: Overlay = {
+            ...cb.item,
+            from: Math.max(0, frame),
+            motions: [...(cb.item.motions ?? [])],
+            motionParams: cb.item.motionParams ? cb.item.motionParams.map((p) => ({ ...p })) : undefined,
+          };
+          const overlays = [...s.project.overlays, copy];
+          return {
+            project: { ...s.project, overlays },
+            selection: { kind: "overlay", index: overlays.length - 1 },
+            toast: { msg: "Pasted layer", n: ++toastN },
+          };
+        }),
+
+      flash: (msg) => set({ toast: { msg, n: ++toastN } }),
+      toggleShortcuts: (v) => set((s) => ({ showShortcuts: v ?? !s.showShortcuts })),
 
       setView: (view) => set({ view }),
       select: (selection) => set({ selection }),

@@ -295,3 +295,50 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .sb-trans select { flex: 1; font-size: 11px; padding: 3px 5px; }
 .sb-add { min-height: 210px; border: 2px dashed var(--border); border-radius: 10px; background: transparent; color: var(--muted); font-size: 13px; display: grid; place-items: center; cursor: pointer; }
 .sb-add:hover { border-color: var(--accent); color: var(--text); }
+
+/* ===== toolbar toggle (active) state — magnet, render ⚙, etc. ===== */
+.tl-toolbar button.on, .topbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tl-readout { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ===== playhead head (drag affordance in the ruler band) ===== */
+.tl-playhead-head {
+  position: absolute; top: 0; left: -5px; width: 12px; height: 12px;
+  background: var(--accent-2); border-radius: 0 0 6px 6px; box-shadow: 0 0 6px var(--accent-2);
+}
+
+/* ===== keyboard cheat-sheet overlay ===== */
+.sc-backdrop {
+  position: fixed; inset: 0; z-index: 200; background: rgba(8, 8, 12, 0.6);
+  display: grid; place-items: center; backdrop-filter: blur(2px);
+}
+.sc-modal {
+  width: min(720px, 92vw); max-height: 86vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.sc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sc-head strong { font-size: 15px; }
+.sc-head button { background: none; border: none; font-size: 15px; padding: 2px 8px; }
+.sc-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 22px; }
+.sc-group { display: flex; flex-direction: column; gap: 6px; }
+.sc-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--cyan); margin-bottom: 2px; }
+.sc-row { display: flex; align-items: center; gap: 8px; }
+.sc-keys { display: inline-flex; align-items: center; gap: 3px; flex: none; min-width: 92px; }
+.sc-plus { color: var(--muted); font-size: 10px; }
+.sc-label { font-size: 12px; color: var(--text); }
+.kbd {
+  display: inline-block; min-width: 18px; text-align: center; padding: 2px 6px;
+  font: 11px/1.2 ui-monospace, Menlo, Consolas, monospace; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 5px;
+}
+.sc-foot { margin-top: 14px; font-size: 11px; text-align: center; }
+
+/* ===== transient toast ===== */
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 210;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 8px 16px; font-size: 12px; color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); animation: toast-in 0.15s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }

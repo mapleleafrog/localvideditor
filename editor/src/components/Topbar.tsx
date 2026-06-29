@@ -16,6 +16,7 @@ export const Topbar: React.FC = () => {
   const setProjectName = useEditor((s) => s.setProjectName);
   const view = useEditor((s) => s.view);
   const setView = useEditor((s) => s.setView);
+  const toggleShortcuts = useEditor((s) => s.toggleShortcuts);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
   const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
   const [note, setNote] = useState<string | null>(null);
@@ -117,6 +118,7 @@ export const Topbar: React.FC = () => {
       <span className="sep" />
       <button onClick={() => useTemporal.getState().undo()} title="Undo (Ctrl+Z)">↶</button>
       <button onClick={() => useTemporal.getState().redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
+      <button onClick={() => toggleShortcuts()} title="Keyboard shortcuts (?)">⌨</button>
 
       <span className="sep" />
       <input

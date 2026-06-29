@@ -86,15 +86,27 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
 
   const seek = (f: number) => playerRef.current?.seekTo(f);
   // reorder an overlay lane (= compositing z-order), keeping the selection on the moved item
-  const moveOverlay = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= overlayCount) return;
-    reorderOverlay(i, j);
-    if (selection?.kind === "overlay") {
-      if (selection.index === i) select({ kind: "overlay", index: j });
-      else if (selection.index === j) select({ kind: "overlay", index: i });
-    }
+  const reorderTo = (from: number, to: number) => {
+    const clamped = Math.max(0, Math.min(overlayCount - 1, to));
+    if (clamped === from) return;
+    reorderOverlay(from, clamped);
+    select({ kind: "overlay", index: clamped });
   };
+  const moveOverlay = (i: number, dir: -1 | 1) => reorderTo(i, i + dir);
+
+  // right-click layer menu + drag-to-reorder lanes
+  const [menu, setMenu] = useState<{ x: number; y: number; index: number } | null>(null);
+  const dragLane = useRef<number | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu]);
   const onRulerDown = (e: React.PointerEvent) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -132,7 +144,25 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
               className={"tl-gutter-row clickable" + (selection?.kind === "overlay" && selection.index === i ? " on" : "")}
               style={{ height: LANE_H }}
               onClick={() => select({ kind: "overlay", index: i })}
-              title="Click to select layer"
+              title="Click to select · drag to reorder · right-click for more"
+              draggable
+              onDragStart={(e) => {
+                dragLane.current = i;
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (dragLane.current !== null) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragLane.current !== null && dragLane.current !== i) reorderTo(dragLane.current, i);
+                dragLane.current = null;
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                select({ kind: "overlay", index: i });
+                setMenu({ x: e.clientX, y: e.clientY, index: i });
+              }}
             >
               <span className="ovl-label">
                 {o.type === "text" ? "T" : o.type === "fx" ? "✦" : o.type === "video" ? "▶" : "▦"}{" "}
@@ -251,6 +281,15 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
           </div>
         </div>
       </div>
+
+      {menu && (
+        <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          <button disabled={menu.index === 0} onClick={() => { reorderTo(menu.index, 0); setMenu(null); }}>Move to top</button>
+          <button disabled={menu.index === 0} onClick={() => { moveOverlay(menu.index, -1); setMenu(null); }}>Move up</button>
+          <button disabled={menu.index === overlayCount - 1} onClick={() => { moveOverlay(menu.index, 1); setMenu(null); }}>Move down</button>
+          <button disabled={menu.index === overlayCount - 1} onClick={() => { reorderTo(menu.index, overlayCount - 1); setMenu(null); }}>Move to bottom</button>
+        </div>
+      )}
     </div>
   );
 };

@@ -61,6 +61,20 @@ function loadName(): string {
 
 const seed = loadSeed();
 
+// Leading-edge throttle for zundo's history recording: a continuous gesture (canvas/timeline drag,
+// slider scrub, fast typing) records ONE history entry (the pre-gesture state) per window instead
+// of one per pointer-move — so Ctrl+Z reverts the whole motion, not a few pixels.
+const throttleHandleSet = <F extends (...args: never[]) => void>(fn: F, wait: number): F => {
+  let last = 0;
+  return ((...args: Parameters<F>) => {
+    const now = Date.now();
+    if (now - last >= wait) {
+      last = now;
+      fn(...args);
+    }
+  }) as F;
+};
+
 export const useEditor = create<EditorState>()(
   temporal(
     (set) => ({
@@ -142,7 +156,12 @@ export const useEditor = create<EditorState>()(
       setZoom: (zoom) => set({ zoom }),
     }),
     // Only project edits are undoable; selection/playhead/zoom are transient.
-    { partialize: (s) => ({ project: s.project }), limit: 100 },
+    {
+      partialize: (s) => ({ project: s.project }),
+      limit: 100,
+      // Coalesce rapid changes (drags/scrubs/typing) into one undo step.
+      handleSet: (handleSet) => throttleHandleSet(handleSet, 600),
+    },
   ),
 );
 

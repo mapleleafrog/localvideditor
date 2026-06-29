@@ -42,6 +42,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom } =
     useEditor();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
   const fps = project.fps ?? 30;
   const total = computeDuration(project);
   const starts = clipStarts(project);
@@ -120,8 +121,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
       </div>
 
       <div className="tl-body">
-        <div className="tl-gutter">
-          <div className="tl-gutter-row" style={{ height: RULER_H }} />
+        <div className="tl-gutter" ref={gutterRef}>
+          <div className="tl-gutter-row tl-gutter-top" style={{ height: RULER_H }} />
           <div className="tl-gutter-row" style={{ height: LANE_H }}>CLIPS</div>
           {project.overlays.map((o, i) => (
             <div
@@ -164,6 +165,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
         <div
           className={"tl-scroll" + (dropping ? " dropping" : "")}
           ref={scrollRef}
+          onScroll={(e) => { if (gutterRef.current) gutterRef.current.scrollTop = e.currentTarget.scrollTop; }}
           onDragOver={(e) => { e.preventDefault(); if (!dropping) setDropping(true); }}
           onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
           onDrop={onDropFiles}

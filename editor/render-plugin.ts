@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promises as fs } from "node:fs";
+import { cpus } from "node:os";
 import type { Plugin } from "vite";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -109,9 +110,11 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const fileName = `timeline-${tag}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
     const kind = transparent ? "transparent ProRes" : "H.264";
+    // Use the whole machine: one render tab per core, GPU-accelerated browser rendering.
+    const concurrency = Math.max(1, options.concurrency ?? cpus().length);
     send({
       type: "status",
-      message: `Rendering ${composition.durationInFrames} frames (${kind})…`,
+      message: `Rendering ${composition.durationInFrames} frames (${kind}) · ${concurrency} cores · GPU…`,
       durationInFrames: composition.durationInFrames,
     });
     await renderMedia({
@@ -119,10 +122,14 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       serveUrl,
       outputLocation,
       inputProps,
+      concurrency,
+      // GPU-accelerated rendering (ANGLE) — big win for filter-heavy comps (drop-shadow/blur/glow).
+      chromiumOptions: { gl: "angle" },
       onProgress: ({ progress }) => send({ type: "progress", progress }),
       ...(transparent
         ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
-        : { codec: "h264" as const }),
+        : // H.264 with max-quality frame capture (jpegQuality 100) + high-quality encode (low CRF), software x264.
+          { codec: "h264" as const, jpegQuality: 100, crf: 16 }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {

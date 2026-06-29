@@ -12,7 +12,7 @@ import {
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
-import { getMotion, getTransitionPresentation } from "../effects";
+import { getMotion, getTransitionPresentation, scaleStrength } from "../effects";
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
@@ -34,15 +34,18 @@ const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: numbe
   const t = frame / fps;
   const motionStyle =
     clip.motion && clip.motion !== "none"
-      ? getMotion(clip.motion)({
-          progress,
-          frame,
-          fps,
-          t,
-          beat: beatKick(t, bpm, 6, beatOffsetInFrames / fps),
-          z: 0,
-          params: {},
-        })
+      ? scaleStrength(
+          getMotion(clip.motion)({
+            progress,
+            frame,
+            fps,
+            t,
+            beat: beatKick(t, bpm, 6, beatOffsetInFrames / fps),
+            z: 0,
+            params: {},
+          }),
+          clip.strength ?? 1,
+        )
       : {};
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
@@ -112,6 +115,8 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         exit={o.exit}
         enterDurationInFrames={o.enterDurationInFrames}
         exitDurationInFrames={o.exitDurationInFrames}
+        loop={o.loop}
+        strength={o.strength}
         dataIndex={index}
         style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
       />
@@ -151,6 +156,8 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       exit={o.exit}
       enterDurationInFrames={o.enterDurationInFrames}
       exitDurationInFrames={o.exitDurationInFrames}
+      loop={o.loop}
+      strength={o.strength}
       z={o.z}
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}
@@ -239,6 +246,10 @@ export const calculateTimelineMetadata: CalculateMetadataFunction<Project> = asy
   const overlays = props.overlays ?? [];
   const audio = props.audio ?? [];
   const fps = props.fps ?? 30;
+  // A fixed project length, when set, caps everything.
+  if (props.durationInFrames && props.durationInFrames > 0) {
+    return { durationInFrames: props.durationInFrames, fps, width: props.width ?? 1920, height: props.height ?? 1080 };
+  }
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);
   const transTotal = clips.reduce(
     (s, c, i) =>

@@ -7,7 +7,7 @@ export * from "./types";
 export { motions, transitions };
 export { CATALOG } from "./catalog";
 export { depthShadow, depthScale, bevel } from "./depth";
-export { composeStyles } from "./compose";
+export { composeStyles, scaleStrength } from "./compose";
 
 const IDENTITY: NonNullable<MotionDef["style"]> = () => ({});
 

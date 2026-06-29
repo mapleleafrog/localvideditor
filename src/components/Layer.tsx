@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { getMotion, depthShadow, composeStyles } from "../effects";
+import { getMotion, depthShadow, composeStyles, scaleStrength } from "../effects";
 import { beatKick, clamp, smooth, lerp, quantize } from "../effects/helpers";
 
 export type TransitionKind =
@@ -70,6 +70,10 @@ interface LayerProps {
   exit?: TransitionKind;
   enterDurationInFrames?: number;
   exitDurationInFrames?: number;
+  /** Loop the motion's progress over the window instead of running once. */
+  loop?: boolean;
+  /** Effect strength multiplier (1 = normal; 0 = off; >1 = exaggerated). */
+  strength?: number;
   /** Depth 0=far .. 1=near. Adds a base drop-shadow; read by depth motions via ctx.z. */
   z?: number;
   /** When true, prepend translate(-50%,-50%) so the layer centers on its left/top anchor. */
@@ -103,6 +107,8 @@ export const Layer: React.FC<LayerProps> = ({
   exit = "none",
   enterDurationInFrames = 15,
   exitDurationInFrames = 15,
+  loop = false,
+  strength = 1,
   z,
   centered = false,
   scale,
@@ -121,14 +127,16 @@ export const Layer: React.FC<LayerProps> = ({
 
   const f = frame - from;
   const t = frame / fps;
-  const progress = windowInFrames ? clamp(f / windowInFrames) : clamp(f / fps);
+  const win = windowInFrames || fps;
+  const progress = loop ? f / win - Math.floor(f / win) : clamp(f / win);
   const beat = beatKick(t, bpm, 6, beatOffsetInFrames / fps);
   const zz = z ?? 0;
 
   const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];
   const ctx = { progress, frame, fps, t, beat, z: zz, params };
-  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = composeStyles(
-    ids.map((id) => getMotion(id)(ctx)),
+  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = scaleStrength(
+    composeStyles(ids.map((id) => getMotion(id)(ctx))),
+    strength,
   );
 
   // --- enter / exit transitions (element-scoped: fade / slide / zoom / pop / rotate / spin / blur / flash / wipe / iris / typewriter) ---

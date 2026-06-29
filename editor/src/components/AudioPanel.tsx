@@ -14,10 +14,11 @@ export const AudioPanel: React.FC = () => {
   const patchAudio = useEditor((s) => s.patchAudio);
   const removeAudio = useEditor((s) => s.removeAudio);
 
+  const projectName = useEditor((s) => s.projectName);
   const [files, setFiles] = useState<string[]>([]);
   useEffect(() => {
-    listAudio().then(setFiles);
-  }, []);
+    listAudio(projectName).then(setFiles);
+  }, [projectName]);
 
   const tracks = project.audio ?? [];
   const bpm = project.bpm ?? 120;

@@ -70,6 +70,11 @@ const stamp = () => {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 };
 
+/** Filesystem-safe single path segment (project name / filename). No separators, no traversal. */
+const safeSeg = (s: string) => (s || "").split(/[\\/]/).pop()!.replace(/[^a-z0-9._-]/gi, "_").replace(/^\.+/, "");
+const qparam = (req: IncomingMessage, key: string) =>
+  new URL(req.url || "", "http://localhost").searchParams.get(key) || "";
+
 /** Render the current project with the SAME composition/renderer the CLI uses, streaming NDJSON
  *  progress. POST body = { project, options } (or a bare project for back-compat).
  *  options.transparent → ProRes 4444 .mov with an alpha channel (background forced to none) for
@@ -141,38 +146,42 @@ async function handleSaveProject(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
-/** Import a dropped/picked file into public/media/ so the editor can use it via staticFile().
- *  Raw bytes in the body, filename in ?name=. Sanitizes the name and avoids clobbering by suffixing. */
+/** Import a dropped/picked file so the editor can use it via staticFile(). Raw bytes in the body,
+ *  filename in ?name=, optional ?project= → public/media/<project>/ (else flat public/media/).
+ *  Sanitizes the name and avoids clobbering by suffixing photo.jpg → photo-1.jpg. */
 async function handleUpload(req: IncomingMessage, res: ServerResponse) {
   try {
-    const name = new URL(req.url || "", "http://localhost").searchParams.get("name") || "upload.bin";
-    const base = name.split(/[\\/]/).pop() || "upload.bin";
-    const safe = base.replace(/[^a-z0-9._-]/gi, "_").replace(/^\.+/, "") || "upload.bin";
+    const safe = safeSeg(qparam(req, "name")) || "upload.bin";
+    const project = safeSeg(qparam(req, "project"));
+    const dir = project ? join(MEDIA_DIR, project) : MEDIA_DIR;
+    const prefix = project ? `media/${project}` : "media";
     const buf = await readRawBody(req);
-    await fs.mkdir(MEDIA_DIR, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
 
-    // Avoid overwriting an existing file with the same name: photo.jpg -> photo-1.jpg, …
     const dot = safe.lastIndexOf(".");
     const stem = dot > 0 ? safe.slice(0, dot) : safe;
     const ext = dot > 0 ? safe.slice(dot) : "";
     let finalName = safe;
     for (let i = 1; ; i++) {
       try {
-        await fs.access(join(MEDIA_DIR, finalName));
+        await fs.access(join(dir, finalName));
         finalName = `${stem}-${i}${ext}`;
       } catch {
         break; // free name
       }
     }
-    await fs.writeFile(join(MEDIA_DIR, finalName), buf);
-    sendJson(res, 200, { ok: true, ref: `media/${finalName}` });
+    await fs.writeFile(join(dir, finalName), buf);
+    sendJson(res, 200, { ok: true, ref: `${prefix}/${finalName}` });
   } catch (err) {
     sendJson(res, 500, { ok: false, message: err instanceof Error ? err.message : String(err) });
   }
 }
 
-/** List drop-in media (public/media/* + root public/) split into visual assets and audio tracks. */
-async function handleMedia(_req: IncomingMessage, res: ServerResponse) {
+/** List media for the asset/audio pickers, split into visual assets + audio tracks.
+ *  Includes root public/ (shared), flat public/media/ (legacy/shared), and — if ?project= is given —
+ *  that project's public/media/<project>/ folder. */
+async function handleMedia(req: IncomingMessage, res: ServerResponse) {
+  const project = safeSeg(qparam(req, "project"));
   const isVisual = (f: string) => /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)$/i.test(f);
   const isAudio = (f: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f);
   const assets: string[] = [];
@@ -182,18 +191,40 @@ async function handleMedia(_req: IncomingMessage, res: ServerResponse) {
     else if (isAudio(name)) audio.push(ref);
   };
   try {
-    const media = await fs.readdir(MEDIA_DIR);
-    media.forEach((f) => sort(f, `media/${f}`));
-  } catch {
-    /* no media dir yet */
-  }
-  try {
     const root = await fs.readdir(PUBLIC_DIR, { withFileTypes: true });
     root.filter((d) => d.isFile()).forEach((d) => sort(d.name, d.name));
   } catch {
     /* ignore */
   }
+  try {
+    const media = await fs.readdir(MEDIA_DIR, { withFileTypes: true });
+    media.filter((d) => d.isFile()).forEach((d) => sort(d.name, `media/${d.name}`));
+  } catch {
+    /* no media dir yet */
+  }
+  if (project) {
+    try {
+      const files = await fs.readdir(join(MEDIA_DIR, project));
+      files.forEach((f) => sort(f, `media/${project}/${f}`));
+    } catch {
+      /* no folder for this project yet */
+    }
+  }
   sendJson(res, 200, { assets, audio });
+}
+
+/** Delete a project: removes projects/<name>.json and its public/media/<name>/ folder. */
+async function handleDeleteProject(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const { name } = await readJsonBody(req);
+    const safe = safeSeg(String(name || ""));
+    if (!safe) return sendJson(res, 400, { ok: false, message: "missing project name" });
+    await fs.rm(join(PROJECTS_DIR, `${safe}.json`), { force: true });
+    await fs.rm(join(MEDIA_DIR, safe), { recursive: true, force: true });
+    sendJson(res, 200, { ok: true });
+  } catch (err) {
+    sendJson(res, 500, { ok: false, message: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 export function renderApiPlugin(): Plugin {
@@ -205,6 +236,7 @@ export function renderApiPlugin(): Plugin {
         if (req.method === "POST" && url === "/api/render") return void handleRender(req, res);
         if (req.method === "POST" && url === "/api/save-project") return void handleSaveProject(req, res);
         if (req.method === "POST" && url === "/api/upload") return void handleUpload(req, res);
+        if (req.method === "POST" && url === "/api/delete-project") return void handleDeleteProject(req, res);
         if (req.method === "GET" && url === "/api/media") return void handleMedia(req, res);
         next();
       });

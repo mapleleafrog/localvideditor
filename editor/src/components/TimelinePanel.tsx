@@ -20,7 +20,7 @@ const newClip = (src = "clip-a.svg", type: "image" | "video" = "image"): Clip =>
   transitionToNext: "none", transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1,
   label: "", note: "",
 });
-const newOverlay = (type: "text" | "image" | "fx", from: number): Overlay => ({
+const newOverlay = (type: "text" | "image" | "fx", from: number, width = 200): Overlay => ({
   type,
   text: type === "text" ? "New text" : "Title",
   src: "orange-mush.gif",
@@ -29,7 +29,7 @@ const newOverlay = (type: "text" | "image" | "fx", from: number): Overlay => ({
   x: 50, y: 50, scale: 1, rotation: 0, opacity: 1,
   // FX layers start with a romantic atmospheric so the new layer is visibly doing something.
   motions: type === "fx" ? ["weddingPetals"] : [],
-  z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width: 200,
+  z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
 });
 
 const Playhead: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; zoom: number }> = ({ playerRef, zoom }) => {
@@ -108,7 +108,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
         <span className="sep" />
         <button onClick={() => addClip(newClip())}>+ Clip</button>
         <button onClick={() => addOverlay(newOverlay("text", 0))}>+ Text</button>
-        <button onClick={() => addOverlay(newOverlay("image", 0))}>+ Image</button>
+        <button onClick={() => addOverlay(newOverlay("image", 0, Math.round((project.width ?? 1920) * 0.5)))}>+ Image</button>
         <button onClick={() => addOverlay(newOverlay("fx", 0))} title="Full-frame effect layer (petals, bokeh, light-leaks…)">+ FX</button>
         <span className="sep" />
         <button onClick={() => setZoom(Math.max(1, zoom - 1))}>−</button>

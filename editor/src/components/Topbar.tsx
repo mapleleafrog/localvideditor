@@ -1,6 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave } from "../store";
-import { renderVideo, saveProjectFile } from "../lib/api";
+import { renderVideo, saveProjectFile, deleteProject } from "../lib/api";
+import { ensureProjectName, safeName } from "../lib/names";
 
 type RenderState =
   | { phase: "idle" }
@@ -11,12 +12,18 @@ type RenderState =
 export const Topbar: React.FC = () => {
   const project = useEditor((s) => s.project);
   const setProject = useEditor((s) => s.setProject);
+  const projectName = useEditor((s) => s.projectName);
+  const setProjectName = useEditor((s) => s.setProjectName);
   const view = useEditor((s) => s.view);
   const setView = useEditor((s) => s.setView);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
   const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
   const [note, setNote] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState(projectName);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => setNameInput(projectName), [projectName]);
+  const commitName = () => setProjectName(safeName(nameInput));
 
   const flash = (m: string) => {
     setNote(m);
@@ -40,10 +47,22 @@ export const Topbar: React.FC = () => {
   };
 
   const onSave = async () => {
-    const name = window.prompt("Save project to projects/<name>.json", "my-video");
+    const name = ensureProjectName(); // uses the name field, or prompts if still unset
     if (!name) return;
     const r = await saveProjectFile(name, project);
     flash(r.ok ? `Saved → ${r.file}` : `Save failed: ${r.message}`);
+  };
+
+  const onDeleteProject = async () => {
+    if (!projectName) return flash("No named project to delete yet.");
+    if (!window.confirm(`Delete project "${projectName}" — its projects/${projectName}.json and public/media/${projectName}/ folder? This cannot be undone.`))
+      return;
+    const r = await deleteProject(projectName);
+    if (!r.ok) return flash(`Delete failed: ${r.message}`);
+    clearAutosave();
+    setProject(structuredClone(SAMPLE_PROJECT));
+    setProjectName("");
+    flash(`Deleted project "${projectName}"`);
   };
 
   const onExport = () => {
@@ -73,6 +92,7 @@ export const Topbar: React.FC = () => {
     if (!window.confirm("Discard the current project and reload the sample?")) return;
     clearAutosave();
     setProject(structuredClone(SAMPLE_PROJECT));
+    setProjectName("");
     flash("Reset to sample project");
   };
 
@@ -90,10 +110,22 @@ export const Topbar: React.FC = () => {
       <button onClick={() => useTemporal.getState().redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
 
       <span className="sep" />
+      <input
+        className="proj-name"
+        value={nameInput}
+        placeholder="project name…"
+        onChange={(e) => setNameInput(e.target.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => { if (e.key === "Enter") { commitName(); (e.target as HTMLInputElement).blur(); } }}
+        title="Project name — sets projects/<name>.json and the public/media/<name>/ folder"
+      />
+
+      <span className="sep" />
       <button onClick={onSave} title="Save to projects/*.json">💾 Save</button>
       <button onClick={onExport} title="Download project JSON">⭳ Export</button>
       <button onClick={() => fileRef.current?.click()} title="Load project JSON">⭱ Import</button>
       <button onClick={onReset} title="Reset to sample">⟲ Reset</button>
+      <button onClick={onDeleteProject} title="Delete this project's JSON + media folder">🗑 Delete</button>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
 
       <div className="spacer" />

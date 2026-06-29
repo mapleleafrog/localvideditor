@@ -7,12 +7,15 @@ export type Selection = { kind: "clip" | "overlay"; index: number } | null;
 
 export interface EditorState {
   project: Project;
+  /** Current project name — used for projects/<name>.json AND its public/media/<name>/ folder. */
+  projectName: string;
   selection: Selection;
   playhead: number; // frame
   zoom: number; // px per frame
   view: "edit" | "storyboard";
   // mutations (project edits are tracked by zundo for undo/redo)
   setProject: (p: Project) => void;
+  setProjectName: (name: string) => void;
   /** Merge top-level project fields (bpm, beatOffsetInFrames, background, …). */
   patchProject: (patch: Partial<Project>) => void;
   patchClip: (i: number, patch: Partial<Clip>) => void;
@@ -35,6 +38,7 @@ export interface EditorState {
 
 export const SAMPLE_PROJECT = sampleProject as unknown as Project;
 const LS_KEY = "soranji.editor.project";
+const LS_NAME = "soranji.editor.projectName";
 
 /** Seed from the last autosaved project (localStorage), falling back to the sample. */
 function loadSeed(): Project {
@@ -47,18 +51,28 @@ function loadSeed(): Project {
   return SAMPLE_PROJECT;
 }
 
+function loadName(): string {
+  try {
+    return localStorage.getItem(LS_NAME) || "";
+  } catch {
+    return "";
+  }
+}
+
 const seed = loadSeed();
 
 export const useEditor = create<EditorState>()(
   temporal(
     (set) => ({
       project: seed,
+      projectName: loadName(),
       selection: null,
       playhead: 0,
       zoom: 4,
       view: "edit",
 
       setProject: (project) => set({ project, selection: null }),
+      setProjectName: (projectName) => set({ projectName }),
 
       patchProject: (patch) => set((s) => ({ project: { ...s.project, ...patch } })),
 
@@ -138,13 +152,17 @@ export const useTemporal = useEditor.temporal;
 /** Debounced autosave of the project to localStorage (transient UI state is not persisted). */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSaved: Project | null = null;
+let lastName: string | null = null;
 useEditor.subscribe((s) => {
-  if (s.project === lastSaved) return;
+  if (s.project === lastSaved && s.projectName === lastName) return;
   lastSaved = s.project;
+  lastName = s.projectName;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(useEditor.getState().project));
+      const st = useEditor.getState();
+      localStorage.setItem(LS_KEY, JSON.stringify(st.project));
+      localStorage.setItem(LS_NAME, st.projectName);
     } catch {
       /* quota / unavailable */
     }
@@ -154,6 +172,7 @@ useEditor.subscribe((s) => {
 export const clearAutosave = () => {
   try {
     localStorage.removeItem(LS_KEY);
+    localStorage.removeItem(LS_NAME);
   } catch {
     /* ignore */
   }

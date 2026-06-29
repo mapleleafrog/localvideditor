@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { staticFile } from "remotion";
 import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
 import { listMedia, uploadMedia } from "../lib/api";
+import { ensureProjectName } from "../lib/names";
 
 // Fallback list until /api/media responds (the dev server scans public/ + public/media/).
 const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
@@ -19,13 +20,17 @@ const imageOverlay = (src: string): Overlay => ({
  *  click a tile to add it as an image layer. Audio files import too but show up in the Audio tab. */
 export const AssetsPanel: React.FC = () => {
   const addOverlay = useEditor((s) => s.addOverlay);
+  const projectName = useEditor((s) => s.projectName);
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => listMedia().then((a) => { if (a.length) setAssets(a); });
-  useEffect(() => { refresh(); }, []);
+  const refresh = useCallback(
+    (proj = projectName) => listMedia(proj).then((a) => { if (a.length) setAssets(a); }),
+    [projectName],
+  );
+  useEffect(() => { refresh(); }, [refresh]);
 
   const flash = (m: string) => {
     setNote(m);
@@ -35,13 +40,18 @@ export const AssetsPanel: React.FC = () => {
   const importFiles = async (files: FileList | File[]) => {
     const arr = Array.from(files);
     if (!arr.length) return;
+    const proj = ensureProjectName();
+    if (!proj) {
+      flash("Name the project first to import media.");
+      return;
+    }
     setNote(`Importing ${arr.length} file${arr.length > 1 ? "s" : ""}…`);
     let ok = 0;
     for (const f of arr) {
-      const r = await uploadMedia(f);
+      const r = await uploadMedia(f, proj);
       if (r.ok) ok++;
     }
-    await refresh();
+    await refresh(proj);
     flash(`Imported ${ok}/${arr.length}${ok < arr.length ? " (some failed)" : ""}`);
   };
 

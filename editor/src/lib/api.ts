@@ -58,33 +58,44 @@ export async function saveProjectFile(name: string, project: Project): Promise<{
   return res.json();
 }
 
-export async function listMedia(): Promise<string[]> {
+const mediaList = async (project: string, key: "assets" | "audio"): Promise<string[]> => {
   try {
-    const res = await fetch("/api/media");
+    const res = await fetch(`/api/media${project ? `?project=${encodeURIComponent(project)}` : ""}`);
     const data = await res.json();
-    return Array.isArray(data.assets) ? data.assets : [];
+    return Array.isArray(data[key]) ? data[key] : [];
   } catch {
     return [];
   }
-}
+};
 
-/** Import a dropped/picked file into public/media/. Returns the ref (e.g. "media/photo.jpg"). */
-export async function uploadMedia(file: File): Promise<{ ok: boolean; ref?: string; message?: string }> {
+/** Visual assets: root public/ + flat public/media/ + this project's folder. */
+export const listMedia = (project = ""): Promise<string[]> => mediaList(project, "assets");
+
+/** Import a dropped/picked file into public/media/<project>/. Returns the ref (e.g.
+ *  "media/my-wedding/photo.jpg"). With no project it lands in flat public/media/. */
+export async function uploadMedia(file: File, project = ""): Promise<{ ok: boolean; ref?: string; message?: string }> {
   try {
-    const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+    const q = `name=${encodeURIComponent(file.name)}${project ? `&project=${encodeURIComponent(project)}` : ""}`;
+    const res = await fetch(`/api/upload?${q}`, { method: "POST", body: file });
     return await res.json();
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) };
   }
 }
 
-/** Audio files dropped in public/media/ (or public/) — for the soundtrack picker. */
-export async function listAudio(): Promise<string[]> {
+/** Delete a project's JSON + its media folder. */
+export async function deleteProject(name: string): Promise<{ ok: boolean; message?: string }> {
   try {
-    const res = await fetch("/api/media");
-    const data = await res.json();
-    return Array.isArray(data.audio) ? data.audio : [];
-  } catch {
-    return [];
+    const res = await fetch("/api/delete-project", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return await res.json();
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** Audio files for the soundtrack picker (same scoping as listMedia). */
+export const listAudio = (project = ""): Promise<string[]> => mediaList(project, "audio");

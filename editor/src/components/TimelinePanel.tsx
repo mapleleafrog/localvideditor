@@ -1,16 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { PlayerRef } from "@remotion/player";
 import { useEditor } from "../store";
-import type { Clip, Overlay } from "../../../src/timeline/schema";
+import type { AudioTrack, Clip, Overlay } from "../../../src/timeline/schema";
 import { computeDuration, clipStarts, fmtTime } from "../lib/timeline-utils";
 import { startBlockDrag, startScrub } from "../lib/drag";
 import { useCurrentPlayerFrame } from "../lib/useCurrentPlayerFrame";
+import { uploadMedia } from "../lib/api";
+import { ensureProjectName } from "../lib/names";
 
 const RULER_H = 24;
 const LANE_H = 40;
 
-const newClip = (): Clip => ({
-  type: "image", src: "clip-a.svg", durationInFrames: 60, motion: "none",
+const isAudioFile = (n: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(n);
+const isVideoFile = (n: string) => /\.(mp4|webm|mov)$/i.test(n);
+const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
+
+const newClip = (src = "clip-a.svg", type: "image" | "video" = "image"): Clip => ({
+  type, src, durationInFrames: 60, motion: "none",
   transitionToNext: "none", transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1,
   label: "", note: "",
 });
@@ -32,7 +38,7 @@ const Playhead: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; zoom: n
 };
 
 export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
-  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, reorderOverlay, setZoom } =
+  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom } =
     useEditor();
   const scrollRef = useRef<HTMLDivElement>(null);
   const fps = project.fps ?? 30;
@@ -40,6 +46,23 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   const starts = clipStarts(project);
   const innerW = total * zoom + 80;
   const overlayCount = project.overlays.length;
+  const [dropping, setDropping] = useState(false);
+
+  // Drop media onto the timeline: video/image → a new clip; audio → a new soundtrack track.
+  const onDropFiles = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDropping(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+    const proj = ensureProjectName();
+    if (!proj) return;
+    for (const f of files) {
+      const r = await uploadMedia(f, proj);
+      if (!r.ok || !r.ref) continue;
+      if (isAudioFile(f.name)) addAudio(audioTrack(r.ref));
+      else addClip(newClip(r.ref, isVideoFile(f.name) ? "video" : "image"));
+    }
+  };
 
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
@@ -137,7 +160,13 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
           ))}
         </div>
 
-        <div className="tl-scroll" ref={scrollRef}>
+        <div
+          className={"tl-scroll" + (dropping ? " dropping" : "")}
+          ref={scrollRef}
+          onDragOver={(e) => { e.preventDefault(); if (!dropping) setDropping(true); }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
+          onDrop={onDropFiles}
+        >
           <div className="tl-inner" style={{ width: innerW }}>
             {/* ruler */}
             <div className="tl-ruler" style={{ height: RULER_H }} onPointerDown={onRulerDown}>

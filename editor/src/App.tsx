@@ -6,7 +6,11 @@ import { Library } from "./components/Library";
 import { Inspector } from "./components/Inspector";
 import { Topbar } from "./components/Topbar";
 import { Storyboard } from "./components/Storyboard";
+import { ShortcutsModal, Toast } from "./components/ShortcutsModal";
 import { useEditor, useTemporal } from "./store";
+import { computeDuration } from "./lib/timeline-utils";
+import { saveProjectFile } from "./lib/api";
+import { ensureProjectName } from "./lib/names";
 
 const lsNum = (key: string, def: number) => {
   const v = Number(localStorage.getItem(key));
@@ -47,28 +51,126 @@ export const App: React.FC = () => {
       window.addEventListener("pointerup", up);
     };
 
-  // Global shortcuts: undo/redo, delete selection, space = play/pause (suppressed while typing).
+  // Global keyboard map — see ShortcutsModal for the full list. Mod = Ctrl/⌘.
   useEffect(() => {
+    const saveProject = async () => {
+      const name = ensureProjectName();
+      if (!name) return;
+      const r = await saveProjectFile(name, useEditor.getState().project);
+      useEditor.getState().flash(r.ok ? `Saved → ${r.file}` : `Save failed: ${r.message}`);
+    };
+
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const typing =
         !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
       const mod = e.ctrlKey || e.metaKey;
+      const st = useEditor.getState();
+      const player = playerRef.current;
+      const fps = st.project.fps ?? 30;
+      const total = computeDuration(st.project);
+      const cur = () => Math.round(player?.getCurrentFrame() ?? 0);
+      const seek = (f: number) => player?.seekTo(Math.max(0, Math.min(total - 1, f)));
+
+      // Esc closes the cheat sheet from anywhere.
+      if (e.key === "Escape") {
+        if (st.showShortcuts) {
+          e.preventDefault();
+          st.toggleShortcuts(false);
+        }
+        return;
+      }
+
+      // --- modifier combos (work even while a field is focused) ---
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) useTemporal.getState().redo();
         else useTemporal.getState().undo();
-      } else if (mod && (e.key === "y" || e.key === "Y")) {
+        return;
+      }
+      if (mod && (e.key === "y" || e.key === "Y")) {
         e.preventDefault();
         useTemporal.getState().redo();
-      } else if (!typing && (e.key === "Delete" || e.key === "Backspace")) {
-        if (useEditor.getState().selection) {
-          e.preventDefault();
-          useEditor.getState().removeSelected();
-        }
-      } else if (!typing && e.key === " ") {
+        return;
+      }
+      if (mod && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
-        playerRef.current?.toggle();
+        void saveProject();
+        return;
+      }
+      if (mod && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        st.duplicateSelected();
+        return;
+      }
+      if (mod && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        st.splitSelected(cur());
+        return;
+      }
+      // Copy/paste only when NOT typing (so text fields keep native copy/paste).
+      if (mod && (e.key === "c" || e.key === "C") && !typing) {
+        e.preventDefault();
+        st.copySelected();
+        return;
+      }
+      if (mod && (e.key === "v" || e.key === "V") && !typing) {
+        e.preventDefault();
+        st.pasteAt(cur());
+        return;
+      }
+
+      if (typing || mod) return; // remaining shortcuts are single-key, no modifiers
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          player?.toggle();
+          break;
+        case "Delete":
+        case "Backspace":
+          if (st.selection) {
+            e.preventDefault();
+            st.removeSelected();
+          }
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          seek(cur() - (e.shiftKey ? fps : 1));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          seek(cur() + (e.shiftKey ? fps : 1));
+          break;
+        case "Home":
+          e.preventDefault();
+          seek(0);
+          break;
+        case "End":
+          e.preventDefault();
+          seek(total - 1);
+          break;
+        case "s":
+        case "S":
+          e.preventDefault();
+          st.splitSelected(cur());
+          break;
+        case "+":
+        case "=":
+          e.preventDefault();
+          st.setZoom(clamp(st.zoom + 1, 0.2, 40));
+          break;
+        case "-":
+        case "_":
+          e.preventDefault();
+          st.setZoom(clamp(st.zoom - 1, 0.2, 40));
+          break;
+        case "?":
+          e.preventDefault();
+          st.toggleShortcuts();
+          break;
+        default:
+          break;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -126,6 +228,9 @@ export const App: React.FC = () => {
           </footer>
         </>
       )}
+
+      <ShortcutsModal />
+      <Toast />
     </div>
   );
 };

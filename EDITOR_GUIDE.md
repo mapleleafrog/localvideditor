@@ -21,7 +21,7 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
 
 ```
 ┌────────────────────────── Topbar ──────────────────────────┐
-│ undo/redo · Save · Export · Import · Reset · ⏺ Render MP4    │
+│ undo/redo · ⌨ shortcuts · Save · Export · Import · ⏺ Render  │
 ├──────────┬────────────────────────────────┬─────────────────┤
 │ Library  │          Preview (Player)       │   Inspector     │
 │ Effects  │   exact composition + on-canvas │  props of the   │
@@ -41,8 +41,11 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
   sliders (X/Y/scale/rotation/opacity/depth-z), text/color/glow/source, a motion **multi-select** (stack
   effects, removable chips), and a transition picker.
 - **Timeline** (bottom) — clip track (sequential, with transition markers) + one lane per overlay. Drag a
-  block to retime (`from`), drag its edges to resize (`durationInFrames`), drag the ruler to scrub. The
-  per-lane ▲/▼ buttons reorder overlays = **compositing z-order**.
+  block to retime (`from`), drag its edges to resize (`durationInFrames`) — edges **snap** to the playhead /
+  clip boundaries (🧲 toggle). Drag the ruler **or click any empty lane** to scrub; the per-lane ▲/▼ buttons
+  reorder overlays = **compositing z-order**. Toolbar adds **✂ Split** / **⎘ Duplicate**, a snap toggle, a
+  live current/total time readout, and **⤢ Fit** (`Ctrl`+wheel zooms at the cursor). New text/image/FX
+  layers are added **at the playhead**.
 
 ## Storyboard tab
 
@@ -63,13 +66,15 @@ arrange + annotate your shots in Storyboard, then switch to Edit to layer effect
 | Add a photo/clip | **+ Clip** (timeline / Storyboard **+ Add shot**) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
 | Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
 | Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
-| Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
-| Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
-| Retime an element | Drag its timeline block; drag edges to change duration |
+| Retime an element | Drag its timeline block; drag edges to change duration (edges **snap** to the playhead / clip boundaries — toggle with the 🧲 button) |
+| Split a clip/layer | Move the playhead, select the block, **✂ Split** (or press `S` / `Ctrl+K`) |
+| Duplicate / copy-paste | **⎘ Duplicate** (`Ctrl+D`); or `Ctrl+C` then `Ctrl+V` (pastes at the playhead) |
 | Move/scale/rotate on screen | Select it → drag / corner-handle / rotate-handle on the canvas |
 | Stack effects | Select an overlay → click effects in the Library (or the Inspector "+ add effect") |
 | Set a transition | Select a clip → pick one in the Library Transitions tab (or Inspector) |
 | Layer order (z) | ▲/▼ on the overlay's timeline lane |
+| Scrub / seek | Drag the ruler, **click any empty lane**, or step with `←/→` (`Shift` = 1 s, `Home`/`End` = ends) |
+| Zoom the timeline | `+` / `−` buttons or keys · **⤢ Fit** · `Ctrl`+mouse-wheel to zoom at the cursor |
 | Play / pause | Spacebar, or the ▶/⏸ button |
 | Render the video | Pick a format (MP4 / ProRes-alpha / overlays-only) then **⏺ Render** (top right) → writes to `out/` with a live progress bar |
 | Save the project | **💾 Save** → `projects/<name>.json` (round-trips with Studio + the CLI) |
@@ -80,14 +85,24 @@ The project **autosaves to `localStorage`** as you work and is restored on reloa
 
 ## Keyboard shortcuts
 
+Press **`?`** (or the **⌨** button in the topbar) anytime for the in-app cheat sheet.
+
 | Key | Action |
 |---|---|
 | `Space` | Play / pause |
+| `←` / `→` | Step one frame (`Shift` = one second) |
+| `Home` / `End` | Jump to start / end |
+| `S` or `Ctrl/Cmd + K` | Split the selection at the playhead |
+| `Ctrl/Cmd + D` | Duplicate the selection |
+| `Ctrl/Cmd + C` / `V` | Copy / paste the selection (paste lands at the playhead) |
+| `Delete` / `Backspace` | Delete the selected clip/overlay |
 | `Ctrl/Cmd + Z` | Undo |
 | `Ctrl/Cmd + Shift + Z` / `Ctrl + Y` | Redo |
-| `Delete` / `Backspace` | Delete the selected clip/overlay |
+| `Ctrl/Cmd + S` | Save the project to `projects/<name>.json` |
+| `+` / `−` | Zoom the timeline in / out (`Ctrl`+wheel zooms at the cursor) |
+| `?` | Toggle the shortcuts cheat sheet |
 
-(Shortcuts are suppressed while typing in a field.)
+(Single-key shortcuts are suppressed while typing in a field; `Ctrl/Cmd` combos still work, except copy/paste which defer to the focused field.)
 
 ## Rendering
 
@@ -128,13 +143,14 @@ editor/
   vite.config.ts        root=editor, publicDir=../public (staticFile), dedupe React, render-api plugin
   render-plugin.ts      /api/render (bundle+renderMedia, streamed) · /api/save-project · /api/media
   src/
-    App.tsx             layout + global keyboard shortcuts
-    store.ts            zustand + zundo (undo/redo) + localStorage autosave; seeded from projects/sample.json
+    App.tsx             layout + full global keyboard map (split/dup/copy-paste/step/zoom/save) + modal/toast
+    store.ts            zustand + zundo (undo/redo) + split/duplicate/copy-paste/clipboard/toast; autosave
     components/
-      Topbar.tsx        render (streamed progress) · save/export/import/reset · undo/redo
+      Topbar.tsx        render (streamed progress) · save/export/import/reset · undo/redo · ⌨ shortcuts
       Preview.tsx       <Player component={Timeline}> in an exact-aspect box + CanvasOverlay
       CanvasOverlay.tsx react-moveable drag/scale/rotate + click-to-select, mapped to composition coords
-      TimelinePanel.tsx ruler/scrub + clip track + overlay lanes (drag/resize) + lane reorder + play/pause
+      TimelinePanel.tsx ruler/scrub + click-to-seek + clip/overlay drag/resize (snap) + split/dup/fit/zoom
+      ShortcutsModal.tsx keyboard cheat-sheet overlay (?) + transient action Toast
       Inspector.tsx     per-item prop editor incl. effect multi-select + transition picker
       Library.tsx       registry-driven Effects / Transitions / Assets browsers
     lib/

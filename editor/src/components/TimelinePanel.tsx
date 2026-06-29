@@ -35,11 +35,32 @@ const newOverlay = (type: "text" | "image" | "fx", from: number, width = 200): O
 
 const Playhead: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; zoom: number }> = ({ playerRef, zoom }) => {
   const frame = useCurrentPlayerFrame(playerRef);
-  return <div className="tl-playhead" style={{ left: frame * zoom }} />;
+  return (
+    <div className="tl-playhead" style={{ left: frame * zoom }}>
+      <div className="tl-playhead-head" />
+    </div>
+  );
 };
 
+/** Live current-time / total readout — subscribes to the player so only this span re-renders per tick. */
+const TimeReadout: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; total: number; fps: number }> = ({
+  playerRef,
+  total,
+  fps,
+}) => {
+  const f = useCurrentPlayerFrame(playerRef);
+  return (
+    <span className="muted tl-readout" title="Current / total (mm:ss · frame)">
+      {fmtTime(f, fps)} / {fmtTime(total, fps)} · {f}/{total}f
+    </span>
+  );
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const SNAP_PX = 8;
+
 export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
-  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom } =
+  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected } =
     useEditor();
   const scrollRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -51,6 +72,51 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   const innerW = total * zoom + 80;
   const overlayCount = project.overlays.length;
   const [dropping, setDropping] = useState(false);
+
+  // Snap-to-edge toggle (persisted). Magnet pulls dragged block edges to playhead / clip boundaries / 0.
+  const [snapOn, setSnapOn] = useState(() => localStorage.getItem("soranji.tl.snap") !== "0");
+  useEffect(() => localStorage.setItem("soranji.tl.snap", snapOn ? "1" : "0"), [snapOn]);
+
+  // Live playhead frame, read on demand (no per-tick re-render of the whole panel).
+  const phFrame = () => Math.round(playerRef.current?.getCurrentFrame() ?? 0);
+  // Snap targets: 0, the timeline end, every clip boundary, and the current playhead.
+  const snap = () => {
+    if (!snapOn) return undefined;
+    const pts = new Set<number>([0, total, phFrame()]);
+    project.clips.forEach((c, i) => {
+      pts.add(starts[i]);
+      pts.add(starts[i] + c.durationInFrames);
+    });
+    return { targets: [...pts], px: SNAP_PX };
+  };
+
+  // Ctrl/⌘ + wheel = zoom the timeline, keeping the frame under the cursor anchored.
+  // Native non-passive listener so preventDefault actually suppresses the page scroll.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const z = zoomRef.current;
+      const frameAt = (e.clientX - rect.left + el.scrollLeft) / z;
+      const nz = clamp(z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 0.2, 40);
+      setZoom(nz);
+      requestAnimationFrame(() => {
+        el.scrollLeft = Math.max(0, frameAt * nz - (e.clientX - rect.left));
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [setZoom]);
+
+  const fitZoom = () => {
+    const el = scrollRef.current;
+    if (el && el.clientWidth > 0 && total > 0) setZoom(clamp((el.clientWidth - 24) / total, 0.2, 40));
+  };
 
   // Drop media onto the timeline: video/image → a new clip; audio → a new soundtrack track.
   const onDropFiles = async (e: React.DragEvent) => {
@@ -112,6 +178,11 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
     if (!el) return;
     startScrub(e, zoom, el.getBoundingClientRect().left, el.scrollLeft, total - 1, seek);
   };
+  // Click/drag on empty lane background (or the inner gap) to move the playhead — like every NLE.
+  const onBodyDown = (e: React.PointerEvent) => {
+    const t = e.target as HTMLElement;
+    if (t === e.currentTarget || t.classList.contains("tl-lane")) onRulerDown(e);
+  };
 
   const seconds = Math.ceil(total / fps);
 
@@ -122,16 +193,21 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
           {playing ? "⏸ Pause" : "▶ Play"}
         </button>
         <span className="sep" />
-        <button onClick={() => addClip(newClip())}>+ Clip</button>
-        <button onClick={() => addOverlay(newOverlay("text", 0))}>+ Text</button>
-        <button onClick={() => addOverlay(newOverlay("image", 0, Math.round((project.width ?? 1920) * 0.5)))}>+ Image</button>
-        <button onClick={() => addOverlay(newOverlay("fx", 0))} title="Full-frame effect layer (petals, bokeh, light-leaks…)">+ FX</button>
+        <button onClick={() => addClip(newClip())} title="Append a clip to the track">+ Clip</button>
+        <button onClick={() => addOverlay(newOverlay("text", phFrame()))} title="Add a text layer at the playhead">+ Text</button>
+        <button onClick={() => addOverlay(newOverlay("image", phFrame(), Math.round((project.width ?? 1920) * 0.5)))} title="Add an image layer at the playhead">+ Image</button>
+        <button onClick={() => addOverlay(newOverlay("fx", phFrame()))} title="Full-frame effect layer at the playhead (petals, bokeh, light-leaks…)">+ FX</button>
         <span className="sep" />
-        <button onClick={() => setZoom(Math.max(1, zoom - 1))}>−</button>
+        <button onClick={() => splitSelected(phFrame())} disabled={!selection} title="Split at playhead (S)">✂ Split</button>
+        <button onClick={duplicateSelected} disabled={!selection} title="Duplicate selection (Ctrl+D)">⎘ Duplicate</button>
+        <span className="sep" />
+        <button className={snapOn ? "on" : ""} onClick={() => setSnapOn((v) => !v)} title="Snap block edges to playhead / clip edges">🧲</button>
+        <button onClick={() => setZoom(clamp(zoom - 1, 0.2, 40))} title="Zoom out">−</button>
         <span className="muted">zoom</span>
-        <button onClick={() => setZoom(Math.min(20, zoom + 1))}>+</button>
+        <button onClick={() => setZoom(clamp(zoom + 1, 0.2, 40))} title="Zoom in">+</button>
+        <button onClick={fitZoom} title="Zoom to fit (Ctrl+wheel to zoom on the timeline)">⤢ Fit</button>
         <span className="sep" />
-        <span className="muted">{fmtTime(0, fps)} / {fmtTime(total, fps)} · {total}f</span>
+        <TimeReadout playerRef={playerRef} total={total} fps={fps} />
       </div>
 
       <div className="tl-body">
@@ -202,7 +278,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
           onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
           onDrop={onDropFiles}
         >
-          <div className="tl-inner" style={{ width: innerW }}>
+          <div className="tl-inner" style={{ width: innerW }} onPointerDown={onBodyDown}>
             {/* ruler */}
             <div className="tl-ruler" style={{ height: RULER_H }} onPointerDown={onRulerDown}>
               {Array.from({ length: seconds + 1 }, (_, s) => (
@@ -229,8 +305,14 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     <span
                       className="tl-handle right"
                       onPointerDown={(e) =>
-                        startBlockDrag(e, "right", zoom, { from: 0, durationInFrames: c.durationInFrames }, (s) =>
-                          patchClip(i, { durationInFrames: capDur(s.durationInFrames) }),
+                        startBlockDrag(
+                          e,
+                          "right",
+                          zoom,
+                          { from: starts[i], durationInFrames: c.durationInFrames },
+                          (s) => patchClip(i, { durationInFrames: capDur(s.durationInFrames) }),
+                          1,
+                          snap(),
                         )
                       }
                     />
@@ -249,8 +331,14 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     style={{ left: o.from * zoom, width: o.durationInFrames * zoom }}
                     onPointerDown={(e) => {
                       select({ kind: "overlay", index: i });
-                      startBlockDrag(e, "move", zoom, { from: o.from, durationInFrames: o.durationInFrames }, (s) =>
-                        patchOverlay(i, { from: s.from }),
+                      startBlockDrag(
+                        e,
+                        "move",
+                        zoom,
+                        { from: o.from, durationInFrames: o.durationInFrames },
+                        (s) => patchOverlay(i, { from: s.from }),
+                        1,
+                        snap(),
                       );
                     }}
                     title={`${o.type === "text" ? o.text : o.src} · from ${o.from}f · ${o.durationInFrames}f`}
@@ -258,8 +346,14 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     <span
                       className="tl-handle left"
                       onPointerDown={(e) =>
-                        startBlockDrag(e, "left", zoom, { from: o.from, durationInFrames: o.durationInFrames }, (s) =>
-                          patchOverlay(i, { from: s.from, durationInFrames: capDur(s.durationInFrames) }),
+                        startBlockDrag(
+                          e,
+                          "left",
+                          zoom,
+                          { from: o.from, durationInFrames: o.durationInFrames },
+                          (s) => patchOverlay(i, { from: s.from, durationInFrames: capDur(s.durationInFrames) }),
+                          1,
+                          snap(),
                         )
                       }
                     />
@@ -267,8 +361,14 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     <span
                       className="tl-handle right"
                       onPointerDown={(e) =>
-                        startBlockDrag(e, "right", zoom, { from: o.from, durationInFrames: o.durationInFrames }, (s) =>
-                          patchOverlay(i, { durationInFrames: capDur(s.durationInFrames) }),
+                        startBlockDrag(
+                          e,
+                          "right",
+                          zoom,
+                          { from: o.from, durationInFrames: o.durationInFrames },
+                          (s) => patchOverlay(i, { durationInFrames: capDur(s.durationInFrames) }),
+                          1,
+                          snap(),
                         )
                       }
                     />

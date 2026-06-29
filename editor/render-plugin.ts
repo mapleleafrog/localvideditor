@@ -110,11 +110,14 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const fileName = `timeline-${tag}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
     const kind = transparent ? "transparent ProRes" : "H.264";
-    // Use the whole machine: one render tab per core, GPU-accelerated browser rendering.
-    const concurrency = Math.max(1, options.concurrency ?? cpus().length);
+    // Render-machine controls (overridable from the editor's Render settings).
+    const concurrency = Math.max(1, Number(options.concurrency) || cpus().length); // 0/unset → all cores
+    const gl = (typeof options.gl === "string" && options.gl) || "angle"; // "angle" | "swiftshader" | "default"
+    const useGpu = gl !== "default";
+    const crf = Number(options.crf) >= 1 ? Math.max(1, Math.min(51, Math.round(Number(options.crf)))) : 16; // lower = higher quality
     send({
       type: "status",
-      message: `Rendering ${composition.durationInFrames} frames (${kind}) · ${concurrency} cores · GPU…`,
+      message: `Rendering ${composition.durationInFrames} frames (${kind}) · ${concurrency} cores · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
       durationInFrames: composition.durationInFrames,
     });
     await renderMedia({
@@ -123,13 +126,14 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       outputLocation,
       inputProps,
       concurrency,
-      // GPU-accelerated rendering (ANGLE) — big win for filter-heavy comps (drop-shadow/blur/glow).
-      chromiumOptions: { gl: "angle" },
+      // GPU-accelerated rendering (ANGLE by default) — big win for filter-heavy comps; switch to
+      // SwiftShader (CPU) or "default" if a GPU backend ever fails to launch.
+      ...(useGpu ? { chromiumOptions: { gl: gl as "angle" | "swiftshader" } } : {}),
       onProgress: ({ progress }) => send({ type: "progress", progress }),
       ...(transparent
         ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
-        : // H.264 with max-quality frame capture (jpegQuality 100) + high-quality encode (low CRF), software x264.
-          { codec: "h264" as const, jpegQuality: 100, crf: 16 }),
+        : // H.264: max-quality frame capture (jpegQuality 100) + configurable CRF, software x264.
+          { codec: "h264" as const, jpegQuality: 100, crf }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {

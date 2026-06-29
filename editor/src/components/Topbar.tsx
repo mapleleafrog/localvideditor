@@ -22,6 +22,15 @@ export const Topbar: React.FC = () => {
   const [nameInput, setNameInput] = useState(projectName);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Render machine settings (persisted) — escape hatches for speed/stability.
+  const [showSettings, setShowSettings] = useState(false);
+  const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem("soranji.render.concurrency")) || 0);
+  const [gl, setGl] = useState(() => localStorage.getItem("soranji.render.gl") || "angle");
+  const [crf, setCrf] = useState(() => Number(localStorage.getItem("soranji.render.crf")) || 16);
+  useEffect(() => localStorage.setItem("soranji.render.concurrency", String(concurrency)), [concurrency]);
+  useEffect(() => localStorage.setItem("soranji.render.gl", gl), [gl]);
+  useEffect(() => localStorage.setItem("soranji.render.crf", String(crf)), [crf]);
+
   useEffect(() => setNameInput(projectName), [projectName]);
   const commitName = () => setProjectName(safeName(nameInput));
 
@@ -32,7 +41,7 @@ export const Topbar: React.FC = () => {
 
   const onRender = async () => {
     setRender({ phase: "running", message: "Starting…", progress: 0 });
-    const options = { transparent: mode !== "mp4", overlaysOnly: mode === "overlays" };
+    const options = { transparent: mode !== "mp4", overlaysOnly: mode === "overlays", concurrency, gl, crf };
     try {
       await renderVideo(project, options, (msg) => {
         if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
@@ -153,6 +162,33 @@ export const Topbar: React.FC = () => {
         <option value="alpha">Full video · ProRes (alpha)</option>
         <option value="overlays">Overlays only · ProRes (alpha)</option>
       </select>
+      <span className="render-settings-wrap">
+        <button onClick={() => setShowSettings((s) => !s)} title="Render settings" className={showSettings ? "on" : ""}>⚙</button>
+        {showSettings && (
+          <div className="render-settings">
+            <div className="rs-title">Render settings</div>
+            <div className="fld">
+              <label>Concurrency (0 = all cores)</label>
+              <input type="number" min={0} max={64} value={concurrency} onChange={(e) => setConcurrency(Math.max(0, Math.round(+e.target.value || 0)))} />
+            </div>
+            <div className="fld">
+              <label>GPU backend</label>
+              <select value={gl} onChange={(e) => setGl(e.target.value)}>
+                <option value="angle">ANGLE — GPU (fast)</option>
+                <option value="swiftshader">SwiftShader — CPU (safe)</option>
+                <option value="default">Default</option>
+              </select>
+            </div>
+            <div className="fld">
+              <label>H.264 quality — CRF (lower = better)</label>
+              <input type="number" min={1} max={51} value={crf} onChange={(e) => setCrf(Math.max(1, Math.min(51, Math.round(+e.target.value || 16))))} />
+            </div>
+            <div className="muted" style={{ fontSize: 10 }}>
+              Defaults: all cores · ANGLE (GPU) · CRF 16. Switch to SwiftShader if a render fails to launch; lower concurrency if it runs out of memory. (ProRes/alpha exports ignore CRF.)
+            </div>
+          </div>
+        )}
+      </span>
       <button className="primary" onClick={onRender} disabled={render.phase === "running"}>
         {render.phase === "running" ? "Rendering…" : mode === "mp4" ? "⏺ Render MP4" : "⏺ Render .mov"}
       </button>

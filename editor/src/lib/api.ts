@@ -11,6 +11,12 @@ export interface RenderOptions {
   transparent?: boolean;
   /** Drop the clip track and render only the overlays/VFX/titles (implies transparent). */
   overlaysOnly?: boolean;
+  /** Parallel render tabs. 0/undefined = all CPU cores. */
+  concurrency?: number;
+  /** Chromium GL backend: "angle" (GPU) · "swiftshader" (CPU) · "default". */
+  gl?: string;
+  /** H.264 quality (1–51, lower = higher quality). Default 16. */
+  crf?: number;
 }
 
 /** POST the project + render options to the dev-server endpoint and stream NDJSON progress. */

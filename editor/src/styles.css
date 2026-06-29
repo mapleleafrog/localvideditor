@@ -231,6 +231,17 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .render-ok { font-size: 11px; color: #6ee7a8; }
 .render-err { font-size: 11px; color: #ff8fa3; }
 
+/* render settings popover */
+.render-settings-wrap { position: relative; display: inline-flex; }
+.render-settings {
+  position: absolute; top: 110%; right: 0; z-index: 50; width: 240px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.render-settings .rs-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--cyan); }
+.render-settings .fld > label { font-size: 11px; }
+
 .render-mode { font-size: 11px; padding: 4px 6px; max-width: 190px; }
 
 /* ===== view toggle (topbar) ===== */

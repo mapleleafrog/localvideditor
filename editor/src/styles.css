@@ -171,6 +171,20 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 
 /* timeline drop-to-add-clip highlight */
 .tl-scroll.dropping { outline: 2px dashed var(--accent); outline-offset: -3px; }
+
+/* canvas drop-to-add-layer highlight */
+.comp-box.dropping { outline: 3px dashed var(--accent); outline-offset: -3px; }
+
+/* on-canvas transform handles (custom, center-pivot) */
+.cv-frame { outline: 1px solid var(--accent); }
+.cv-corner {
+  width: 12px; height: 12px; box-sizing: border-box; border-radius: 2px;
+  background: #fff; border: 2px solid var(--accent); cursor: nwse-resize;
+}
+.cv-rot {
+  width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%;
+  background: var(--accent); border: 2px solid #fff; cursor: grab;
+}
 .lib-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .lib-body { padding: 10px; overflow: auto; flex: 1; min-height: 0; }
 .lib-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }

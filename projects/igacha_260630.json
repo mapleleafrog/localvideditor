@@ -1,0 +1,13 @@
+{
+  "background": {
+    "type": "motion",
+    "color": "#0c1322",
+    "gradient": "linear-gradient(#1b2a6b, #0e3b4d)",
+    "motion": "synthGrid"
+  },
+  "clips": [],
+  "overlays": [],
+  "fps": 30,
+  "width": 1080,
+  "height": 1350
+}

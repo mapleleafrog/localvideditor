@@ -73,12 +73,12 @@ var SoranjiEffects = (() => {
     const c4 = 2 * Math.PI / 3;
     return Math.pow(2, -10 * p) * Math.sin((p * 10 - 0.75) * c4) + 1;
   };
-  var beatKick = (t, bpm = 120, exp = 6) => {
+  var beatKick = (t, bpm = 120, exp = 6, offsetSec = 0) => {
     const spb = 60 / bpm;
-    const ph = t % spb / spb;
+    const ph = ((t - offsetSec) % spb + spb) % spb / spb;
     return Math.pow(1 - ph, exp);
   };
-  var beatIndex = (t, bpm = 120) => Math.floor(t / (60 / bpm));
+  var beatIndex = (t, bpm = 120, offsetSec = 0) => Math.floor((t - offsetSec) / (60 / bpm));
   var bez = (t, p0, p1, p2, p3) => {
     const u = 1 - t;
     return [

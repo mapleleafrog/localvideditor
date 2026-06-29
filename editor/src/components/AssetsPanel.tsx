@@ -11,9 +11,9 @@ const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-m
 const isVideo = (f: string) => /\.(mp4|webm|mov)$/i.test(f);
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
 
-const imageOverlay = (src: string): Overlay => ({
+const imageOverlay = (src: string, width: number): Overlay => ({
   type: "image", text: "", src, from: 0, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0,
-  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width: 240,
+  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
 });
 
 /** Asset browser: drag-drop / pick files to import into public/media/, preview thumbnails, and
@@ -21,6 +21,7 @@ const imageOverlay = (src: string): Overlay => ({
 export const AssetsPanel: React.FC = () => {
   const addOverlay = useEditor((s) => s.addOverlay);
   const projectName = useEditor((s) => s.projectName);
+  const compW = useEditor((s) => s.project.width ?? 1920);
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export const AssetsPanel: React.FC = () => {
 
       <div className="asset-grid">
         {assets.map((a) => (
-          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addOverlay(imageOverlay(a))}>
+          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addOverlay(imageOverlay(a, Math.round(compW * 0.5)))}>
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (

@@ -3,12 +3,27 @@ import { Player, type PlayerRef } from "@remotion/player";
 import { staticFile } from "remotion";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { Timeline } from "../../../src/timeline/Timeline";
-import type { AudioTrack } from "../../../src/timeline/schema";
+import type { AudioTrack, Clip, Overlay } from "../../../src/timeline/schema";
 import { useEditor } from "../store";
 import { audioEndFrames, computeDuration } from "../lib/timeline-utils";
+import { uploadMedia } from "../lib/api";
+import { ensureProjectName } from "../lib/names";
 import { CanvasOverlay } from "./CanvasOverlay";
 
 const resolveSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
+const isAudioFile = (n: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(n);
+const isVideoFile = (n: string) => /\.(mp4|webm|mov)$/i.test(n);
+const clampPct = (v: number) => Math.max(-20, Math.min(120, v));
+
+const imageOverlay = (src: string, width: number, x: number, y: number): Overlay => ({
+  type: "image", text: "", src, from: 0, durationInFrames: 60, x, y, scale: 1, rotation: 0,
+  opacity: 1, motions: [], z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
+});
+const videoClip = (src: string): Clip => ({
+  type: "video", src, durationInFrames: 60, motion: "none", transitionToNext: "none",
+  transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1, label: "", note: "",
+});
+const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
 
 /** Read each non-looping track's length (frames) in the browser so the Player is sized to the song. */
 function useAudioEnd(audio: AudioTrack[], fps: number): number {
@@ -60,6 +75,9 @@ function useContainFit(ref: React.RefObject<HTMLDivElement | null>, aw: number, 
  *  transform tools (CanvasOverlay) can map screen px <-> composition coordinates 1:1. */
 export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
   const project = useEditor((s) => s.project);
+  const addOverlay = useEditor((s) => s.addOverlay);
+  const addClip = useEditor((s) => s.addClip);
+  const addAudio = useEditor((s) => s.addAudio);
   const audioEnd = useAudioEnd(project.audio ?? [], project.fps ?? 30);
   const duration = computeDuration(project, audioEnd);
   const compW = project.width ?? 1920;
@@ -67,10 +85,38 @@ export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }>
   const wrapRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const fit = useContainFit(wrapRef, compW, compH);
+  const [dropping, setDropping] = useState(false);
+
+  // Drop media onto the canvas: image → image layer AT the drop point; video → clip; audio → track.
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDropping(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+    const proj = ensureProjectName();
+    if (!proj) return;
+    const rect = boxRef.current?.getBoundingClientRect();
+    const x = rect ? clampPct(((e.clientX - rect.left) / rect.width) * 100) : 50;
+    const y = rect ? clampPct(((e.clientY - rect.top) / rect.height) * 100) : 50;
+    for (const f of files) {
+      const r = await uploadMedia(f, proj);
+      if (!r.ok || !r.ref) continue;
+      if (isAudioFile(f.name)) addAudio(audioTrack(r.ref));
+      else if (isVideoFile(f.name)) addClip(videoClip(r.ref));
+      else addOverlay(imageOverlay(r.ref, Math.round(compW * 0.5), Math.round(x), Math.round(y)));
+    }
+  };
 
   return (
     <div className="preview-fit" ref={wrapRef}>
-      <div className="comp-box" ref={boxRef} style={{ width: fit.w || undefined, height: fit.h || undefined }}>
+      <div
+        className={"comp-box" + (dropping ? " dropping" : "")}
+        ref={boxRef}
+        style={{ width: fit.w || undefined, height: fit.h || undefined }}
+        onDragOver={(e) => { e.preventDefault(); if (!dropping) setDropping(true); }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
+        onDrop={onDrop}
+      >
         <Player
           ref={playerRef}
           component={Timeline as React.ComponentType<Record<string, unknown>>}

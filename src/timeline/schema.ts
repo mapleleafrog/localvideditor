@@ -89,6 +89,9 @@ const overlaySchema = z.object({
   color: z.string().default("#ffffff"),
   glow: z.string().default(""),
   width: z.number().default(200),
+  /** Crisp pixel-art scaling (`image-rendering: pixelated`) for image layers. Optional — default is
+   *  smooth (bilinear), so slow/sub-pixel motion doesn't snap to whole pixels (= choppy). */
+  pixelated: z.boolean().optional(),
 });
 
 // A soundtrack / sfx track layered under the whole timeline (rendered as <Audio>).

@@ -144,6 +144,11 @@ export const Inspector: React.FC = () => {
         <>
           <Field label="Source"><input value={o.src} onChange={(e) => patchOverlay(i, { src: e.target.value })} placeholder="media/<project>/clip.mp4" /></Field>
           <Field label="Width (px)"><input type="number" min={1} value={o.width} onChange={(e) => patchOverlay(i, { width: +e.target.value })} /></Field>
+          {o.type === "image" && (
+            <Field label="Pixelated (crisp pixel-art; off = smoother motion)">
+              <input type="checkbox" checked={!!o.pixelated} onChange={(e) => patchOverlay(i, { pixelated: e.target.checked })} />
+            </Field>
+          )}
         </>
       )}
       {o.type === "fx" && (

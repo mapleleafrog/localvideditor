@@ -142,7 +142,7 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         <OffthreadVideo src={resolveSrc(o.src)} style={{ width: o.width ?? 480, height: "auto", display: "block" }} />
       </Sequence>
     ) : (
-      <Img src={resolveSrc(o.src)} className="pixelated" style={{ width: o.width ?? 200, height: "auto", display: "block" }} />
+      <Img src={resolveSrc(o.src)} className={o.pixelated ? "pixelated" : undefined} style={{ width: o.width ?? 200, height: "auto", display: "block" }} />
     );
   return (
     <Layer

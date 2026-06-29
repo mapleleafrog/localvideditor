@@ -131,6 +131,11 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       >
         {o.text}
       </div>
+    ) : o.type === "video" ? (
+      // Video layer — rebased to start at the overlay's `from` so it plays from its beginning.
+      <Sequence from={o.from ?? 0} layout="none">
+        <OffthreadVideo src={resolveSrc(o.src)} style={{ width: o.width ?? 480, height: "auto", display: "block" }} />
+      </Sequence>
     ) : (
       <Img src={resolveSrc(o.src)} className="pixelated" style={{ width: o.width ?? 200, height: "auto", display: "block" }} />
     );

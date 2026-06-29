@@ -132,8 +132,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
               title="Click to select layer"
             >
               <span className="ovl-label">
-                {o.type === "text" ? "T" : o.type === "fx" ? "✦" : "▦"}{" "}
-                {o.type === "text" ? (o.text || "text").slice(0, 8) : o.type === "fx" ? "fx" : "image"}
+                {o.type === "text" ? "T" : o.type === "fx" ? "✦" : o.type === "video" ? "▶" : "▦"}{" "}
+                {o.type === "text" ? (o.text || "text").slice(0, 8) : o.type === "fx" ? "fx" : o.type === "video" ? "video" : "image"}
               </span>
               <span className="ovl-reorder">
                 <button

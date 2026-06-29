@@ -4,7 +4,7 @@ import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
 import { listMedia, uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
-import { imageNaturalSize, placeWidth } from "../lib/image";
+import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
 
 // Fallback list until /api/media responds (the dev server scans public/ + public/media/).
 const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
@@ -12,8 +12,8 @@ const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-m
 const isVideo = (f: string) => /\.(mp4|webm|mov)$/i.test(f);
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
 
-const imageOverlay = (src: string, width: number): Overlay => ({
-  type: "image", text: "", src, from: 0, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0,
+const mediaOverlay = (src: string, width: number, type: "image" | "video"): Overlay => ({
+  type, text: "", src, from: 0, durationInFrames: 60, x: 50, y: 50, scale: 1, rotation: 0,
   opacity: 1, motions: [], z: 0.4, windowInFrames: 30, enter: "none", exit: "none",
   enterDurationInFrames: 15, exitDurationInFrames: 15, fontSize: 80, color: "#ffffff", glow: "", width,
 });
@@ -26,10 +26,12 @@ export const AssetsPanel: React.FC = () => {
   const compW = useEditor((s) => s.project.width ?? 1920);
   const compH = useEditor((s) => s.project.height ?? 1080);
 
-  // Add an asset as an image layer at its NATIVE size (scaled down only if bigger than the frame).
-  const addImage = async (ref: string) => {
-    const { w, h } = await imageNaturalSize(srcUrl(ref));
-    addOverlay(imageOverlay(ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5))));
+  // Add an asset as a layer at its NATIVE size (scaled down only if bigger than the frame).
+  // Video files become video layers; everything else an image layer.
+  const addAsset = async (ref: string) => {
+    const vid = isVideo(ref);
+    const { w, h } = await (vid ? videoNaturalSize : imageNaturalSize)(srcUrl(ref));
+    addOverlay(mediaOverlay(ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5)), vid ? "video" : "image"));
   };
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
   const [dragging, setDragging] = useState(false);
@@ -72,7 +74,7 @@ export const AssetsPanel: React.FC = () => {
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={(e) => { e.preventDefault(); setDragging(false); importFiles(e.dataTransfer.files); }}
     >
-      <div className="lib-hint">Drag files here to import, or click a tile to add it as an image layer. Audio lands in the Audio tab.</div>
+      <div className="lib-hint">Drag files here to import, or click a tile to add it as a layer (video → video layer). Audio lands in the Audio tab.</div>
       <button className="lib-item" style={{ width: "100%", textAlign: "center" }} onClick={() => inputRef.current?.click()}>
         + Add files…
       </button>
@@ -88,7 +90,7 @@ export const AssetsPanel: React.FC = () => {
 
       <div className="asset-grid">
         {assets.map((a) => (
-          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addImage(a)}>
+          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addAsset(a)}>
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (

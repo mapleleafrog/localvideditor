@@ -4,6 +4,7 @@ import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
 import { listMedia, uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
+import { imageNaturalSize, placeWidth } from "../lib/image";
 
 // Fallback list until /api/media responds (the dev server scans public/ + public/media/).
 const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
@@ -22,6 +23,13 @@ export const AssetsPanel: React.FC = () => {
   const addOverlay = useEditor((s) => s.addOverlay);
   const projectName = useEditor((s) => s.projectName);
   const compW = useEditor((s) => s.project.width ?? 1920);
+  const compH = useEditor((s) => s.project.height ?? 1080);
+
+  // Add an asset as an image layer at its NATIVE size (scaled down only if bigger than the frame).
+  const addImage = async (ref: string) => {
+    const { w, h } = await imageNaturalSize(srcUrl(ref));
+    addOverlay(imageOverlay(ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5))));
+  };
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -79,7 +87,7 @@ export const AssetsPanel: React.FC = () => {
 
       <div className="asset-grid">
         {assets.map((a) => (
-          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addOverlay(imageOverlay(a, Math.round(compW * 0.5)))}>
+          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addImage(a)}>
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (

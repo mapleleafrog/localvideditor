@@ -8,6 +8,7 @@ import { useEditor } from "../store";
 import { audioEndFrames, computeDuration } from "../lib/timeline-utils";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
+import { imageNaturalSize, placeWidth } from "../lib/image";
 import { CanvasOverlay } from "./CanvasOverlay";
 
 const resolveSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
@@ -103,7 +104,13 @@ export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }>
       if (!r.ok || !r.ref) continue;
       if (isAudioFile(f.name)) addAudio(audioTrack(r.ref));
       else if (isVideoFile(f.name)) addClip(videoClip(r.ref));
-      else addOverlay(imageOverlay(r.ref, Math.round(compW * 0.5), Math.round(x), Math.round(y)));
+      else {
+        // place the image at its native size (scaled down only if larger than the frame)
+        const url = URL.createObjectURL(f);
+        const { w, h } = await imageNaturalSize(url);
+        URL.revokeObjectURL(url);
+        addOverlay(imageOverlay(r.ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5)), Math.round(x), Math.round(y)));
+      }
     }
   };
 

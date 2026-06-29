@@ -22,6 +22,7 @@ export const CanvasPanel: React.FC = () => {
   const w = project.width ?? 1920;
   const h = project.height ?? 1080;
   const fps = project.fps ?? 30;
+  const dur = project.durationInFrames ?? 0;
   const g = gcd(w, h) || 1;
   const presetIdx = PRESETS.findIndex((p) => p.w === w && p.h === h);
 
@@ -83,6 +84,19 @@ export const CanvasPanel: React.FC = () => {
         />
       </div>
       <div className="lib-hint">Clip/overlay lengths are stored in frames, so changing FPS changes their real-time duration.</div>
+
+      <div className="lib-cat">Project duration</div>
+      <div className="lib-hint">Fixed video length. 0 = auto (fit clips/overlays/song). When set, it caps the length and the max a clip can be extended to.</div>
+      <div className="fld">
+        <label>Duration (frames)</label>
+        <input
+          type="number"
+          min={0}
+          value={dur}
+          onChange={(e) => patchProject({ durationInFrames: Math.max(0, Math.round(+e.target.value || 0)) })}
+        />
+        <span className="muted">{dur > 0 ? `${(dur / fps).toFixed(2)}s` : "auto"}</span>
+      </div>
     </div>
   );
 };

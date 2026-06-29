@@ -39,6 +39,25 @@ function readJsonBody(req: IncomingMessage): Promise<any> {
   });
 }
 
+/** Collect a request body as raw bytes (for binary uploads). Capped to avoid runaway memory. */
+function readRawBody(req: IncomingMessage, maxBytes = 2 * 1024 * 1024 * 1024): Promise<Buffer> {
+  return new Promise((resolveBody, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > maxBytes) {
+        reject(new Error("Upload too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => resolveBody(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
 const sendJson = (res: ServerResponse, code: number, obj: unknown) => {
   res.statusCode = code;
   res.setHeader("Content-Type", "application/json");
@@ -122,6 +141,36 @@ async function handleSaveProject(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/** Import a dropped/picked file into public/media/ so the editor can use it via staticFile().
+ *  Raw bytes in the body, filename in ?name=. Sanitizes the name and avoids clobbering by suffixing. */
+async function handleUpload(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const name = new URL(req.url || "", "http://localhost").searchParams.get("name") || "upload.bin";
+    const base = name.split(/[\\/]/).pop() || "upload.bin";
+    const safe = base.replace(/[^a-z0-9._-]/gi, "_").replace(/^\.+/, "") || "upload.bin";
+    const buf = await readRawBody(req);
+    await fs.mkdir(MEDIA_DIR, { recursive: true });
+
+    // Avoid overwriting an existing file with the same name: photo.jpg -> photo-1.jpg, …
+    const dot = safe.lastIndexOf(".");
+    const stem = dot > 0 ? safe.slice(0, dot) : safe;
+    const ext = dot > 0 ? safe.slice(dot) : "";
+    let finalName = safe;
+    for (let i = 1; ; i++) {
+      try {
+        await fs.access(join(MEDIA_DIR, finalName));
+        finalName = `${stem}-${i}${ext}`;
+      } catch {
+        break; // free name
+      }
+    }
+    await fs.writeFile(join(MEDIA_DIR, finalName), buf);
+    sendJson(res, 200, { ok: true, ref: `media/${finalName}` });
+  } catch (err) {
+    sendJson(res, 500, { ok: false, message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 /** List drop-in media (public/media/* + root public/) split into visual assets and audio tracks. */
 async function handleMedia(_req: IncomingMessage, res: ServerResponse) {
   const isVisual = (f: string) => /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)$/i.test(f);
@@ -155,6 +204,7 @@ export function renderApiPlugin(): Plugin {
         const url = (req.url || "").split("?")[0];
         if (req.method === "POST" && url === "/api/render") return void handleRender(req, res);
         if (req.method === "POST" && url === "/api/save-project") return void handleSaveProject(req, res);
+        if (req.method === "POST" && url === "/api/upload") return void handleUpload(req, res);
         if (req.method === "GET" && url === "/api/media") return void handleMedia(req, res);
         next();
       });

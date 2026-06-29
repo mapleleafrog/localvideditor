@@ -8,6 +8,7 @@ export { motions, transitions };
 export { CATALOG } from "./catalog";
 export { depthShadow, depthScale, bevel } from "./depth";
 export { composeStyles, scaleStrength } from "./compose";
+export { EASINGS, EASING_NAMES, ease, type EasingName } from "./easing";
 
 const IDENTITY: NonNullable<MotionDef["style"]> = () => ({});
 

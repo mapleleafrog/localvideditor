@@ -1,6 +1,6 @@
 import React from "react";
 import { useEditor } from "../store";
-import type { Overlay } from "../../../src/timeline/schema";
+import type { Overlay, MotionParam } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 
 const IO_OPTS: [Overlay["enter"], string][] = [
@@ -24,6 +24,19 @@ const IO_OPTS: [Overlay["enter"], string][] = [
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 const MOTION_CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
+
+const EASING_OPTS: [string, string][] = [
+  ["linear", "Linear"],
+  ["easeIn", "Ease in"],
+  ["easeOut", "Ease out"],
+  ["easeInOut", "Ease in-out"],
+  ["easeOutIn", "Ease out-in"],
+];
+const EasingSelect: React.FC<{ value?: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
+  <select value={value ?? "linear"} onChange={(e) => onChange(e.target.value)}>
+    {EASING_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+  </select>
+);
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="fld">
@@ -70,6 +83,20 @@ export const Inspector: React.FC = () => {
 
   const maxDur = project.durationInFrames && project.durationInFrames > 0 ? project.durationInFrames : Infinity;
 
+  // Per-effect param helpers (motionParams is index-aligned with motions).
+  const setMotionParam = (oi: number, mi: number, patch: Partial<MotionParam>) => {
+    const ov = project.overlays[oi];
+    const params: MotionParam[] = (ov.motionParams ?? []).slice();
+    while (params.length < ov.motions.length) params.push({});
+    params[mi] = { ...params[mi], ...patch };
+    patchOverlay(oi, { motionParams: params });
+  };
+  const removeEffect = (oi: number, mi: number) => {
+    const ov = project.overlays[oi];
+    const params = (ov.motionParams ?? []).filter((_, k) => k !== mi);
+    patchOverlay(oi, { motions: ov.motions.filter((_, k) => k !== mi), motionParams: params.length ? params : undefined });
+  };
+
   if (selection.kind === "clip") {
     const c = project.clips[selection.index];
     if (!c) return <div className="muted pad">Clip gone.</div>;
@@ -105,7 +132,10 @@ export const Inspector: React.FC = () => {
           </select>
         </Field>
         {c.transitionToNext !== "none" && (
-          <Field label="Transition (frames)"><input type="number" min={1} value={c.transitionDurationInFrames} onChange={(e) => patchClip(i, { transitionDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+          <>
+            <Field label="Transition (frames)"><input type="number" min={1} value={c.transitionDurationInFrames} onChange={(e) => patchClip(i, { transitionDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Transition easing"><EasingSelect value={c.transitionEasing} onChange={(v) => patchClip(i, { transitionEasing: v as typeof c.transitionEasing })} /></Field>
+          </>
         )}
         {c.type === "video" && (
           <>
@@ -168,7 +198,10 @@ export const Inspector: React.FC = () => {
         </select>
       </Field>
       {(o.enter ?? "none") !== "none" && (
-        <Field label="Enter length (frames)"><input type="number" min={1} value={o.enterDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { enterDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+        <>
+          <Field label="Enter length (frames)"><input type="number" min={1} value={o.enterDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { enterDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+          <Field label="Enter easing"><EasingSelect value={o.enterEasing} onChange={(v) => patchOverlay(i, { enterEasing: v as Overlay["enterEasing"] })} /></Field>
+        </>
       )}
       <Field label="Exit">
         <select value={o.exit ?? "none"} onChange={(e) => patchOverlay(i, { exit: e.target.value as Overlay["exit"] })}>
@@ -176,7 +209,10 @@ export const Inspector: React.FC = () => {
         </select>
       </Field>
       {(o.exit ?? "none") !== "none" && (
-        <Field label="Exit length (frames)"><input type="number" min={1} value={o.exitDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { exitDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+        <>
+          <Field label="Exit length (frames)"><input type="number" min={1} value={o.exitDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { exitDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+          <Field label="Exit easing"><EasingSelect value={o.exitEasing} onChange={(v) => patchOverlay(i, { exitEasing: v as Overlay["exitEasing"] })} /></Field>
+        </>
       )}
 
       <div className="insp-sub">{o.type === "fx" ? "Layer" : "Transform"}</div>
@@ -192,23 +228,23 @@ export const Inspector: React.FC = () => {
       {o.type !== "fx" && (
         <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
       )}
-      <div className="insp-sub">Effects (stacked)</div>
-      <div className="chips">
-        {o.motions.map((m, mi) => (
-          <span key={mi} className="chip">
-            {m}
-            <button onClick={() => patchOverlay(i, { motions: o.motions.filter((_, k) => k !== mi) })}>×</button>
-          </span>
-        ))}
-        {o.motions.length === 0 && <span className="muted">no effects</span>}
-      </div>
+      <div className="insp-sub">Effects (stacked) — each has its own settings</div>
+      {o.motions.length === 0 && <span className="muted">no effects</span>}
+      {o.motions.map((m, mi) => {
+        const p = o.motionParams?.[mi] ?? {};
+        return (
+          <div className="fx-item" key={mi}>
+            <div className="fx-item-head">
+              <span className="fx-name" title={m}>{m}</span>
+              <button className="del" title="Remove effect" onClick={() => removeEffect(i, mi)}>×</button>
+            </div>
+            <Field label="Strength"><Slider value={p.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => setMotionParam(i, mi, { strength: v })} /></Field>
+            <Field label="Easing"><EasingSelect value={p.easing} onChange={(v) => setMotionParam(i, mi, { easing: v as MotionParam["easing"] })} /></Field>
+            <Field label="Loop"><input type="checkbox" checked={!!p.loop} onChange={(e) => setMotionParam(i, mi, { loop: e.target.checked })} /></Field>
+          </div>
+        );
+      })}
       <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
-      {o.motions.length > 0 && (
-        <>
-          <Field label="Effect strength"><Slider value={o.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchOverlay(i, { strength: v })} /></Field>
-          <Field label="Loop effects"><input type="checkbox" checked={!!o.loop} onChange={(e) => patchOverlay(i, { loop: e.target.checked })} /></Field>
-        </>
-      )}
     </div>
   );
 };

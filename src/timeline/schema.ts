@@ -21,6 +21,13 @@ const TRANSITION_IDS = readyTransitions().map((t) => t.id);
 
 // z.enum needs a non-empty tuple type; the registry always has entries.
 const enumOf = (vals: string[]) => z.enum(vals as [string, ...string[]]);
+const easingPick = z.enum(["linear", "easeIn", "easeOut", "easeInOut", "easeOutIn"]);
+// Per-effect settings, index-aligned with `overlay.motions`.
+const motionParamSchema = z.object({
+  loop: z.boolean().optional(),
+  strength: z.number().min(0).optional(),
+  easing: easingPick.optional(),
+});
 const motionPick = enumOf(["none", ...MOTION_IDS]); // "none" = no full-frame motion
 const transitionPick = enumOf(["none", ...TRANSITION_IDS]);
 const bgMotionPick = enumOf(["none", ...BG_IDS]);
@@ -35,6 +42,8 @@ const clipSchema = z.object({
   /** Transition INTO the next clip (ignored on the last clip). */
   transitionToNext: transitionPick.default("none"),
   transitionDurationInFrames: z.number().int().positive().default(20),
+  /** Easing curve for the transition (linear / easeIn / easeOut / easeInOut / easeOutIn). */
+  transitionEasing: easingPick.optional(),
   /** Video only — 0 means "no trim". */
   trimBefore: z.number().int().nonnegative().default(0),
   trimAfter: z.number().int().nonnegative().default(0),
@@ -80,10 +89,14 @@ const overlaySchema = z.object({
     .default("none"),
   enterDurationInFrames: z.number().int().nonnegative().default(15),
   exitDurationInFrames: z.number().int().nonnegative().default(15),
-  /** Loop the stacked effects over `windowInFrames` instead of running once. Optional. */
+  /** Easing curves for the enter / exit ramps. */
+  enterEasing: easingPick.optional(),
+  exitEasing: easingPick.optional(),
+  /** Per-layer fallback loop/strength (applied to every effect unless a per-effect param overrides). */
   loop: z.boolean().optional(),
-  /** Effect strength multiplier for the stacked effects (1 = normal). Optional — defaults to 1. */
   strength: z.number().min(0).optional(),
+  /** Per-effect settings, index-aligned with `motions` (loop / strength / easing each). */
+  motionParams: z.array(motionParamSchema).optional(),
   /** Text only. */
   fontSize: z.number().default(80),
   color: z.string().default("#ffffff"),
@@ -137,4 +150,5 @@ export type Project = z.infer<typeof projectSchema>;
 export type Clip = z.infer<typeof clipSchema>;
 export type Overlay = z.infer<typeof overlaySchema>;
 export type AudioTrack = z.infer<typeof audioTrackSchema>;
+export type MotionParam = z.infer<typeof motionParamSchema>;
 export type Background = z.infer<typeof projectSchema>["background"];

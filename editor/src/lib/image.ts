@@ -9,6 +9,16 @@ export const imageNaturalSize = (url: string): Promise<{ w: number; h: number }>
     img.src = url;
   });
 
+/** Natural size of a video URL (or object URL) via its metadata. Resolves {w:0,h:0} on error. */
+export const videoNaturalSize = (url: string): Promise<{ w: number; h: number }> =>
+  new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => resolve({ w: v.videoWidth, h: v.videoHeight });
+    v.onerror = () => resolve({ w: 0, h: 0 });
+    v.src = url;
+  });
+
 /** Composition-px width to place an image at: its NATIVE width, scaled DOWN only if larger than the
  *  frame (so a 1080×1350 image on a 1080 canvas fills it exactly; a huge photo fits the frame). */
 export const placeWidth = (natW: number, natH: number, compW: number, compH: number, fallback: number): number => {

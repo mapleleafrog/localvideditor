@@ -15,9 +15,9 @@ const sig = (o: Overlay) => `${o.type}|${o.text}|${o.fontSize}|${o.src}|${o.widt
 
 /** fallback base size (composition px) when the live node isn't measurable yet. */
 function estimateBase(o: Overlay): { w: number; h: number } {
-  if (o.type === "image") {
+  if (o.type === "image" || o.type === "video") {
     const w = o.width || 600;
-    return { w, h: w * 0.66 };
+    return { w, h: w * 0.56 };
   }
   const fs = o.fontSize || 80;
   const len = (o.text || "Text").length || 4;

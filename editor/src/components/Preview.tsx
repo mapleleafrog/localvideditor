@@ -3,12 +3,12 @@ import { Player, type PlayerRef } from "@remotion/player";
 import { staticFile } from "remotion";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { Timeline } from "../../../src/timeline/Timeline";
-import type { AudioTrack, Clip, Overlay } from "../../../src/timeline/schema";
+import type { AudioTrack, Overlay } from "../../../src/timeline/schema";
 import { useEditor } from "../store";
 import { audioEndFrames, computeDuration } from "../lib/timeline-utils";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
-import { imageNaturalSize, placeWidth } from "../lib/image";
+import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
 import { CanvasOverlay } from "./CanvasOverlay";
 
 const resolveSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
@@ -16,14 +16,10 @@ const isAudioFile = (n: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(n);
 const isVideoFile = (n: string) => /\.(mp4|webm|mov)$/i.test(n);
 const clampPct = (v: number) => Math.max(-20, Math.min(120, v));
 
-const imageOverlay = (src: string, width: number, x: number, y: number): Overlay => ({
-  type: "image", text: "", src, from: 0, durationInFrames: 60, x, y, scale: 1, rotation: 0,
+const mediaOverlay = (src: string, width: number, x: number, y: number, type: "image" | "video"): Overlay => ({
+  type, text: "", src, from: 0, durationInFrames: 60, x, y, scale: 1, rotation: 0,
   opacity: 1, motions: [], z: 0.4, windowInFrames: 30, enter: "none", exit: "none",
   enterDurationInFrames: 15, exitDurationInFrames: 15, fontSize: 80, color: "#ffffff", glow: "", width,
-});
-const videoClip = (src: string): Clip => ({
-  type: "video", src, durationInFrames: 60, motion: "none", transitionToNext: "none",
-  transitionDurationInFrames: 20, trimBefore: 0, trimAfter: 0, volume: 1, label: "", note: "",
 });
 const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
 
@@ -78,7 +74,6 @@ function useContainFit(ref: React.RefObject<HTMLDivElement | null>, aw: number, 
 export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
   const project = useEditor((s) => s.project);
   const addOverlay = useEditor((s) => s.addOverlay);
-  const addClip = useEditor((s) => s.addClip);
   const addAudio = useEditor((s) => s.addAudio);
   const audioEnd = useAudioEnd(project.audio ?? [], project.fps ?? 30);
   const duration = computeDuration(project, audioEnd);
@@ -103,14 +98,17 @@ export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }>
     for (const f of files) {
       const r = await uploadMedia(f, proj);
       if (!r.ok || !r.ref) continue;
-      if (isAudioFile(f.name)) addAudio(audioTrack(r.ref));
-      else if (isVideoFile(f.name)) addClip(videoClip(r.ref));
-      else {
-        // place the image at its native size (scaled down only if larger than the frame)
+      if (isAudioFile(f.name)) {
+        addAudio(audioTrack(r.ref));
+      } else {
+        // image/video → a layer at the drop point, placed at native size (scaled down to fit frame)
+        const vid = isVideoFile(f.name);
         const url = URL.createObjectURL(f);
-        const { w, h } = await imageNaturalSize(url);
+        const { w, h } = await (vid ? videoNaturalSize : imageNaturalSize)(url);
         URL.revokeObjectURL(url);
-        addOverlay(imageOverlay(r.ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5)), Math.round(x), Math.round(y)));
+        addOverlay(
+          mediaOverlay(r.ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5)), Math.round(x), Math.round(y), vid ? "video" : "image"),
+        );
       }
     }
   };

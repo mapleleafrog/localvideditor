@@ -110,11 +110,12 @@ export const Inspector: React.FC = () => {
   const i = selection.index;
   return (
     <div className="insp">
-      <div className="insp-head">{o.type === "text" ? "Text" : o.type === "image" ? "Image" : "FX"} layer <button className="del" onClick={removeSelected}>Delete</button></div>
+      <div className="insp-head">{o.type === "text" ? "Text" : o.type === "image" ? "Image" : o.type === "video" ? "Video" : "FX"} layer <button className="del" onClick={removeSelected}>Delete</button></div>
       <Field label="Type">
-        <select value={o.type} onChange={(e) => patchOverlay(i, { type: e.target.value as "text" | "image" | "fx" })}>
+        <select value={o.type} onChange={(e) => patchOverlay(i, { type: e.target.value as Overlay["type"] })}>
           <option value="text">text</option>
           <option value="image">image</option>
+          <option value="video">video</option>
           <option value="fx">fx (full-frame)</option>
         </select>
       </Field>
@@ -126,9 +127,9 @@ export const Inspector: React.FC = () => {
           <Field label="Glow (CSS shadow)"><input value={o.glow} onChange={(e) => patchOverlay(i, { glow: e.target.value })} placeholder="0 0 18px #ff2e88" /></Field>
         </>
       )}
-      {o.type === "image" && (
+      {(o.type === "image" || o.type === "video") && (
         <>
-          <Field label="Source"><input value={o.src} onChange={(e) => patchOverlay(i, { src: e.target.value })} /></Field>
+          <Field label="Source"><input value={o.src} onChange={(e) => patchOverlay(i, { src: e.target.value })} placeholder="media/<project>/clip.mp4" /></Field>
           <Field label="Width (px)"><input type="number" min={1} value={o.width} onChange={(e) => patchOverlay(i, { width: +e.target.value })} /></Field>
         </>
       )}

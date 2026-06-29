@@ -39,6 +39,8 @@ const clipSchema = z.object({
   trimBefore: z.number().int().nonnegative().default(0),
   trimAfter: z.number().int().nonnegative().default(0),
   volume: z.number().min(0).max(1).default(1),
+  /** Effect strength multiplier for this clip's motion (1 = normal). Optional — defaults to 1. */
+  strength: z.number().min(0).optional(),
   /** Storyboard-only: a short shot title + free notes. Optional so existing clip literals
    *  (Root.tsx defaultProps, projects/*.json) stay valid; the render ignores these. */
   label: z.string().optional(),
@@ -78,6 +80,10 @@ const overlaySchema = z.object({
     .default("none"),
   enterDurationInFrames: z.number().int().nonnegative().default(15),
   exitDurationInFrames: z.number().int().nonnegative().default(15),
+  /** Loop the stacked effects over `windowInFrames` instead of running once. Optional. */
+  loop: z.boolean().optional(),
+  /** Effect strength multiplier for the stacked effects (1 = normal). Optional — defaults to 1. */
+  strength: z.number().min(0).optional(),
   /** Text only. */
   fontSize: z.number().default(80),
   color: z.string().default("#ffffff"),
@@ -116,6 +122,9 @@ export const projectSchema = z.object({
   bpm: z.number().positive().default(120),
   /** Shift the beat grid so the downbeat lands on the song's first beat (in frames). */
   beatOffsetInFrames: z.number().int().default(0),
+  /** Fixed project length in frames. Optional — 0/unset = auto (fit clips/overlays/audio). When set
+   *  it caps the video length and the max a clip can be extended to. */
+  durationInFrames: z.number().int().nonnegative().optional(),
   fps: z.number().int().positive().default(30),
   width: z.number().int().positive().default(1920),
   height: z.number().int().positive().default(1080),

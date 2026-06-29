@@ -68,6 +68,8 @@ export const Inspector: React.FC = () => {
     return <div className="muted pad">Select a clip or layer to edit it.</div>;
   }
 
+  const maxDur = project.durationInFrames && project.durationInFrames > 0 ? project.durationInFrames : Infinity;
+
   if (selection.kind === "clip") {
     const c = project.clips[selection.index];
     if (!c) return <div className="muted pad">Clip gone.</div>;
@@ -82,7 +84,7 @@ export const Inspector: React.FC = () => {
           </select>
         </Field>
         <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
-        <Field label="Duration (frames)"><input type="number" min={1} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.max(1, +e.target.value) })} /></Field>
+        <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
         <Field label="Motion">
           <select value={c.motion} onChange={(e) => patchClip(i, { motion: e.target.value })}>
             <option value="none">none</option>
@@ -93,6 +95,9 @@ export const Inspector: React.FC = () => {
             ))}
           </select>
         </Field>
+        {c.motion !== "none" && (
+          <Field label="Effect strength"><Slider value={c.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchClip(i, { strength: v })} /></Field>
+        )}
         <Field label="Transition →next">
           <select value={c.transitionToNext} onChange={(e) => patchClip(i, { transitionToNext: e.target.value })}>
             <option value="none">none</option>
@@ -149,7 +154,7 @@ export const Inspector: React.FC = () => {
       )}
       <div className="insp-sub">Timing</div>
       <Field label="Start (frame)"><input type="number" min={0} value={o.from} onChange={(e) => patchOverlay(i, { from: Math.max(0, +e.target.value) })} /></Field>
-      <Field label="Duration (frames)"><input type="number" min={1} value={o.durationInFrames} onChange={(e) => patchOverlay(i, { durationInFrames: Math.max(1, +e.target.value) })} /></Field>
+      <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={o.durationInFrames} onChange={(e) => patchOverlay(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
 
       <div className="insp-sub">Transitions</div>
       <Field label="Enter">
@@ -193,6 +198,12 @@ export const Inspector: React.FC = () => {
         {o.motions.length === 0 && <span className="muted">no effects</span>}
       </div>
       <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+      {o.motions.length > 0 && (
+        <>
+          <Field label="Effect strength"><Slider value={o.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchOverlay(i, { strength: v })} /></Field>
+          <Field label="Loop effects"><input type="checkbox" checked={!!o.loop} onChange={(e) => patchOverlay(i, { loop: e.target.checked })} /></Field>
+        </>
+      )}
     </div>
   );
 };

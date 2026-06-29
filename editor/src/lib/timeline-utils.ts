@@ -13,6 +13,7 @@ export const audioEndFrames = (audio: AudioTrack[], durationOf: (src: string) =>
 /** Mirror of calculateTimelineMetadata: max(Σclip − Σtransitions, overlay end, audio end).
  *  `audioEnd` is supplied by the caller (audio lengths are loaded async in the browser). */
 export const computeDuration = (p: Project, audioEnd = 0): number => {
+  if (p.durationInFrames && p.durationInFrames > 0) return p.durationInFrames; // fixed project length
   const clips = p.clips ?? [];
   const overlays = p.overlays ?? [];
   const clipsTotal = clips.reduce((s, c) => s + c.durationInFrames, 0);

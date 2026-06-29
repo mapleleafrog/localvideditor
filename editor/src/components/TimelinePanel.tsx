@@ -45,6 +45,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   const gutterRef = useRef<HTMLDivElement>(null);
   const fps = project.fps ?? 30;
   const total = computeDuration(project);
+  const maxDur = project.durationInFrames && project.durationInFrames > 0 ? project.durationInFrames : Infinity;
+  const capDur = (n: number) => Math.min(maxDur, n);
   const starts = clipStarts(project);
   const innerW = total * zoom + 80;
   const overlayCount = project.overlays.length;
@@ -198,7 +200,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                       className="tl-handle right"
                       onPointerDown={(e) =>
                         startBlockDrag(e, "right", zoom, { from: 0, durationInFrames: c.durationInFrames }, (s) =>
-                          patchClip(i, { durationInFrames: s.durationInFrames }),
+                          patchClip(i, { durationInFrames: capDur(s.durationInFrames) }),
                         )
                       }
                     />
@@ -227,7 +229,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                       className="tl-handle left"
                       onPointerDown={(e) =>
                         startBlockDrag(e, "left", zoom, { from: o.from, durationInFrames: o.durationInFrames }, (s) =>
-                          patchOverlay(i, { from: s.from, durationInFrames: s.durationInFrames }),
+                          patchOverlay(i, { from: s.from, durationInFrames: capDur(s.durationInFrames) }),
                         )
                       }
                     />
@@ -236,7 +238,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                       className="tl-handle right"
                       onPointerDown={(e) =>
                         startBlockDrag(e, "right", zoom, { from: o.from, durationInFrames: o.durationInFrames }, (s) =>
-                          patchOverlay(i, { durationInFrames: s.durationInFrames }),
+                          patchOverlay(i, { durationInFrames: capDur(s.durationInFrames) }),
                         )
                       }
                     />

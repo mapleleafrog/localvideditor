@@ -12,30 +12,33 @@ echo ============================================================
 echo             SORANJI-VFX  ::  LAUNCHER
 echo ============================================================
 echo.
-echo   [1]  Open the Retro Portal         (index.html - no npm)
-echo   [2]  Launch Remotion Studio         (edit + live preview)
-echo   [3]  Render sample BPM video        (out\soranji-sample.mp4)
-echo   [4]  Render Timeline video          (out\timeline.mp4)
-echo   [5]  Regenerate portal bundle       (gen:portal)
-echo   [6]  Check portal bundle is current (check:portal)
-echo   [7]  Regenerate CREDITS.md          (credits)
+echo   [1]  Soranji Studio  - drag-and-drop EDITOR   (the main app; also editor.bat)
+echo   [2]  Retro Portal    - quick effect preview   (index.html, no npm)
+echo   [3]  Remotion Studio - effect galleries / dev (npm run dev)
+echo.
+echo   (Render your video from the editor's Render button. Dev/maintenance
+echo    commands - sample renders, gen:portal, credits - are still available
+echo    via "npm run ^<name^>" if you ever need them.)
 echo.
 echo   [Q]  Quit
 echo.
 set "choice="
 set /p "choice=Choose an option: "
 
-if /i "%choice%"=="1" goto portal
-if /i "%choice%"=="2" goto studio
-if /i "%choice%"=="3" goto render
-if /i "%choice%"=="4" goto rendertimeline
-if /i "%choice%"=="5" goto genportal
-if /i "%choice%"=="6" goto checkportal
-if /i "%choice%"=="7" goto credits
+if /i "%choice%"=="1" goto editor
+if /i "%choice%"=="2" goto portal
+if /i "%choice%"=="3" goto studio
 if /i "%choice%"=="Q" goto end
 echo.
 echo   "%choice%" is not a valid option.
 timeout /t 1 >nul
+goto menu
+
+:editor
+echo.
+echo Starting Soranji Studio editor... opens at http://localhost:5173
+echo Press Ctrl+C to stop, then it returns here.
+call npm run editor
 goto menu
 
 :portal
@@ -45,43 +48,9 @@ goto menu
 
 :studio
 echo.
-echo Starting Remotion Studio... press Ctrl+C to stop, then it returns here.
+echo Starting Remotion Studio (effect galleries + props/JSON)...
+echo Press Ctrl+C to stop, then it returns here.
 call npm run dev
-goto menu
-
-:render
-echo.
-call npm run render
-echo.
-pause
-goto menu
-
-:rendertimeline
-echo.
-call npm run render:timeline
-echo.
-pause
-goto menu
-
-:genportal
-echo.
-call npm run gen:portal
-echo.
-pause
-goto menu
-
-:checkportal
-echo.
-call npm run check:portal
-echo.
-pause
-goto menu
-
-:credits
-echo.
-call npm run credits
-echo.
-pause
 goto menu
 
 :end

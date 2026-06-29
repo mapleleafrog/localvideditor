@@ -21,7 +21,7 @@ A Remotion (React → MP4) VFX pipeline for a wedding walk-in video set to "Sora
   - `presentations.tsx` — custom CSS `TransitionPresentation` components (dip, flash, masks, zoom look-alikes, pixel reveals).
   - `index.ts` — `getMotion(id)` / `getTransitionPresentation(id, params)` (always safe-fallback, never throw) + `buildCreditsMarkdown()` + `readyMotions()` / `readyTransitions()`.
 - Effects carry `tier` (Core/Ext/Adv), `engine` (css/canvas/webgl/three/either), `status` (ready/todo), `tags`, and `license`/`credit`.
-- `Layer.tsx` is the single frame→ctx boundary: reads `useCurrentFrame()`/`useVideoConfig()`, computes `progress`/`t`/`beat`/`z`, mount-gates the layer, composes centering, and applies the motion's CSS.
+- `Layer.tsx` is the single frame→ctx boundary: reads `useCurrentFrame()`/`useVideoConfig()`, computes `progress`/`t`/`beat`/`z`, mount-gates the layer, composes centering, applies the motion's CSS, and runs per-overlay **enter/exit transitions** (`none`/`fade`/`slide{Left,Right,Up,Down}`/`zoom`, ramped over `enter`/`exitDurationInFrames`) — folded into one combined opacity + transform. Set per overlay in the Inspector's **Transitions** section.
 - `Mushroom.tsx` renders animated GIF sprites via `@remotion/gif`'s `<Gif>` with crisp `pixelated` scaling.
 
 ## Conventions (non-negotiable)

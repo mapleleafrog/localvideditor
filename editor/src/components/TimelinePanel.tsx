@@ -29,7 +29,8 @@ const newOverlay = (type: "text" | "image" | "fx", from: number, width = 200): O
   x: 50, y: 50, scale: 1, rotation: 0, opacity: 1,
   // FX layers start with a romantic atmospheric so the new layer is visibly doing something.
   motions: type === "fx" ? ["weddingPetals"] : [],
-  z: 0.4, windowInFrames: 30, fontSize: 80, color: "#ffffff", glow: "", width,
+  z: 0.4, windowInFrames: 30, enter: "none", exit: "none", enterDurationInFrames: 15, exitDurationInFrames: 15,
+  fontSize: 80, color: "#ffffff", glow: "", width,
 });
 
 const Playhead: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; zoom: number }> = ({ playerRef, zoom }) => {

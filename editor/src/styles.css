@@ -227,6 +227,8 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-item { font-size: 11px; padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ===== audio / beat-sync panel ===== */
+.audio-panel { position: relative; min-height: 120px; }
+.audio-panel.dragging { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: 6px; }
 .audio-panel .fld { margin-bottom: 6px; }
 .audio-panel input[type="checkbox"] { width: auto; align-self: flex-start; }
 .audio-track { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-bottom: 8px; background: var(--panel-2); }

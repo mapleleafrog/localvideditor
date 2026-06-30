@@ -5,11 +5,14 @@ import type { Overlay } from "../../../src/timeline/schema";
 import { listMedia, uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
+import type { AudioTrack } from "../../../src/timeline/schema";
 
 // Fallback list until /api/media responds (the dev server scans public/ + public/media/).
 const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
 
 const isVideo = (f: string) => /\.(mp4|webm|mov)$/i.test(f);
+const isAudio = (f: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f);
+const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
 
 const mediaOverlay = (src: string, width: number, type: "image" | "video"): Overlay => ({
@@ -22,6 +25,7 @@ const mediaOverlay = (src: string, width: number, type: "image" | "video"): Over
  *  click a tile to add it as an image layer. Audio files import too but show up in the Audio tab. */
 export const AssetsPanel: React.FC = () => {
   const addOverlay = useEditor((s) => s.addOverlay);
+  const addAudio = useEditor((s) => s.addAudio);
   const projectName = useEditor((s) => s.projectName);
   const compW = useEditor((s) => s.project.width ?? 1920);
   const compH = useEditor((s) => s.project.height ?? 1080);
@@ -59,12 +63,24 @@ export const AssetsPanel: React.FC = () => {
     }
     setNote(`Importing ${arr.length} file${arr.length > 1 ? "s" : ""}…`);
     let ok = 0;
+    let audioCount = 0;
     for (const f of arr) {
       const r = await uploadMedia(f, proj);
-      if (r.ok) ok++;
+      if (!r.ok || !r.ref) continue;
+      ok++;
+      // Audio isn't a visual asset — route it straight to a soundtrack track so it isn't "lost"
+      // (it lives in the Audio tab, not this grid).
+      if (isAudio(f.name)) {
+        addAudio(audioTrack(r.ref));
+        audioCount++;
+      }
     }
     await refresh(proj);
-    flash(`Imported ${ok}/${arr.length}${ok < arr.length ? " (some failed)" : ""}`);
+    flash(
+      `Imported ${ok}/${arr.length}` +
+        (audioCount ? ` · ${audioCount} audio → Audio tab` : "") +
+        (ok < arr.length ? " (some failed)" : ""),
+    );
   };
 
   return (

@@ -66,6 +66,7 @@ arrange + annotate your shots in Storyboard, then switch to Edit to layer effect
 | Add a photo/clip | **+ Clip** (timeline / Storyboard **+ Add shot**) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
 | Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
 | Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
+| Add music / soundtrack | **Library → Audio** tab: drag an audio file onto it (or **+ Add audio files**) — it imports and becomes a track. Set BPM/offset there for beat-sync. (Dropping audio on the Assets panel or timeline also adds a track; audio never shows in the Assets grid.) |
 | Retime an element | Drag its timeline block; drag edges to change duration (edges **snap** to the playhead / clip boundaries — toggle with the 🧲 button) |
 | Split a clip/layer | Move the playhead, select the block, **✂ Split** (or press `S` / `Ctrl+K`) |
 | Duplicate / copy-paste | **⎘ Duplicate** (`Ctrl+D`); or `Ctrl+C` then `Ctrl+V` (pastes at the playhead) |

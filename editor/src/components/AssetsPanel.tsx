@@ -106,13 +106,12 @@ export const AssetsPanel: React.FC = () => {
 
       <div className="asset-grid">
         {assets.map((a) => (
-          <button key={a} className="asset-tile" title={`Add ${a}`} onClick={() => addAsset(a)}>
+          <button key={a} className="asset-tile" title={a} onClick={() => addAsset(a)}>
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (
               <img className="asset-thumb" src={srcUrl(a)} alt="" loading="lazy" />
             )}
-            <span className="asset-name">{a}</span>
           </button>
         ))}
       </div>

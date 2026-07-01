@@ -173,11 +173,12 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(20, 10, 40, 0.72); color: #fff; font-weight: 600; border-radius: 6px; pointer-events: none;
 }
-.asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-.asset-tile { display: flex; flex-direction: column; gap: 4px; padding: 4px; text-align: left; }
-/* full image visible (contain, not cropped); tile scales with the panel width via aspect-ratio. */
+/* auto-fill so many small tiles pack per row instead of 2 huge columns; count scales with panel width */
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 8px; }
+.asset-tile { display: flex; padding: 3px; }
+/* full image visible (contain, not cropped) — filename is a title-attr tooltip, not an always-on label. */
 .asset-thumb {
-  width: 100%; aspect-ratio: 4 / 3; height: auto; object-fit: contain;
+  width: 100%; aspect-ratio: 1 / 1; height: auto; object-fit: contain;
   border-radius: 4px; background: #0a0a10; display: block;
   background-image: linear-gradient(45deg, #1a1a24 25%, transparent 25%, transparent 75%, #1a1a24 75%),
     linear-gradient(45deg, #1a1a24 25%, transparent 25%, transparent 75%, #1a1a24 75%);
@@ -191,7 +192,6 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .rail-resizer.col.on-right { right: 0; }
 .rail-resizer.col.on-left { left: 0; }
 .rail-resizer.row { left: 0; right: 0; height: 6px; top: 0; cursor: row-resize; }
-.asset-name { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* topbar project-name field */
 .proj-name { width: 130px; font-size: 12px; padding: 4px 6px; }

@@ -594,6 +594,27 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     filter: `blur(${lerp(20, 0, easeOutCubic(p))}px)`,
     transform: `scale(${lerp(1.15, 1, easeOutCubic(p))})`,
   }),
+  chapterTitleReveal: ({ progress: p }) => ({
+    opacity: clamp(p * 2),
+    transform: `translateY(${lerp(24, 0, easeOutCubic(p))}px)`,
+    clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`,
+  }),
+  quoteCardReveal: ({ progress: p }) => ({
+    opacity: clamp(p * 2),
+    transform: `scale(${lerp(1.08, 1, easeOutCubic(p))})`,
+    backgroundColor: "rgba(10, 10, 16, 0.35)",
+    borderRadius: "10px",
+    padding: "18px 28px",
+    boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+  }),
+  lowerThirdBar: ({ progress: p }) => ({
+    opacity: clamp(p * 3),
+    transform: `translateX(${lerp(-40, 0, easeOutCubic(p))}px)`,
+    backgroundColor: "rgba(124, 92, 255, 0.85)",
+    padding: "8px 20px",
+    borderRadius: "3px",
+    clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`,
+  }),
 };
 
 // ===== motion display metadata for the portal (derived from the catalog) =====

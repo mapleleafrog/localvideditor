@@ -17,6 +17,9 @@ const TEMPLATE_IDS = [
   "monogramSpinReveal",
   "monogramScaleRotate",
   "monogramBlurReveal",
+  "chapterTitleReveal",
+  "quoteCardReveal",
+  "lowerThirdBar",
 ] as const;
 
 export const templateStyles: Record<string, (ctx: MotionCtx) => CSSProperties> = Object.fromEntries(

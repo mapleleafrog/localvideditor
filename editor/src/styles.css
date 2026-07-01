@@ -139,6 +139,15 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .del { background: #3a1020; border-color: #702038; color: #ffb3c4; font-size: 11px; padding: 3px 8px; }
 .del:hover { border-color: #ff5577; }
 .insp-sub { margin-top: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--cyan); border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+
+/* ===== collapsible Inspector sections (native <details>, state kept in React so re-renders don't fight manual toggles) ===== */
+.insp-section { border: none; }
+.insp-section > summary.insp-sub { cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
+.insp-section > summary.insp-sub::-webkit-details-marker { display: none; }
+.insp-section > summary.insp-sub::before { content: "▸"; font-size: 9px; color: var(--muted); display: inline-block; transition: transform 0.1s; }
+.insp-section[open] > summary.insp-sub::before { transform: rotate(90deg); }
+.insp-section-body { display: flex; flex-direction: column; gap: 9px; padding-top: 8px; }
+.insp-badge { margin-left: auto; background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 9px; line-height: 15px; }
 .fld { display: flex; flex-direction: column; gap: 3px; }
 .fld > label { font-size: 11px; color: var(--muted); }
 .fld input, .fld select { width: 100%; }

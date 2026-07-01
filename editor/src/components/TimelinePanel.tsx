@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { PlayerRef } from "@remotion/player";
+import { staticFile } from "remotion";
 import { useEditor } from "../store";
-import type { AudioTrack, Clip, Overlay } from "../../../src/timeline/schema";
+import type { AudioTrack, Clip, Overlay, Project } from "../../../src/timeline/schema";
 import { computeDuration, clipStarts, fmtTime } from "../lib/timeline-utils";
 import { startBlockDrag, startScrub } from "../lib/drag";
 import { useCurrentPlayerFrame } from "../lib/useCurrentPlayerFrame";
@@ -10,10 +11,12 @@ import { ensureProjectName } from "../lib/names";
 
 const RULER_H = 24;
 const LANE_H = 40;
+const HOVER_DELAY_MS = 450;
 
 const isAudioFile = (n: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(n);
 const isVideoFile = (n: string) => /\.(mp4|webm|mov)$/i.test(n);
 const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
+const previewUrl = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
 
 const newClip = (src = "clip-a.svg", type: "image" | "video" = "image"): Clip => ({
   type, src, durationInFrames: 60, motion: "none",
@@ -58,6 +61,39 @@ const TimeReadout: React.FC<{ playerRef: React.RefObject<PlayerRef | null>; tota
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const SNAP_PX = 8;
+
+type HoverPreview = { kind: "clip" | "overlay"; index: number; left: number; top: number } | null;
+
+/** What's actually IN this block — a static first-frame poster for video, the full image for
+ *  image/fx-source, or the raw text for text/fx layers. Not a scrub-accurate video frame (that
+ *  would need seeking a hidden <video> to the hovered position); first-frame already answers
+ *  "what is this clip" for the common case. */
+const TimelineTip: React.FC<{ project: Project; preview: HoverPreview }> = ({ project, preview }) => {
+  if (!preview) return null;
+  let body: React.ReactNode;
+  if (preview.kind === "clip") {
+    const c = project.clips[preview.index];
+    if (!c) return null;
+    body =
+      c.type === "video" ? (
+        <video className="tl-tip-media" src={previewUrl(c.src)} muted preload="metadata" />
+      ) : (
+        <img className="tl-tip-media" src={previewUrl(c.src)} alt="" />
+      );
+  } else {
+    const o = project.overlays[preview.index];
+    if (!o) return null;
+    if (o.type === "text") body = <div className="tl-tip-text">{o.text || "(empty text)"}</div>;
+    else if (o.type === "fx") body = <div className="tl-tip-text">fx: {(o.motions ?? []).join(", ") || "no effects"}</div>;
+    else if (o.type === "video") body = <video className="tl-tip-media" src={previewUrl(o.src)} muted preload="metadata" />;
+    else body = <img className="tl-tip-media" src={previewUrl(o.src)} alt="" />;
+  }
+  return (
+    <div className="tl-tip" style={{ left: preview.left, top: preview.top }}>
+      {body}
+    </div>
+  );
+};
 
 export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
   const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected } =
@@ -184,6 +220,30 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
     if (t === e.currentTarget || t.classList.contains("tl-lane")) onRulerDown(e);
   };
 
+  // Hover-to-preview: after a short delay (so quick mouse passes don't spam it), show what's
+  // actually in the block near the cursor's spot.
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current != null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+  const onBlockHoverEnter = (kind: "clip" | "overlay", index: number, e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    clearHoverTimer();
+    hoverTimer.current = window.setTimeout(
+      () => setHoverPreview({ kind, index, left: rect.left, top: rect.top - 8 }),
+      HOVER_DELAY_MS,
+    );
+  };
+  const onBlockHoverLeave = () => {
+    clearHoverTimer();
+    setHoverPreview(null);
+  };
+  useEffect(() => clearHoverTimer, []);
+
   const seconds = Math.ceil(total / fps);
 
   return (
@@ -297,7 +357,12 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     key={i}
                     className={"tl-block clip" + (sel ? " on" : "")}
                     style={{ left: starts[i] * zoom, width: c.durationInFrames * zoom }}
-                    onPointerDown={() => select({ kind: "clip", index: i })}
+                    onPointerDown={() => {
+                      onBlockHoverLeave();
+                      select({ kind: "clip", index: i });
+                    }}
+                    onMouseEnter={(e) => onBlockHoverEnter("clip", i, e)}
+                    onMouseLeave={onBlockHoverLeave}
                     title={`${c.src} · ${c.durationInFrames}f` + (c.transitionToNext !== "none" ? ` · →${c.transitionToNext}` : "")}
                   >
                     <span className="tl-block-label">{c.src}</span>
@@ -330,6 +395,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     className={"tl-block overlay" + (sel ? " on" : "")}
                     style={{ left: o.from * zoom, width: o.durationInFrames * zoom }}
                     onPointerDown={(e) => {
+                      onBlockHoverLeave();
                       select({ kind: "overlay", index: i });
                       startBlockDrag(
                         e,
@@ -341,6 +407,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                         snap(),
                       );
                     }}
+                    onMouseEnter={(e) => onBlockHoverEnter("overlay", i, e)}
+                    onMouseLeave={onBlockHoverLeave}
                     title={`${o.type === "text" ? o.text : o.src} · from ${o.from}f · ${o.durationInFrames}f`}
                   >
                     <span
@@ -381,6 +449,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
           </div>
         </div>
       </div>
+
+      <TimelineTip project={project} preview={hoverPreview} />
 
       {menu && (
         <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>

@@ -379,3 +379,11 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
   object-fit: contain; background: #0a0a10; border-radius: 4px;
 }
 .tl-tip-text { font-size: 11px; color: var(--text); max-width: 140px; word-break: break-word; }
+
+/* ===== batch photo-arrange prompt (Assets tab, after a multi-photo import) ===== */
+.batch-arrange {
+  display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px;
+  padding: 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); font-size: 12px;
+}
+.batch-arrange-actions { display: flex; gap: 6px; }
+.batch-arrange-actions .lib-item { flex: 1; text-align: center; }

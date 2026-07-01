@@ -25,6 +25,8 @@ export interface EditorState {
   patchOverlay: (i: number, patch: Partial<Overlay>) => void;
   addClip: (clip: Clip) => void;
   addOverlay: (o: Overlay) => void;
+  /** Append several overlays in one undo step (batch photo-arrange helpers). */
+  addOverlays: (list: Overlay[]) => void;
   // soundtrack tracks
   addAudio: (track: AudioTrack) => void;
   patchAudio: (i: number, patch: Partial<AudioTrack>) => void;
@@ -141,6 +143,12 @@ export const useEditor = create<EditorState>()(
         set((s) => ({
           project: { ...s.project, overlays: [...s.project.overlays, o] },
           selection: { kind: "overlay", index: s.project.overlays.length },
+        })),
+
+      addOverlays: (list) =>
+        set((s) => ({
+          project: { ...s.project, overlays: [...s.project.overlays, ...list] },
+          selection: list.length ? { kind: "overlay", index: s.project.overlays.length } : s.selection,
         })),
 
       removeSelected: () =>

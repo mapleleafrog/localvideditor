@@ -562,6 +562,25 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     const pts: [number, number][] = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40]];
     return { backgroundImage: pts.map(([x, y], i) => star(i, x, y)).join(", ") };
   },
+
+  // --- Ported from reactvideoeditor/remotion-templates (MIT) ---
+  spotlightReveal: ({ progress: p }) => ({
+    clipPath: `circle(${lerp(0, 75, easeOutCubic(p))}% at 50% 50%)`,
+    filter: `brightness(${lerp(1.4, 1, p)})`,
+  }),
+  letterboxReveal: ({ progress: p }) => ({
+    clipPath: `inset(${lerp(50, 0, easeOutCubic(p))}% 0 ${lerp(50, 0, easeOutCubic(p))}% 0)`,
+  }),
+  liquidWave: ({ t }) => {
+    const x1 = 50 + Math.sin(t * 0.3) * 20;
+    const y1 = 40 + Math.cos(t * 0.25) * 15;
+    const x2 = 50 + Math.sin(t * 0.22 + 2) * 25;
+    const y2 = 60 + Math.cos(t * 0.18 + 1) * 18;
+    return {
+      backgroundImage: `radial-gradient(circle at ${x1}% ${y1}%, rgba(120,180,255,0.25), transparent 55%), radial-gradient(circle at ${x2}% ${y2}%, rgba(255,200,220,0.2), transparent 60%)`,
+      filter: "blur(18px)",
+    };
+  },
 };
 
 // ===== motion display metadata for the portal (derived from the catalog) =====

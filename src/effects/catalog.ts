@@ -252,4 +252,9 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "transition", id: "pixelDither", name: "Bayer Dither Dissolve", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "pixel", "8-bit"], license: "write-own" },
   { kind: "transition", id: "scanlineWipe", name: "Scanline Sweep", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt"], license: "write-own" },
   { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" },
+
+  // --- Ported from reactvideoeditor/remotion-templates (MIT), reworked into style(ctx) motions ---
+  { kind: "motion", id: "spotlightReveal", name: "Spotlight Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "letterboxReveal", name: "Letterbox Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "liquidWave", name: "Liquid Wave", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["background", "romantic", "soft", "fullframe"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
 ];

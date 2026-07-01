@@ -240,6 +240,14 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-section[open] > summary.lib-cat::before { transform: rotate(90deg); }
 .lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .lib-item { font-size: 11px; padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* effect tiles hold a hover-preview swatch + label, so they need flex (plain .lib-item buttons elsewhere stay block) */
+.lib-item.has-swatch { display: flex; align-items: center; gap: 6px; }
+.lib-item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fx-swatch {
+  position: relative; width: 22px; height: 22px; flex: none; border-radius: 4px; overflow: hidden;
+  background: #0a0a10 center/cover no-repeat; background-image: url("/orange-mush.gif");
+}
+.fx-swatch-inner { position: absolute; inset: 0; }
 
 /* ===== audio / beat-sync panel ===== */
 .audio-panel { position: relative; min-height: 120px; }

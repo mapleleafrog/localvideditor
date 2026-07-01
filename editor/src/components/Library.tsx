@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useEditor } from "../store";
-import { readyMotions, readyTransitions } from "../lib/effects-bridge";
+import { readyMotions, readyTransitions, getMotion } from "../lib/effects-bridge";
+import { beatKick } from "../../../src/effects/helpers";
 import { AudioPanel } from "./AudioPanel";
 import { CanvasPanel } from "./CanvasPanel";
 import { AssetsPanel } from "./AssetsPanel";
@@ -9,6 +10,48 @@ const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m
 const CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 const matches = (q: string, ...fields: string[]) => fields.some((f) => f.toLowerCase().includes(q));
+
+const PREVIEW_FPS = 30;
+const PREVIEW_WINDOW = 45; // ~1.5s loop, long enough to read most motions
+
+/** Hover-only live preview: runs the actual motion formula over a small swatch via rAF, so you can
+ *  tell "wiggle vs. bob vs. zoom" apart without clicking. Only the hovered tile animates — the other
+ *  ~100 stay static, so this doesn't run 100 rAF loops at once. */
+const EffectSwatch: React.FC<{ id: string }> = ({ id }) => {
+  const [hover, setHover] = useState(false);
+  const [style, setStyle] = useState<React.CSSProperties>({});
+  useEffect(() => {
+    if (!hover) {
+      setStyle({});
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      const frame = Math.floor(elapsed * PREVIEW_FPS) % PREVIEW_WINDOW;
+      setStyle(
+        getMotion(id)({
+          progress: frame / PREVIEW_WINDOW,
+          frame,
+          fps: PREVIEW_FPS,
+          t: elapsed,
+          beat: beatKick(elapsed, 120, 6, 0),
+          z: 0.4,
+          params: {},
+        }),
+      );
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [id, hover]);
+  return (
+    <span className="fx-swatch" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <span className="fx-swatch-inner" style={style} />
+    </span>
+  );
+};
 
 export const Library: React.FC = () => {
   const { project, selection, patchOverlay, patchClip } = useEditor();
@@ -75,8 +118,9 @@ export const Library: React.FC = () => {
             {fxQ ? (
               <div className="lib-grid">
                 {filteredMotions.map((m) => (
-                  <button key={m.id} className="lib-item" disabled={!selection} onClick={() => applyEffect(m.id)} title={m.category}>
-                    {m.name}
+                  <button key={m.id} className="lib-item has-swatch" disabled={!selection} onClick={() => applyEffect(m.id)} title={m.category}>
+                    <EffectSwatch id={m.id} />
+                    <span className="lib-item-label">{m.name}</span>
                   </button>
                 ))}
                 {filteredMotions.length === 0 && <span className="muted">no matches</span>}
@@ -89,8 +133,9 @@ export const Library: React.FC = () => {
                     <summary className="lib-cat">{cat}</summary>
                     <div className="lib-grid">
                       {MOTIONS.filter((m) => m.category === cat).map((m) => (
-                        <button key={m.id} className="lib-item" disabled={!selection} onClick={() => applyEffect(m.id)}>
-                          {m.name}
+                        <button key={m.id} className="lib-item has-swatch" disabled={!selection} onClick={() => applyEffect(m.id)}>
+                          <EffectSwatch id={m.id} />
+                          <span className="lib-item-label">{m.name}</span>
                         </button>
                       ))}
                     </div>

@@ -1,7 +1,7 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 8991
+/***/ 5119
 (__unused_webpack_module, __unused_webpack___webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1812,7 +1812,19 @@ const CATALOG = [
   { kind: "transition", id: "glitchCut", name: "Glitch Cut", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "energetic"], license: "write-own" },
   { kind: "transition", id: "pixelDither", name: "Bayer Dither Dissolve", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "pixel", "8-bit"], license: "write-own" },
   { kind: "transition", id: "scanlineWipe", name: "Scanline Sweep", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt"], license: "write-own" },
-  { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" }
+  { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" },
+  // --- Ported from reactvideoeditor/remotion-templates (MIT), reworked into style(ctx) motions ---
+  { kind: "motion", id: "spotlightReveal", name: "Spotlight Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "letterboxReveal", name: "Letterbox Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "liquidWave", name: "Liquid Wave", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["background", "romantic", "soft", "fullframe"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramSpinReveal", name: "Monogram Spin Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramScaleRotate", name: "Monogram Scale + Rotate", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "loop", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramBlurReveal", name: "Monogram Blur Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "chapterTitleReveal", name: "Chapter Title Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "title", "reveal"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "quoteCardReveal", name: "Quote Card Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "quote", "card"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "lowerThirdBar", name: "Lower Third Bar", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "caption", "lower-third"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "polaroidFrame", name: "Polaroid Frame", category: "Photo", engine: "css", tier: "Ext", status: "todo", tags: ["photo", "frame", "nostalgic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "circularProgressReveal", name: "Circular Progress Ring", category: "Charts & Data", engine: "css", tier: "Ext", status: "todo", tags: ["decorative", "ring", "progress"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" }
 ];
 
 ;// ./src/effects/helpers.ts
@@ -2341,7 +2353,71 @@ const MOTION_FORMULAS = {
     };
     const pts = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40]];
     return { backgroundImage: pts.map(([x, y], i) => star(i, x, y)).join(", ") };
-  }
+  },
+  // --- Ported from reactvideoeditor/remotion-templates (MIT) ---
+  spotlightReveal: ({ progress: p }) => ({
+    clipPath: `circle(${lerp(0, 75, easeOutCubic(p))}% at 50% 50%)`,
+    filter: `brightness(${lerp(1.4, 1, p)})`
+  }),
+  letterboxReveal: ({ progress: p }) => ({
+    clipPath: `inset(${lerp(50, 0, easeOutCubic(p))}% 0 ${lerp(50, 0, easeOutCubic(p))}% 0)`
+  }),
+  liquidWave: ({ t }) => {
+    const x1 = 50 + Math.sin(t * 0.3) * 20;
+    const y1 = 40 + Math.cos(t * 0.25) * 15;
+    const x2 = 50 + Math.sin(t * 0.22 + 2) * 25;
+    const y2 = 60 + Math.cos(t * 0.18 + 1) * 18;
+    return {
+      backgroundImage: `radial-gradient(circle at ${x1}% ${y1}%, rgba(120,180,255,0.25), transparent 55%), radial-gradient(circle at ${x2}% ${y2}%, rgba(255,200,220,0.2), transparent 60%)`,
+      filter: "blur(18px)"
+    };
+  },
+  monogramSpinReveal: ({ progress: p }) => ({
+    opacity: p,
+    transform: `scale(${lerp(0.4, 1, easeOutCubic(p))}) rotate(${lerp(-180, 0, easeOutCubic(p))}deg)`
+  }),
+  monogramScaleRotate: ({ progress: p, t }) => ({
+    opacity: clamp(p * 3),
+    transform: `scale(${lerp(0.85, 1, easeOutCubic(clamp(p * 2)))}) rotate(${Math.sin(t * 0.6) * 4}deg)`
+  }),
+  monogramBlurReveal: ({ progress: p }) => ({
+    opacity: p,
+    filter: `blur(${lerp(20, 0, easeOutCubic(p))}px)`,
+    transform: `scale(${lerp(1.15, 1, easeOutCubic(p))})`
+  }),
+  chapterTitleReveal: ({ progress: p }) => ({
+    opacity: clamp(p * 2),
+    transform: `translateY(${lerp(24, 0, easeOutCubic(p))}px)`,
+    clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`
+  }),
+  quoteCardReveal: ({ progress: p }) => ({
+    opacity: clamp(p * 2),
+    transform: `scale(${lerp(1.08, 1, easeOutCubic(p))})`,
+    backgroundColor: "rgba(10, 10, 16, 0.35)",
+    borderRadius: "10px",
+    padding: "18px 28px",
+    boxShadow: "0 8px 30px rgba(0,0,0,0.35)"
+  }),
+  lowerThirdBar: ({ progress: p }) => ({
+    opacity: clamp(p * 3),
+    transform: `translateX(${lerp(-40, 0, easeOutCubic(p))}px)`,
+    backgroundColor: "rgba(124, 92, 255, 0.85)",
+    padding: "8px 20px",
+    borderRadius: "3px",
+    clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`
+  }),
+  polaroidFrame: ({ progress: p, t }) => ({
+    opacity: clamp(p * 2),
+    transform: `scale(${lerp(0.92, 1, easeOutCubic(p))}) rotate(${-2 + Math.sin(t * 0.4) * 1.5}deg)`,
+    border: "10px solid #fdfdfa",
+    borderBottom: "38px solid #fdfdfa",
+    boxShadow: "0 18px 36px rgba(0,0,0,0.45)"
+  }),
+  circularProgressReveal: ({ progress: p }) => ({
+    backgroundImage: `conic-gradient(from -90deg, #7c5cff ${p * 360}deg, rgba(255,255,255,0.12) ${p * 360}deg)`,
+    borderRadius: "50%",
+    boxShadow: "inset 0 0 0 6px rgba(0,0,0,0.35)"
+  })
 };
 const MOTION_META = Object.fromEntries(
   CATALOG.filter((e) => e.kind === "motion").map((e) => [e.id, { name: e.name, category: e.category, tier: e.tier }])
@@ -2430,7 +2506,28 @@ const weddingStyles = Object.fromEntries(
   WEDDING_IDS.map((id) => [id, MOTION_FORMULAS[id]])
 );
 
+;// ./src/effects/templates.ts
+
+
+const TEMPLATE_IDS = [
+  "spotlightReveal",
+  "letterboxReveal",
+  "liquidWave",
+  "monogramSpinReveal",
+  "monogramScaleRotate",
+  "monogramBlurReveal",
+  "chapterTitleReveal",
+  "quoteCardReveal",
+  "lowerThirdBar",
+  "polaroidFrame",
+  "circularProgressReveal"
+];
+const templateStyles = Object.fromEntries(
+  TEMPLATE_IDS.map((id) => [id, MOTION_FORMULAS[id]])
+);
+
 ;// ./src/effects/motions.ts
+
 
 
 
@@ -2501,6 +2598,7 @@ for (const [id, style] of Object.entries(depthStyles)) ready(id, style);
 for (const [id, style] of Object.entries(pixelStyles)) ready(id, style);
 for (const [id, style] of Object.entries(retroStyles)) ready(id, style);
 for (const [id, style] of Object.entries(weddingStyles)) ready(id, style);
+for (const [id, style] of Object.entries(templateStyles)) ready(id, style);
 
 
 ;// ./node_modules/@remotion/transitions/dist/esm/slide.mjs
@@ -60358,7 +60456,7 @@ config(en());
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
 /******/ 	__webpack_require__(6507);
-/******/ 	__webpack_require__(8991);
+/******/ 	__webpack_require__(5119);
 /******/ 	__webpack_require__(3610);
 /******/ 	var __webpack_exports__ = __webpack_require__(3482);
 /******/ 	

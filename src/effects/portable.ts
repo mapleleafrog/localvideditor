@@ -615,6 +615,18 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     borderRadius: "3px",
     clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`,
   }),
+  polaroidFrame: ({ progress: p, t }) => ({
+    opacity: clamp(p * 2),
+    transform: `scale(${lerp(0.92, 1, easeOutCubic(p))}) rotate(${-2 + Math.sin(t * 0.4) * 1.5}deg)`,
+    border: "10px solid #fdfdfa",
+    borderBottom: "38px solid #fdfdfa",
+    boxShadow: "0 18px 36px rgba(0,0,0,0.45)",
+  }),
+  circularProgressReveal: ({ progress: p }) => ({
+    backgroundImage: `conic-gradient(from -90deg, #7c5cff ${p * 360}deg, rgba(255,255,255,0.12) ${p * 360}deg)`,
+    borderRadius: "50%",
+    boxShadow: "inset 0 0 0 6px rgba(0,0,0,0.35)",
+  }),
 };
 
 // ===== motion display metadata for the portal (derived from the catalog) =====

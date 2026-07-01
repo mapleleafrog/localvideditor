@@ -260,4 +260,7 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "monogramSpinReveal", name: "Monogram Spin Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "monogramScaleRotate", name: "Monogram Scale + Rotate", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "loop", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "monogramBlurReveal", name: "Monogram Blur Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "chapterTitleReveal", name: "Chapter Title Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "title", "reveal"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "quoteCardReveal", name: "Quote Card Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "quote", "card"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "lowerThirdBar", name: "Lower Third Bar", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "caption", "lower-third"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
 ];

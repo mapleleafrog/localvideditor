@@ -257,4 +257,7 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "spotlightReveal", name: "Spotlight Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "letterboxReveal", name: "Letterbox Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "liquidWave", name: "Liquid Wave", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["background", "romantic", "soft", "fullframe"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramSpinReveal", name: "Monogram Spin Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramScaleRotate", name: "Monogram Scale + Rotate", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "loop", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "monogramBlurReveal", name: "Monogram Blur Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
 ];

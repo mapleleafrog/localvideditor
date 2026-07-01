@@ -581,6 +581,19 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
       filter: "blur(18px)",
     };
   },
+  monogramSpinReveal: ({ progress: p }) => ({
+    opacity: p,
+    transform: `scale(${lerp(0.4, 1, easeOutCubic(p))}) rotate(${lerp(-180, 0, easeOutCubic(p))}deg)`,
+  }),
+  monogramScaleRotate: ({ progress: p, t }) => ({
+    opacity: clamp(p * 3),
+    transform: `scale(${lerp(0.85, 1, easeOutCubic(clamp(p * 2)))}) rotate(${Math.sin(t * 0.6) * 4}deg)`,
+  }),
+  monogramBlurReveal: ({ progress: p }) => ({
+    opacity: p,
+    filter: `blur(${lerp(20, 0, easeOutCubic(p))}px)`,
+    transform: `scale(${lerp(1.15, 1, easeOutCubic(p))})`,
+  }),
 };
 
 // ===== motion display metadata for the portal (derived from the catalog) =====

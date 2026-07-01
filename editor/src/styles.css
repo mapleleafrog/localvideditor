@@ -367,3 +367,15 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); animation: toast-in 0.15s ease-out;
 }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ===== timeline hover-preview tooltip (delayed, shows what's actually in a block) ===== */
+.tl-tip {
+  position: fixed; z-index: 150; transform: translateY(-100%); pointer-events: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); max-width: 160px;
+}
+.tl-tip-media {
+  display: block; width: 140px; max-width: 140px; height: auto; max-height: 90px;
+  object-fit: contain; background: #0a0a10; border-radius: 4px;
+}
+.tl-tip-text { font-size: 11px; color: var(--text); max-width: 140px; word-break: break-word; }

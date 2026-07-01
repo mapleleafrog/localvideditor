@@ -263,4 +263,6 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "chapterTitleReveal", name: "Chapter Title Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "title", "reveal"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "quoteCardReveal", name: "Quote Card Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "quote", "card"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "lowerThirdBar", name: "Lower Third Bar", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "caption", "lower-third"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "polaroidFrame", name: "Polaroid Frame", category: "Photo", engine: "css", tier: "Ext", status: "todo", tags: ["photo", "frame", "nostalgic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+  { kind: "motion", id: "circularProgressReveal", name: "Circular Progress Ring", category: "Charts & Data", engine: "css", tier: "Ext", status: "todo", tags: ["decorative", "ring", "progress"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
 ];

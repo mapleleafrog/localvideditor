@@ -20,6 +20,8 @@ const TEMPLATE_IDS = [
   "chapterTitleReveal",
   "quoteCardReveal",
   "lowerThirdBar",
+  "polaroidFrame",
+  "circularProgressReveal",
 ] as const;
 
 export const templateStyles: Record<string, (ctx: MotionCtx) => CSSProperties> = Object.fromEntries(

@@ -232,6 +232,12 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-body { padding: 10px; overflow: auto; flex: 1; min-height: 0; }
 .lib-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
 .lib-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--cyan); margin: 12px 0 5px; }
+.lib-search { width: 100%; margin-bottom: 8px; }
+.lib-section { border: none; }
+.lib-section > summary.lib-cat { cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
+.lib-section > summary.lib-cat::-webkit-details-marker { display: none; }
+.lib-section > summary.lib-cat::before { content: "▸"; font-size: 9px; color: var(--muted); display: inline-block; transition: transform 0.1s; }
+.lib-section[open] > summary.lib-cat::before { transform: rotate(90deg); }
 .lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .lib-item { font-size: 11px; padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useEditor } from "../store";
 import type { Overlay, MotionParam } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
@@ -58,6 +58,27 @@ const Slider: React.FC<{
   </div>
 );
 
+/** Collapsible group — cuts down the constant scrolling on layers with lots of props/effects.
+ *  State is a controlled <details> (not a bare `open` prop) so re-renders while editing a field
+ *  don't fight the user's manual expand/collapse. */
+const Section: React.FC<{ title: string; defaultOpen?: boolean; badge?: number; children: React.ReactNode }> = ({
+  title,
+  defaultOpen = true,
+  badge,
+  children,
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details className="insp-section" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="insp-sub">
+        {title}
+        {!!badge && <span className="insp-badge">{badge}</span>}
+      </summary>
+      <div className="insp-section-body">{children}</div>
+    </details>
+  );
+};
+
 const MotionAdder: React.FC<{ onAdd: (id: string) => void }> = ({ onAdd }) => (
   <select
     value=""
@@ -112,37 +133,44 @@ export const Inspector: React.FC = () => {
         </Field>
         <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
         <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
-        <Field label="Motion">
-          <select value={c.motion} onChange={(e) => patchClip(i, { motion: e.target.value })}>
-            <option value="none">none</option>
-            {MOTION_CATS.map((cat) => (
-              <optgroup key={cat} label={cat}>
-                {MOTIONS.filter((m) => m.category === cat).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
-        {c.motion !== "none" && (
-          <Field label="Effect strength"><Slider value={c.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchClip(i, { strength: v })} /></Field>
-        )}
-        <Field label="Transition →next">
-          <select value={c.transitionToNext} onChange={(e) => patchClip(i, { transitionToNext: e.target.value })}>
-            <option value="none">none</option>
-            {TRANSITIONS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </Field>
-        {c.transitionToNext !== "none" && (
-          <>
-            <Field label="Transition (frames)"><input type="number" min={1} value={c.transitionDurationInFrames} onChange={(e) => patchClip(i, { transitionDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
-            <Field label="Transition easing"><EasingSelect value={c.transitionEasing} onChange={(v) => patchClip(i, { transitionEasing: v as typeof c.transitionEasing })} /></Field>
-          </>
-        )}
+
+        <Section title="Motion" defaultOpen={c.motion !== "none"}>
+          <Field label="Motion">
+            <select value={c.motion} onChange={(e) => patchClip(i, { motion: e.target.value })}>
+              <option value="none">none</option>
+              {MOTION_CATS.map((cat) => (
+                <optgroup key={cat} label={cat}>
+                  {MOTIONS.filter((m) => m.category === cat).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </Field>
+          {c.motion !== "none" && (
+            <Field label="Effect strength"><Slider value={c.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchClip(i, { strength: v })} /></Field>
+          )}
+        </Section>
+
+        <Section title="Transition →next" defaultOpen={c.transitionToNext !== "none"}>
+          <Field label="Transition">
+            <select value={c.transitionToNext} onChange={(e) => patchClip(i, { transitionToNext: e.target.value })}>
+              <option value="none">none</option>
+              {TRANSITIONS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+          {c.transitionToNext !== "none" && (
+            <>
+              <Field label="Transition (frames)"><input type="number" min={1} value={c.transitionDurationInFrames} onChange={(e) => patchClip(i, { transitionDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+              <Field label="Transition easing"><EasingSelect value={c.transitionEasing} onChange={(v) => patchClip(i, { transitionEasing: v as typeof c.transitionEasing })} /></Field>
+            </>
+          )}
+        </Section>
+
         {c.type === "video" && (
-          <>
+          <Section title="Video" defaultOpen={false}>
             <Field label="Trim before"><input type="number" min={0} value={c.trimBefore} onChange={(e) => patchClip(i, { trimBefore: Math.max(0, +e.target.value) })} /></Field>
             <Field label="Trim after"><input type="number" min={0} value={c.trimAfter} onChange={(e) => patchClip(i, { trimAfter: Math.max(0, +e.target.value) })} /></Field>
             <Field label="Volume"><Slider value={c.volume} min={0} max={1} step={0.05} onChange={(v) => patchClip(i, { volume: v })} /></Field>
-          </>
+          </Section>
         )}
       </div>
     );
@@ -187,64 +215,67 @@ export const Inspector: React.FC = () => {
           (petals, bokeh, light-leaks, scanlines…). Alpha-exports cleanly for compositing.
         </div>
       )}
-      <div className="insp-sub">Timing</div>
       <Field label="Start (frame)"><input type="number" min={0} value={o.from} onChange={(e) => patchOverlay(i, { from: Math.max(0, +e.target.value) })} /></Field>
       <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={o.durationInFrames} onChange={(e) => patchOverlay(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
 
-      <div className="insp-sub">Transitions</div>
-      <Field label="Enter">
-        <select value={o.enter ?? "none"} onChange={(e) => patchOverlay(i, { enter: e.target.value as Overlay["enter"] })}>
-          {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      </Field>
-      {(o.enter ?? "none") !== "none" && (
-        <>
-          <Field label="Enter length (frames)"><input type="number" min={1} value={o.enterDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { enterDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
-          <Field label="Enter easing"><EasingSelect value={o.enterEasing} onChange={(v) => patchOverlay(i, { enterEasing: v as Overlay["enterEasing"] })} /></Field>
-        </>
-      )}
-      <Field label="Exit">
-        <select value={o.exit ?? "none"} onChange={(e) => patchOverlay(i, { exit: e.target.value as Overlay["exit"] })}>
-          {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      </Field>
-      {(o.exit ?? "none") !== "none" && (
-        <>
-          <Field label="Exit length (frames)"><input type="number" min={1} value={o.exitDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { exitDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
-          <Field label="Exit easing"><EasingSelect value={o.exitEasing} onChange={(v) => patchOverlay(i, { exitEasing: v as Overlay["exitEasing"] })} /></Field>
-        </>
-      )}
+      <Section title="Transitions" defaultOpen={(o.enter ?? "none") !== "none" || (o.exit ?? "none") !== "none"}>
+        <Field label="Enter">
+          <select value={o.enter ?? "none"} onChange={(e) => patchOverlay(i, { enter: e.target.value as Overlay["enter"] })}>
+            {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        {(o.enter ?? "none") !== "none" && (
+          <>
+            <Field label="Enter length (frames)"><input type="number" min={1} value={o.enterDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { enterDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Enter easing"><EasingSelect value={o.enterEasing} onChange={(v) => patchOverlay(i, { enterEasing: v as Overlay["enterEasing"] })} /></Field>
+          </>
+        )}
+        <Field label="Exit">
+          <select value={o.exit ?? "none"} onChange={(e) => patchOverlay(i, { exit: e.target.value as Overlay["exit"] })}>
+            {IO_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        {(o.exit ?? "none") !== "none" && (
+          <>
+            <Field label="Exit length (frames)"><input type="number" min={1} value={o.exitDurationInFrames ?? 15} onChange={(e) => patchOverlay(i, { exitDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Exit easing"><EasingSelect value={o.exitEasing} onChange={(v) => patchOverlay(i, { exitEasing: v as Overlay["exitEasing"] })} /></Field>
+          </>
+        )}
+      </Section>
 
-      <div className="insp-sub">{o.type === "fx" ? "Layer" : "Transform"}</div>
-      {o.type !== "fx" && (
-        <>
-          <Field label="X (%)"><Slider value={o.x} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { x: v })} /></Field>
-          <Field label="Y (%)"><Slider value={o.y} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
-          <Field label="Scale"><Slider value={o.scale} min={0.1} max={4} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
-          <Field label="Rotation"><Slider value={o.rotation} min={-180} max={180} step={1} onChange={(v) => patchOverlay(i, { rotation: v })} suffix="°" /></Field>
-        </>
-      )}
-      <Field label="Opacity"><Slider value={o.opacity} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { opacity: v })} /></Field>
-      {o.type !== "fx" && (
-        <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
-      )}
-      <div className="insp-sub">Effects (stacked) — each has its own settings</div>
-      {o.motions.length === 0 && <span className="muted">no effects</span>}
-      {o.motions.map((m, mi) => {
-        const p = o.motionParams?.[mi] ?? {};
-        return (
-          <div className="fx-item" key={mi}>
-            <div className="fx-item-head">
-              <span className="fx-name" title={m}>{m}</span>
-              <button className="del" title="Remove effect" onClick={() => removeEffect(i, mi)}>×</button>
+      <Section title={o.type === "fx" ? "Layer" : "Transform"} defaultOpen>
+        {o.type !== "fx" && (
+          <>
+            <Field label="X (%)"><Slider value={o.x} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { x: v })} /></Field>
+            <Field label="Y (%)"><Slider value={o.y} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
+            <Field label="Scale"><Slider value={o.scale} min={0.1} max={4} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
+            <Field label="Rotation"><Slider value={o.rotation} min={-180} max={180} step={1} onChange={(v) => patchOverlay(i, { rotation: v })} suffix="°" /></Field>
+          </>
+        )}
+        <Field label="Opacity"><Slider value={o.opacity} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { opacity: v })} /></Field>
+        {o.type !== "fx" && (
+          <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
+        )}
+      </Section>
+
+      <Section title="Effects (stacked)" defaultOpen={o.motions.length > 0} badge={o.motions.length || undefined}>
+        {o.motions.length === 0 && <span className="muted">no effects</span>}
+        {o.motions.map((m, mi) => {
+          const p = o.motionParams?.[mi] ?? {};
+          return (
+            <div className="fx-item" key={mi}>
+              <div className="fx-item-head">
+                <span className="fx-name" title={m}>{m}</span>
+                <button className="del" title="Remove effect" onClick={() => removeEffect(i, mi)}>×</button>
+              </div>
+              <Field label="Strength"><Slider value={p.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => setMotionParam(i, mi, { strength: v })} /></Field>
+              <Field label="Easing"><EasingSelect value={p.easing} onChange={(v) => setMotionParam(i, mi, { easing: v as MotionParam["easing"] })} /></Field>
+              <Field label="Loop"><input type="checkbox" checked={!!p.loop} onChange={(e) => setMotionParam(i, mi, { loop: e.target.checked })} /></Field>
             </div>
-            <Field label="Strength"><Slider value={p.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => setMotionParam(i, mi, { strength: v })} /></Field>
-            <Field label="Easing"><EasingSelect value={p.easing} onChange={(v) => setMotionParam(i, mi, { easing: v as MotionParam["easing"] })} /></Field>
-            <Field label="Loop"><input type="checkbox" checked={!!p.loop} onChange={(e) => setMotionParam(i, mi, { loop: e.target.checked })} /></Field>
-          </div>
-        );
-      })}
-      <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+          );
+        })}
+        <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+      </Section>
     </div>
   );
 };

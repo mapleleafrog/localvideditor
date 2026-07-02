@@ -265,4 +265,10 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "lowerThirdBar", name: "Lower Third Bar", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "caption", "lower-third"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "polaroidFrame", name: "Polaroid Frame", category: "Photo", engine: "css", tier: "Ext", status: "todo", tags: ["photo", "frame", "nostalgic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
   { kind: "motion", id: "circularProgressReveal", name: "Circular Progress Ring", category: "Charts & Data", engine: "css", tier: "Ext", status: "todo", tags: ["decorative", "ring", "progress"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+
+  // --- Japan MV pack (sakura / flare / komorebi / grade — for the Soranji wedding MV) ---
+  { kind: "motion", id: "sakuraPetals", name: "Sakura Petals", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["japan", "sakura", "atmosphere", "fullframe", "wedding"], license: "write-own" },
+  { kind: "motion", id: "lensFlare", name: "Anamorphic Lens Flare", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["flare", "cinematic", "fullframe"], license: "write-own" },
+  { kind: "motion", id: "godRays", name: "God Rays (Komorebi)", category: "Japan MV", engine: "css", tier: "Ext", status: "todo", tags: ["light", "atmosphere", "fullframe"], license: "write-own" },
+  { kind: "motion", id: "japanMvGrade", name: "Japan MV Pastel Grade", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["grade", "pastel", "japan"], license: "write-own" },
 ];

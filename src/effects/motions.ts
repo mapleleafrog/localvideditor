@@ -6,6 +6,7 @@ import { pixelStyles } from "./pixel";
 import { retroStyles } from "./retro";
 import { weddingStyles } from "./wedding";
 import { templateStyles } from "./templates";
+import { mvStyles } from "./mv";
 
 // Formula bodies live in portable.ts (the single source shared with the portal
 // bundle). This file owns the catalog wiring only: it flips catalog stubs from
@@ -100,5 +101,6 @@ for (const [id, style] of Object.entries(pixelStyles)) ready(id, style);
 for (const [id, style] of Object.entries(retroStyles)) ready(id, style);
 for (const [id, style] of Object.entries(weddingStyles)) ready(id, style);
 for (const [id, style] of Object.entries(templateStyles)) ready(id, style);
+for (const [id, style] of Object.entries(mvStyles)) ready(id, style);
 
 export { motions };

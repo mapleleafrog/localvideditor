@@ -210,7 +210,10 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     const ny = (Math.cos(t * 9) + Math.sin(t * 5) * 0.5) * 4;
     return { transform: `translate(${nx}px, ${ny}px) rotate(${Math.sin(t * 4) * 1.2}deg)` };
   },
-  dutchAngle: ({ params }) => ({ transform: `rotate(${params.angle ?? 8}deg) scale(1.1)` }),
+  // Gentle living drift so the tilt doesn't read as a frozen frame (audit: was fully static).
+  dutchAngle: ({ t, params }) => ({
+    transform: `rotate(${((params.angle ?? 8) + Math.sin(t * 0.35) * 0.8).toFixed(2)}deg) scale(1.1)`,
+  }),
   steadicamFollow: ({ t }) => ({
     transform: `translate(${Math.sin(t * 0.6) * 20}px, ${Math.cos(t * 0.5) * 10}px) scale(1.1)`,
   }),
@@ -523,6 +526,11 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
         petal(3, 77, 6, 25, 0.7),
         petal(4, 30, 8, 29, 0.9),
         petal(5, 88, 9, 20, 0.6),
+        // audit: 6 petals read as near-empty at 1080p — densified to 10 (same character).
+        petal(6, 8, 8, 23, 0.75),
+        petal(7, 48, 11, 13, 0.55),
+        petal(8, 68, 7, 27, 0.85),
+        petal(9, 94, 8, 17, 0.65),
       ].join(", "),
     };
   },
@@ -543,8 +551,9 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
       return `radial-gradient(circle ${size}px at ${x}% ${y}%, rgba(255,240,210,${(0.18 + (seed % 3) * 0.05).toFixed(2)}), rgba(255,240,210,0) 70%)`;
     };
     return {
-      backgroundImage: [orb(0, 20, 30, 70, 0.3), orb(1, 70, 25, 90, 0.25), orb(2, 45, 65, 60, 0.35), orb(3, 82, 70, 80, 0.2), orb(4, 30, 80, 50, 0.4)].join(", "),
-      filter: "blur(2px)",
+      backgroundImage: [orb(0, 20, 30, 70, 0.3), orb(1, 70, 25, 90, 0.25), orb(2, 45, 65, 60, 0.35), orb(3, 82, 70, 80, 0.2), orb(4, 30, 80, 50, 0.4), orb(5, 55, 15, 100, 0.22)].join(", "),
+      // audit: blur(2px) read as hard circles, not bokeh — softened.
+      filter: "blur(6px)",
     };
   },
   lightLeakWarm: ({ t }) => {
@@ -555,11 +564,12 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     };
   },
   sparkleField: ({ t }) => {
+    // audit: 2px stars were sub-visible at 1080p — bumped to 3px + denser field.
     const star = (seed: number, x: number, y: number) => {
       const tw = Math.max(0, Math.sin(t * (2 + (seed % 3)) + seed));
-      return `radial-gradient(circle 2px at ${x}% ${y}%, rgba(255,255,245,${(tw * 0.9).toFixed(2)}), rgba(255,255,245,0) 60%)`;
+      return `radial-gradient(circle 3px at ${x}% ${y}%, rgba(255,255,245,${(tw * 0.9).toFixed(2)}), rgba(255,255,245,0) 60%)`;
     };
-    const pts: [number, number][] = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40]];
+    const pts: [number, number][] = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40], [84, 82], [8, 45], [58, 58], [92, 12]];
     return { backgroundImage: pts.map(([x, y], i) => star(i, x, y)).join(", ") };
   },
 
@@ -626,6 +636,68 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     backgroundImage: `conic-gradient(from -90deg, #7c5cff ${p * 360}deg, rgba(255,255,255,0.12) ${p * 360}deg)`,
     borderRadius: "50%",
     boxShadow: "inset 0 0 0 6px rgba(0,0,0,0.35)",
+  }),
+
+  // ======================= PACK: Japan MV — sakura / flare / komorebi / grade =======================
+  sakuraPetals: ({ t }) => {
+    // 14 sakura-pink petals: tumbling (the ellipse radii oscillate = petal flutter), drifting
+    // slightly left as they fall (wind), each with its own size/speed/sway phase.
+    const petal = (seed: number, xBase: number, size: number, fall: number, sway: number) => {
+      const y = ((t * fall + seed * 19) % 124) - 12;
+      const x = xBase - y * 0.08 + Math.sin(t * sway + seed * 1.7) * 6;
+      const tumble = Math.abs(Math.sin(t * (1.2 + (seed % 4) * 0.3) + seed));
+      const rx = size * (0.72 + 0.28 * tumble);
+      const ry = size * (0.42 + 0.22 * (1 - tumble));
+      const g = 183 + (seed % 4) * 8; // 255,183..207,197.. — sakura pinks
+      return `radial-gradient(ellipse ${rx.toFixed(1)}px ${ry.toFixed(1)}px at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(255,${g},${g + 14},0.95), rgba(255,${g},${g + 14},0) 70%)`;
+    };
+    const P: [number, number, number][] = [
+      [16, 11, 10], [30, 8, 14], [44, 12, 8], [58, 7, 16], [72, 10, 12], [86, 9, 15], [8, 8, 13],
+      [24, 12, 9], [38, 7, 17], [52, 11, 11], [66, 8, 15], [80, 13, 7], [94, 9, 12], [12, 10, 18],
+    ];
+    return { backgroundImage: P.map(([xb, sz, fall], i) => petal(i, xb, sz, fall, 0.5 + (i % 5) * 0.1)).join(", ") };
+  },
+  lensFlare: ({ t }) => {
+    // Anamorphic flare: warm core + thin horizontal cyan streak through it + ghost orbs mirrored
+    // through frame center (classic lens-ghost axis). Screen blend → drop it on any footage.
+    const cx = 50 + Math.sin(t * 0.21) * 26;
+    const cy = 32 + Math.cos(t * 0.17) * 12;
+    const pulse = 0.75 + 0.25 * Math.sin(t * 0.9);
+    const ghost = (k: number, size: number, a: number) => {
+      const gx = 50 + (50 - cx) * k;
+      const gy = 50 + (50 - cy) * k;
+      return `radial-gradient(circle ${size}px at ${gx.toFixed(1)}% ${gy.toFixed(1)}%, rgba(140,200,255,${a}), rgba(140,200,255,0) 70%)`;
+    };
+    return {
+      backgroundImage: [
+        `radial-gradient(circle 90px at ${cx.toFixed(1)}% ${cy.toFixed(1)}%, rgba(255,250,235,${(0.85 * pulse).toFixed(2)}), rgba(255,240,200,0) 70%)`,
+        `linear-gradient(0deg, rgba(90,170,255,0) ${(cy - 1.4).toFixed(1)}%, rgba(120,190,255,${(0.5 * pulse).toFixed(2)}) ${cy.toFixed(1)}%, rgba(90,170,255,0) ${(cy + 1.4).toFixed(1)}%)`,
+        ghost(0.5, 26, 0.2),
+        ghost(0.95, 40, 0.14),
+        ghost(1.4, 18, 0.18),
+      ].join(", "),
+      mixBlendMode: "screen",
+    };
+  },
+  godRays: ({ t }) => {
+    // Komorebi: broad diagonal light shafts sliding slowly, breathing in intensity, with the
+    // source glow pinned to the top-left. Screen blend + blur = soft volumetric feel.
+    const breathe = 0.6 + 0.4 * Math.sin(t * 0.45);
+    const shift = (t * 6) % 140;
+    return {
+      backgroundImage: [
+        `radial-gradient(circle 60% at 12% -8%, rgba(255,248,222,${(0.32 * breathe).toFixed(3)}), rgba(255,248,222,0) 70%)`,
+        `repeating-linear-gradient(63deg, rgba(255,246,214,0) 0px, rgba(255,246,214,${(0.14 * breathe).toFixed(3)}) 60px, rgba(255,246,214,0) 140px)`,
+      ].join(", "),
+      backgroundPosition: `0 0, ${shift.toFixed(1)}px 0`,
+      mixBlendMode: "screen",
+      filter: "blur(6px)",
+    };
+  },
+  japanMvGrade: ({ t }) => ({
+    // Pastel J-MV grade: lowered contrast (lifted blacks), desaturated, warm-pink cast, with a
+    // barely-there exposure breath so it feels filmic rather than frozen.
+    filter: `contrast(0.94) saturate(0.82) brightness(${(1.05 + Math.sin(t * 0.5) * 0.015).toFixed(3)}) sepia(0.10) hue-rotate(-6deg)`,
   }),
 };
 

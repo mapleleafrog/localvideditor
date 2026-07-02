@@ -303,7 +303,24 @@ var SoranjiEffects = (() => {
     { kind: "transition", id: "glitchCut", name: "Glitch Cut", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "glitch", "energetic"], license: "write-own" },
     { kind: "transition", id: "pixelDither", name: "Bayer Dither Dissolve", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "pixel", "8-bit"], license: "write-own" },
     { kind: "transition", id: "scanlineWipe", name: "Scanline Sweep", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "crt"], license: "write-own" },
-    { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" }
+    { kind: "transition", id: "vhsRewind", name: "VHS Rewind Smear", category: "Retro", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "vhs"], license: "write-own" },
+    // --- Ported from reactvideoeditor/remotion-templates (MIT), reworked into style(ctx) motions ---
+    { kind: "motion", id: "spotlightReveal", name: "Spotlight Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "letterboxReveal", name: "Letterbox Reveal", category: "Cinematic", engine: "css", tier: "Ext", status: "todo", tags: ["reveal", "cinematic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "liquidWave", name: "Liquid Wave", category: "Backgrounds", engine: "css", tier: "Ext", status: "todo", tags: ["background", "romantic", "soft", "fullframe"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "monogramSpinReveal", name: "Monogram Spin Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "monogramScaleRotate", name: "Monogram Scale + Rotate", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "loop", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "monogramBlurReveal", name: "Monogram Blur Reveal", category: "Monogram", engine: "css", tier: "Ext", status: "todo", tags: ["logo", "reveal", "wedding"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "chapterTitleReveal", name: "Chapter Title Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "title", "reveal"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "quoteCardReveal", name: "Quote Card Reveal", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "quote", "card"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "lowerThirdBar", name: "Lower Third Bar", category: "Titles", engine: "css", tier: "Ext", status: "todo", tags: ["text", "caption", "lower-third"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "polaroidFrame", name: "Polaroid Frame", category: "Photo", engine: "css", tier: "Ext", status: "todo", tags: ["photo", "frame", "nostalgic"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    { kind: "motion", id: "circularProgressReveal", name: "Circular Progress Ring", category: "Charts & Data", engine: "css", tier: "Ext", status: "todo", tags: ["decorative", "ring", "progress"], license: "MIT", credit: "Adapted from reactvideoeditor/remotion-templates" },
+    // --- Japan MV pack (sakura / flare / komorebi / grade — for the Soranji wedding MV) ---
+    { kind: "motion", id: "sakuraPetals", name: "Sakura Petals", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["japan", "sakura", "atmosphere", "fullframe", "wedding"], license: "write-own" },
+    { kind: "motion", id: "lensFlare", name: "Anamorphic Lens Flare", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["flare", "cinematic", "fullframe"], license: "write-own" },
+    { kind: "motion", id: "godRays", name: "God Rays (Komorebi)", category: "Japan MV", engine: "css", tier: "Ext", status: "todo", tags: ["light", "atmosphere", "fullframe"], license: "write-own" },
+    { kind: "motion", id: "japanMvGrade", name: "Japan MV Pastel Grade", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["grade", "pastel", "japan"], license: "write-own" }
   ];
 
   // src/effects/portable.ts
@@ -454,7 +471,10 @@ var SoranjiEffects = (() => {
       const ny = (Math.cos(t * 9) + Math.sin(t * 5) * 0.5) * 4;
       return { transform: `translate(${nx}px, ${ny}px) rotate(${Math.sin(t * 4) * 1.2}deg)` };
     },
-    dutchAngle: ({ params }) => ({ transform: `rotate(${params.angle ?? 8}deg) scale(1.1)` }),
+    // Gentle living drift so the tilt doesn't read as a frozen frame (audit: was fully static).
+    dutchAngle: ({ t, params }) => ({
+      transform: `rotate(${((params.angle ?? 8) + Math.sin(t * 0.35) * 0.8).toFixed(2)}deg) scale(1.1)`
+    }),
     steadicamFollow: ({ t }) => ({
       transform: `translate(${Math.sin(t * 0.6) * 20}px, ${Math.cos(t * 0.5) * 10}px) scale(1.1)`
     }),
@@ -740,7 +760,12 @@ var SoranjiEffects = (() => {
           petal(2, 58, 10, 18, 0.5),
           petal(3, 77, 6, 25, 0.7),
           petal(4, 30, 8, 29, 0.9),
-          petal(5, 88, 9, 20, 0.6)
+          petal(5, 88, 9, 20, 0.6),
+          // audit: 6 petals read as near-empty at 1080p — densified to 10 (same character).
+          petal(6, 8, 8, 23, 0.75),
+          petal(7, 48, 11, 13, 0.55),
+          petal(8, 68, 7, 27, 0.85),
+          petal(9, 94, 8, 17, 0.65)
         ].join(", ")
       };
     },
@@ -761,8 +786,9 @@ var SoranjiEffects = (() => {
         return `radial-gradient(circle ${size}px at ${x}% ${y}%, rgba(255,240,210,${(0.18 + seed % 3 * 0.05).toFixed(2)}), rgba(255,240,210,0) 70%)`;
       };
       return {
-        backgroundImage: [orb(0, 20, 30, 70, 0.3), orb(1, 70, 25, 90, 0.25), orb(2, 45, 65, 60, 0.35), orb(3, 82, 70, 80, 0.2), orb(4, 30, 80, 50, 0.4)].join(", "),
-        filter: "blur(2px)"
+        backgroundImage: [orb(0, 20, 30, 70, 0.3), orb(1, 70, 25, 90, 0.25), orb(2, 45, 65, 60, 0.35), orb(3, 82, 70, 80, 0.2), orb(4, 30, 80, 50, 0.4), orb(5, 55, 15, 100, 0.22)].join(", "),
+        // audit: blur(2px) read as hard circles, not bokeh — softened.
+        filter: "blur(6px)"
       };
     },
     lightLeakWarm: ({ t }) => {
@@ -775,11 +801,142 @@ var SoranjiEffects = (() => {
     sparkleField: ({ t }) => {
       const star = (seed, x, y) => {
         const tw = Math.max(0, Math.sin(t * (2 + seed % 3) + seed));
-        return `radial-gradient(circle 2px at ${x}% ${y}%, rgba(255,255,245,${(tw * 0.9).toFixed(2)}), rgba(255,255,245,0) 60%)`;
+        return `radial-gradient(circle 3px at ${x}% ${y}%, rgba(255,255,245,${(tw * 0.9).toFixed(2)}), rgba(255,255,245,0) 60%)`;
       };
-      const pts = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40]];
+      const pts = [[12, 18], [28, 62], [44, 30], [60, 78], [76, 22], [88, 55], [20, 85], [52, 12], [68, 48], [36, 40], [84, 82], [8, 45], [58, 58], [92, 12]];
       return { backgroundImage: pts.map(([x, y], i) => star(i, x, y)).join(", ") };
-    }
+    },
+    // --- Ported from reactvideoeditor/remotion-templates (MIT) ---
+    spotlightReveal: ({ progress: p }) => ({
+      clipPath: `circle(${lerp(0, 75, easeOutCubic(p))}% at 50% 50%)`,
+      filter: `brightness(${lerp(1.4, 1, p)})`
+    }),
+    letterboxReveal: ({ progress: p }) => ({
+      clipPath: `inset(${lerp(50, 0, easeOutCubic(p))}% 0 ${lerp(50, 0, easeOutCubic(p))}% 0)`
+    }),
+    liquidWave: ({ t }) => {
+      const x1 = 50 + Math.sin(t * 0.3) * 20;
+      const y1 = 40 + Math.cos(t * 0.25) * 15;
+      const x2 = 50 + Math.sin(t * 0.22 + 2) * 25;
+      const y2 = 60 + Math.cos(t * 0.18 + 1) * 18;
+      return {
+        backgroundImage: `radial-gradient(circle at ${x1}% ${y1}%, rgba(120,180,255,0.25), transparent 55%), radial-gradient(circle at ${x2}% ${y2}%, rgba(255,200,220,0.2), transparent 60%)`,
+        filter: "blur(18px)"
+      };
+    },
+    monogramSpinReveal: ({ progress: p }) => ({
+      opacity: p,
+      transform: `scale(${lerp(0.4, 1, easeOutCubic(p))}) rotate(${lerp(-180, 0, easeOutCubic(p))}deg)`
+    }),
+    monogramScaleRotate: ({ progress: p, t }) => ({
+      opacity: clamp(p * 3),
+      transform: `scale(${lerp(0.85, 1, easeOutCubic(clamp(p * 2)))}) rotate(${Math.sin(t * 0.6) * 4}deg)`
+    }),
+    monogramBlurReveal: ({ progress: p }) => ({
+      opacity: p,
+      filter: `blur(${lerp(20, 0, easeOutCubic(p))}px)`,
+      transform: `scale(${lerp(1.15, 1, easeOutCubic(p))})`
+    }),
+    chapterTitleReveal: ({ progress: p }) => ({
+      opacity: clamp(p * 2),
+      transform: `translateY(${lerp(24, 0, easeOutCubic(p))}px)`,
+      clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`
+    }),
+    quoteCardReveal: ({ progress: p }) => ({
+      opacity: clamp(p * 2),
+      transform: `scale(${lerp(1.08, 1, easeOutCubic(p))})`,
+      backgroundColor: "rgba(10, 10, 16, 0.35)",
+      borderRadius: "10px",
+      padding: "18px 28px",
+      boxShadow: "0 8px 30px rgba(0,0,0,0.35)"
+    }),
+    lowerThirdBar: ({ progress: p }) => ({
+      opacity: clamp(p * 3),
+      transform: `translateX(${lerp(-40, 0, easeOutCubic(p))}px)`,
+      backgroundColor: "rgba(124, 92, 255, 0.85)",
+      padding: "8px 20px",
+      borderRadius: "3px",
+      clipPath: `inset(0 ${lerp(100, 0, easeOutCubic(p))}% 0 0)`
+    }),
+    polaroidFrame: ({ progress: p, t }) => ({
+      opacity: clamp(p * 2),
+      transform: `scale(${lerp(0.92, 1, easeOutCubic(p))}) rotate(${-2 + Math.sin(t * 0.4) * 1.5}deg)`,
+      border: "10px solid #fdfdfa",
+      borderBottom: "38px solid #fdfdfa",
+      boxShadow: "0 18px 36px rgba(0,0,0,0.45)"
+    }),
+    circularProgressReveal: ({ progress: p }) => ({
+      backgroundImage: `conic-gradient(from -90deg, #7c5cff ${p * 360}deg, rgba(255,255,255,0.12) ${p * 360}deg)`,
+      borderRadius: "50%",
+      boxShadow: "inset 0 0 0 6px rgba(0,0,0,0.35)"
+    }),
+    // ======================= PACK: Japan MV — sakura / flare / komorebi / grade =======================
+    sakuraPetals: ({ t }) => {
+      const petal = (seed, xBase, size, fall, sway) => {
+        const y = (t * fall + seed * 19) % 124 - 12;
+        const x = xBase - y * 0.08 + Math.sin(t * sway + seed * 1.7) * 6;
+        const tumble = Math.abs(Math.sin(t * (1.2 + seed % 4 * 0.3) + seed));
+        const rx = size * (0.72 + 0.28 * tumble);
+        const ry = size * (0.42 + 0.22 * (1 - tumble));
+        const g = 183 + seed % 4 * 8;
+        return `radial-gradient(ellipse ${rx.toFixed(1)}px ${ry.toFixed(1)}px at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(255,${g},${g + 14},0.95), rgba(255,${g},${g + 14},0) 70%)`;
+      };
+      const P = [
+        [16, 11, 10],
+        [30, 8, 14],
+        [44, 12, 8],
+        [58, 7, 16],
+        [72, 10, 12],
+        [86, 9, 15],
+        [8, 8, 13],
+        [24, 12, 9],
+        [38, 7, 17],
+        [52, 11, 11],
+        [66, 8, 15],
+        [80, 13, 7],
+        [94, 9, 12],
+        [12, 10, 18]
+      ];
+      return { backgroundImage: P.map(([xb, sz, fall], i) => petal(i, xb, sz, fall, 0.5 + i % 5 * 0.1)).join(", ") };
+    },
+    lensFlare: ({ t }) => {
+      const cx = 50 + Math.sin(t * 0.21) * 26;
+      const cy = 32 + Math.cos(t * 0.17) * 12;
+      const pulse = 0.75 + 0.25 * Math.sin(t * 0.9);
+      const ghost = (k, size, a) => {
+        const gx = 50 + (50 - cx) * k;
+        const gy = 50 + (50 - cy) * k;
+        return `radial-gradient(circle ${size}px at ${gx.toFixed(1)}% ${gy.toFixed(1)}%, rgba(140,200,255,${a}), rgba(140,200,255,0) 70%)`;
+      };
+      return {
+        backgroundImage: [
+          `radial-gradient(circle 90px at ${cx.toFixed(1)}% ${cy.toFixed(1)}%, rgba(255,250,235,${(0.85 * pulse).toFixed(2)}), rgba(255,240,200,0) 70%)`,
+          `linear-gradient(0deg, rgba(90,170,255,0) ${(cy - 1.4).toFixed(1)}%, rgba(120,190,255,${(0.5 * pulse).toFixed(2)}) ${cy.toFixed(1)}%, rgba(90,170,255,0) ${(cy + 1.4).toFixed(1)}%)`,
+          ghost(0.5, 26, 0.2),
+          ghost(0.95, 40, 0.14),
+          ghost(1.4, 18, 0.18)
+        ].join(", "),
+        mixBlendMode: "screen"
+      };
+    },
+    godRays: ({ t }) => {
+      const breathe = 0.6 + 0.4 * Math.sin(t * 0.45);
+      const shift = t * 6 % 140;
+      return {
+        backgroundImage: [
+          `radial-gradient(circle 60% at 12% -8%, rgba(255,248,222,${(0.32 * breathe).toFixed(3)}), rgba(255,248,222,0) 70%)`,
+          `repeating-linear-gradient(63deg, rgba(255,246,214,0) 0px, rgba(255,246,214,${(0.14 * breathe).toFixed(3)}) 60px, rgba(255,246,214,0) 140px)`
+        ].join(", "),
+        backgroundPosition: `0 0, ${shift.toFixed(1)}px 0`,
+        mixBlendMode: "screen",
+        filter: "blur(6px)"
+      };
+    },
+    japanMvGrade: ({ t }) => ({
+      // Pastel J-MV grade: lowered contrast (lifted blacks), desaturated, warm-pink cast, with a
+      // barely-there exposure breath so it feels filmic rather than frozen.
+      filter: `contrast(0.94) saturate(0.82) brightness(${(1.05 + Math.sin(t * 0.5) * 0.015).toFixed(3)}) sepia(0.10) hue-rotate(-6deg)`
+    })
   };
   var MOTION_META = Object.fromEntries(
     CATALOG.filter((e) => e.kind === "motion").map((e) => [e.id, { name: e.name, category: e.category, tier: e.tier }])

@@ -16,6 +16,7 @@ import { getMotion, getTransitionPresentation, scaleStrength, EASINGS } from "..
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
+import { resolveFontFamily } from "./fonts";
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 
@@ -185,7 +186,7 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         style={{
           fontSize: o.fontSize ?? 80,
           color: o.color ?? "#fff",
-          fontFamily: "monospace",
+          fontFamily: resolveFontFamily(o.fontFamily),
           fontWeight: 700,
           whiteSpace: "nowrap",
           textShadow: o.glow || "none",

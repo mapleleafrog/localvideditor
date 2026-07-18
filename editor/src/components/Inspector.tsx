@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useEditor } from "../store";
 import type { Overlay, MotionParam } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
+import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 
 const IO_OPTS: [Overlay["enter"], string][] = [
   ["none", "none"],
@@ -202,6 +203,11 @@ export const Inspector: React.FC = () => {
         <>
           <Field label="Text"><input value={o.text} onChange={(e) => patchOverlay(i, { text: e.target.value })} /></Field>
           <Field label="Font size"><input type="number" min={8} value={o.fontSize} onChange={(e) => patchOverlay(i, { fontSize: +e.target.value })} /></Field>
+          <Field label="Font">
+            <select value={o.fontFamily ?? "default"} onChange={(e) => patchOverlay(i, { fontFamily: e.target.value as Overlay["fontFamily"] })}>
+              {FONT_OPTIONS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+            </select>
+          </Field>
           <Field label="Color"><input type="color" value={o.color} onChange={(e) => patchOverlay(i, { color: e.target.value })} /></Field>
           <Field label="Glow (CSS shadow)"><input value={o.glow} onChange={(e) => patchOverlay(i, { glow: e.target.value })} placeholder="0 0 18px #ff2e88" /></Field>
           <Field label="Text animation">

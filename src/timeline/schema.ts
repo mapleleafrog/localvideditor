@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { readyMotions, readyTransitions } from "../effects";
+import { FONT_IDS } from "./fonts";
 
 // ---------------------------------------------------------------------------
 // The `project` config that drives the generic Timeline composition.
@@ -100,6 +101,9 @@ const overlaySchema = z.object({
   /** Text only. */
   fontSize: z.number().default(80),
   color: z.string().default("#ffffff"),
+  /** Font family id — resolved to a CSS font via @remotion/google-fonts (see fonts.ts). Optional;
+   *  unset / "default" = monospace, so existing projects are unchanged. */
+  fontFamily: enumOf([...FONT_IDS]).optional(),
   glow: z.string().default(""),
   /** Per-character reveal for text overlays (charFadeUp / charBlurReveal / typewriterChar /
    *  wordHighlight). Optional — unset or "none" = static text. */

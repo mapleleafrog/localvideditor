@@ -8,7 +8,10 @@
   "dependencies": {
     "@remotion/cli": "4.0.472",
     "@remotion/gif": "4.0.472",
+    "@remotion/google-fonts": "4.0.472",
+    "@remotion/light-leaks": "4.0.472",
     "@remotion/media-utils": "4.0.472",
+    "@remotion/noise": "4.0.472",
     "@remotion/paths": "4.0.472",
     "@remotion/player": "4.0.472",
     "@remotion/shapes": "4.0.472",

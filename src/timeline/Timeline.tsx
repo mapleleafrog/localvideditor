@@ -93,6 +93,60 @@ const ClipTrack: React.FC<{ clips: Clip[]; bpm: number; beatOffsetInFrames: numb
   return <TransitionSeries>{items}</TransitionSeries>;
 };
 
+// --- per-character text reveal (frame-driven, one <span> per grapheme) ------
+type TextAnim = NonNullable<Overlay["textAnimation"]>;
+type SegmenterCtor = new (
+  locales?: string | string[],
+  options?: { granularity?: "grapheme" | "word" | "sentence" },
+) => { segment(input: string): Iterable<{ segment: string }> };
+
+// Split into grapheme clusters so emoji / combining kana stay intact (Array.from splits code points).
+const splitGraphemes = (s: string): string[] => {
+  const Seg = (Intl as unknown as { Segmenter?: SegmenterCtor }).Segmenter;
+  if (Seg) return Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(s), (x) => x.segment);
+  return Array.from(s);
+};
+
+const charStyle = (kind: TextAnim, p: number, f: number, i: number, stagger: number): React.CSSProperties => {
+  switch (kind) {
+    case "charFadeUp":
+      return { opacity: p, transform: `translateY(${(1 - p) * 0.6}em)` };
+    case "charBlurReveal":
+      return { opacity: p, filter: `blur(${(1 - p) * 12}px)` };
+    case "typewriterChar":
+      // Hide via opacity only (never layout) so the editor's on-canvas size measurement stays stable.
+      return { opacity: f >= i * stagger ? 1 : 0 };
+    case "wordHighlight":
+      return { opacity: 0.35 + 0.65 * p, transform: `scale(${1 + 0.06 * Math.sin(p * Math.PI)})` };
+    default:
+      return {};
+  }
+};
+
+/** Renders an overlay's text as per-unit <span>s, each revealed on the frame clock. `frame` is
+ *  absolute (Layer never rebases text layers), so local time = frame − overlay.from. */
+const AnimatedChars: React.FC<{ o: Overlay }> = ({ o }) => {
+  const frame = useCurrentFrame();
+  const kind = (o.textAnimation ?? "none") as TextAnim;
+  const f = frame - (o.from ?? 0);
+  const stagger = Math.max(0, o.textAnimationStagger ?? 3);
+  const ramp = 12; // frames for one unit to fully reveal
+  const units = kind === "wordHighlight" ? o.text.split(/(\s+)/) : splitGraphemes(o.text);
+  return (
+    <>
+      {units.map((u, i) => {
+        const ws = /^\s+$/.test(u);
+        const p = clamp((f - i * stagger) / ramp);
+        return (
+          <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...(ws ? {} : charStyle(kind, p, f, i, stagger)) }}>
+            {u}
+          </span>
+        );
+      })}
+    </>
+  );
+};
+
 // --- a positioned overlay with stacked effects ---
 const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; beatOffsetInFrames: number }> = ({
   overlay: o,
@@ -137,7 +191,7 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
           textShadow: o.glow || "none",
         }}
       >
-        {o.text}
+        {o.textAnimation && o.textAnimation !== "none" ? <AnimatedChars o={o} /> : o.text}
       </div>
     ) : o.type === "video" ? (
       // Video layer — rebased to start at the overlay's `from` so it plays from its beginning.

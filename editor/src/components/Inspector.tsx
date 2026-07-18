@@ -21,6 +21,14 @@ const IO_OPTS: [Overlay["enter"], string][] = [
   ["typewriter", "Typewriter (text)"],
 ];
 
+const TEXT_ANIM_OPTS: [string, string][] = [
+  ["none", "None (static)"],
+  ["charFadeUp", "Char fade-up"],
+  ["charBlurReveal", "Char blur reveal"],
+  ["typewriterChar", "Typewriter (per char)"],
+  ["wordHighlight", "Word highlight"],
+];
+
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 const MOTION_CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
@@ -196,6 +204,14 @@ export const Inspector: React.FC = () => {
           <Field label="Font size"><input type="number" min={8} value={o.fontSize} onChange={(e) => patchOverlay(i, { fontSize: +e.target.value })} /></Field>
           <Field label="Color"><input type="color" value={o.color} onChange={(e) => patchOverlay(i, { color: e.target.value })} /></Field>
           <Field label="Glow (CSS shadow)"><input value={o.glow} onChange={(e) => patchOverlay(i, { glow: e.target.value })} placeholder="0 0 18px #ff2e88" /></Field>
+          <Field label="Text animation">
+            <select value={o.textAnimation ?? "none"} onChange={(e) => patchOverlay(i, { textAnimation: e.target.value as Overlay["textAnimation"] })}>
+              {TEXT_ANIM_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+          {(o.textAnimation ?? "none") !== "none" && (
+            <Field label="Stagger (frames)"><input type="number" min={0} value={o.textAnimationStagger ?? 3} onChange={(e) => patchOverlay(i, { textAnimationStagger: Math.max(0, +e.target.value) })} /></Field>
+          )}
         </>
       )}
       {(o.type === "image" || o.type === "video") && (

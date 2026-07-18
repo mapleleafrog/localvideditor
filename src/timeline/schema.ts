@@ -101,6 +101,11 @@ const overlaySchema = z.object({
   fontSize: z.number().default(80),
   color: z.string().default("#ffffff"),
   glow: z.string().default(""),
+  /** Per-character reveal for text overlays (charFadeUp / charBlurReveal / typewriterChar /
+   *  wordHighlight). Optional — unset or "none" = static text. */
+  textAnimation: z.enum(["none", "charFadeUp", "charBlurReveal", "typewriterChar", "wordHighlight"]).optional(),
+  /** Frames between successive characters/words in the reveal (default 3). */
+  textAnimationStagger: z.number().int().nonnegative().optional(),
   width: z.number().default(200),
   /** Crisp pixel-art scaling (`image-rendering: pixelated`) for image layers. Optional — default is
    *  smooth (bilinear), so slow/sub-pixel motion doesn't snap to whole pixels (= choppy). */

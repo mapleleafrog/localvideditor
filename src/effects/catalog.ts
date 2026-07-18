@@ -24,6 +24,7 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "transition", id: "additiveDissolve", name: "Additive (Luma) Dissolve", category: "Dissolve", engine: "webgl", tier: "Ext", status: "todo", tags: ["dreamy", "wedding"], license: "MIT" },
   { kind: "transition", id: "randomSquares", name: "Random Squares Dissolve", category: "Dissolve", engine: "css", tier: "Ext", status: "todo", tags: ["energetic", "pixel"], license: "MIT" },
   { kind: "transition", id: "pixelize", name: "Pixelize Dissolve", category: "Dissolve", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "8-bit", "pixel"], license: "MIT" },
+  { kind: "transition", id: "gridPixelate", name: "Grid Pixelate Wipe", category: "Dissolve", engine: "css", tier: "Ext", status: "todo", tags: ["pixel", "energetic", "retro"], license: "write-own", credit: "Inspired by remocn (MIT)" },
   { kind: "transition", id: "hsvFade", name: "HSV Color Fade", category: "Dissolve", engine: "webgl", tier: "Adv", status: "todo", tags: ["stylish"], license: "MIT" },
 
   // --- Wipe ---
@@ -70,6 +71,7 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "transition", id: "scanlines", name: "CRT Scanlines + Bleed", category: "Glitch", engine: "webgl", tier: "Ext", status: "todo", tags: ["retro"], license: "write-own" },
   { kind: "transition", id: "datamoshSim", name: "Datamosh-style Smear", category: "Glitch", engine: "webgl", tier: "Adv", status: "todo", tags: ["edgy"], license: "simulated" },
   { kind: "transition", id: "doomScreen", name: "Doom-style Melt", category: "Glitch", engine: "css", tier: "Ext", status: "todo", tags: ["retro", "gaming", "pixel"], license: "MIT" },
+  { kind: "transition", id: "chromaticAberration", name: "Chromatic Aberration Wipe", category: "Glitch", engine: "css", tier: "Ext", status: "todo", tags: ["glitch", "energetic"], license: "write-own", credit: "Inspired by remocn (MIT)" },
 
   // --- 3D ---
   { kind: "transition", id: "flip3D", name: "3D Flip (card)", category: "3D", engine: "either", tier: "Core", status: "todo", tags: ["playful"], license: "MIT" },
@@ -88,6 +90,9 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "transition", id: "bokehDissolve", name: "Bokeh / Defocus", category: "Light / Color", engine: "webgl", tier: "Ext", status: "todo", tags: ["wedding", "romantic"], license: "MIT" },
   { kind: "transition", id: "colorDistance", name: "Color-distance Fade", category: "Light / Color", engine: "webgl", tier: "Ext", status: "todo", tags: ["stylish"], license: "MIT" },
   { kind: "transition", id: "dreamyZoom", name: "Dreamy Zoom + Flash", category: "Light / Color", engine: "css", tier: "Core", status: "todo", tags: ["wedding", "dreamy"], license: "MIT" },
+  { kind: "transition", id: "lightLeakFilm", name: "Light Leak Burn (film)", category: "Light / Color", engine: "webgl", tier: "Ext", status: "todo", tags: ["wedding", "dreamy", "film"], license: "Remotion", credit: "@remotion/light-leaks" },
+  { kind: "transition", id: "lightLeakGolden", name: "Light Leak (golden)", category: "Light / Color", engine: "webgl", tier: "Ext", status: "todo", tags: ["wedding", "warm"], license: "Remotion", credit: "@remotion/light-leaks" },
+  { kind: "transition", id: "lightLeakRose", name: "Light Leak (rose)", category: "Light / Color", engine: "webgl", tier: "Ext", status: "todo", tags: ["wedding", "romantic"], license: "Remotion", credit: "@remotion/light-leaks" },
 
   // --- Zoom / Blur ---
   { kind: "transition", id: "zoomBlur", name: "Zoom + Radial Blur", category: "Zoom / Blur", engine: "css", tier: "Core", status: "todo", tags: ["energetic"], license: "MIT" },

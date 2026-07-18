@@ -18,7 +18,7 @@ import { crossZoom } from "@remotion/transitions/cross-zoom";
 import { linearBlur } from "@remotion/transitions/linear-blur";
 import { ripple } from "@remotion/transitions/ripple";
 import { dissolve } from "@remotion/transitions/dissolve";
-import { cssPresentations } from "./presentations";
+import { cssPresentations, lightLeakPresentations } from "./presentations";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Dir = any;
@@ -53,6 +53,12 @@ ready("filmDissolve", () => dissolve({}));
 
 // --- Custom CSS presentations (all preview-safe, no flags) ---
 for (const [id, factory] of Object.entries(cssPresentations)) {
+  ready(id, (p) => factory(p ?? {}));
+}
+
+// --- @remotion/light-leaks wrapped as presentations (engine:"webgl"; WebGL, so
+// excluded from the preview-safe gallery — usable in the editor picker + render) ---
+for (const [id, factory] of Object.entries(lightLeakPresentations)) {
   ready(id, (p) => factory(p ?? {}));
 }
 

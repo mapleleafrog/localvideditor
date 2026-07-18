@@ -6,6 +6,7 @@ import type {
 } from "@remotion/transitions";
 import { makeStar } from "@remotion/shapes";
 import { getBoundingBox, translatePath } from "@remotion/paths";
+import { LightLeak } from "@remotion/light-leaks";
 import { clamp, lerp, seededRandom } from "./helpers";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,24 @@ const ditherURI = (p: number) => {
   return `url("data:image/svg+xml,%3Csvg width='8' height='8' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
 };
 
+// Ordered mosaic: a full-frame NxN grid whose cells reveal in a pseudo-scrambled
+// order as p:0->1 — a blocky "pixelate" fill distinct from randomSquares (random
+// growing tiles), pixelDither (8px Bayer) and doomScreen (columns). The fill-order
+// idea is ported from remocn's dither-dissolve; the block look is our own CSS mask.
+const gridPixelURI = (p: number) => {
+  const N = 14;
+  const c = 100 / N;
+  let rects = "";
+  for (let row = 0; row < N; row++) {
+    for (let col = 0; col < N; col++) {
+      if (((col * 7 + row * 13) % 197) / 197 < p) {
+        rects += `%3Crect x='${(col * c).toFixed(2)}' y='${(row * c).toFixed(2)}' width='${(c + 0.3).toFixed(2)}' height='${(c + 0.3).toFixed(2)}' fill='black'/%3E`;
+      }
+    }
+  }
+  return `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
+};
+
 // Dip-to-color / flash: scenes hard-cut at the midpoint while a full-frame
 // color overlay peaks at p=0.5.
 const dip = (color: string, sharpness = 1): Factory => {
@@ -175,6 +194,43 @@ const starWipeFactory: Factory = (() => {
   return (params = {}) => ({ component: Comp, props: params });
 })();
 
+// @remotion/light-leaks wrapped as an A->B transition: hold the exiting scene
+// opaque, fade the entering scene in over it, and sweep the procedural WebGL leak
+// across the cut. durationInFrames MUST be the transition length or the leak never
+// evolves (its shader is driven by its own frame / durationInFrames) — the gallery
+// and editor may pass none, so we hard-default. engine:"webgl" in the catalog.
+const lightLeakPreset = (seed: number, hueShift: number): Factory => {
+  const Comp: React.FC<TransitionPresentationComponentProps<Props>> = ({
+    children,
+    presentationDirection,
+    presentationProgress: p,
+    passedProps,
+  }) => {
+    if (presentationDirection === "exiting") return <AbsoluteFill>{children}</AbsoluteFill>;
+    const dur = (passedProps.durationInFrames as number) ?? 20;
+    return (
+      <AbsoluteFill>
+        <AbsoluteFill style={{ opacity: p }}>{children}</AbsoluteFill>
+        <AbsoluteFill style={{ mixBlendMode: "screen", pointerEvents: "none", opacity: 0.9 }}>
+          <LightLeak
+            durationInFrames={dur}
+            seed={(passedProps.seed as number) ?? seed}
+            hueShift={(passedProps.hueShift as number) ?? hueShift}
+          />
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  };
+  return (params = {}) => ({ component: Comp, props: params });
+};
+
+/** Light-leak presentations (WebGL), keyed by registry id — wired in transitions.ts. */
+export const lightLeakPresentations: Record<string, Factory> = {
+  lightLeakFilm: lightLeakPreset(1, 0), // warm yellow (base hue ~55°)
+  lightLeakGolden: lightLeakPreset(4, 20), // amber/gold (~35°)
+  lightLeakRose: lightLeakPreset(7, 80), // pink/rose (~335°); effective hue ≈ 55° − hueShift
+};
+
 /** All custom CSS presentations, keyed by registry id. */
 export const cssPresentations: Record<string, Factory> = {
   // Light / color
@@ -216,6 +272,20 @@ export const cssPresentations: Record<string, Factory> = {
     const filter = `drop-shadow(${off}px 0 0 rgba(255,0,0,0.6)) drop-shadow(${-off}px 0 0 rgba(0,255,255,0.6))`;
     return dir === "exiting" ? { filter } : { opacity: p, filter };
   }),
+  // Directional glitch wipe with RGB channel fringing at the moving edge — distinct
+  // from rgbSplit's static crossfade. Per-channel offset (remocn rgb-glitch-text
+  // idea) swells at mid-progress while the entering scene wipes in left->right.
+  chromaticAberration: css((p, dir) => {
+    const off = Math.sin(p * Math.PI) * 26;
+    const fringe = `drop-shadow(${off}px 0 0 rgba(255,0,64,0.75)) drop-shadow(${-off}px 0 0 rgba(0,220,255,0.75))`;
+    return dir === "exiting"
+      ? { transform: `translateX(${-p * 22}%) skewX(${-p * 5}deg)`, filter: fringe }
+      : {
+          clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`,
+          transform: `translateX(${(1 - p) * 22}%) skewX(${(1 - p) * 5}deg)`,
+          filter: fringe,
+        };
+  }),
 
   // Slide / shape / mask — entering-only reveals over the held exiting scene.
   coverUncover: enter((p) => ({ transform: `translateX(${(1 - p) * 100}%)` })),
@@ -250,6 +320,7 @@ export const cssPresentations: Record<string, Factory> = {
       : { opacity: clamp(p * 1.5), transform: `scale(${lerp(1.15, 1, p)}) rotate(${(1 - p) * 4}deg)` },
   ),
   doomScreen: enter((p) => fullMask(doomMaskURI(clamp(p)), "100% 100%")),
+  gridPixelate: enter((p) => fullMask(gridPixelURI(clamp(p)), "100% 100%")),
 
   // Advanced retro
   crtOn: enter((p) => {

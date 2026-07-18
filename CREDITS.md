@@ -4,12 +4,28 @@
 > sources require attribution when their shader/source code is shipped. Rendered
 > video output itself carries no practical restriction.
 
+- **Grid Pixelate Wipe** (`gridPixelate`) — write-own — Inspired by remocn (MIT)
 - **Polka Dots Curtain** (`polkaDots`) — MIT — bobylito (gl-transitions)
 - **Crosswarp (melt morph)** (`crossWarp`) — MIT — Eke Péter (gl-transitions)
 - **Directional Warp** (`directionalWarp`) — MIT — pschroen (gl-transitions)
 - **Morph (displacement)** (`morph`) — MIT — paniq (gl-transitions)
 - **Inverted Page Curl** (`pageCurl`) — BSD-3-Clause-HP — Hewlett-Packard
 - **Glitch Memories** (`glitchMemories`) — MIT — Gunnar Roth (gl-transitions)
+- **Chromatic Aberration Wipe** (`chromaticAberration`) — write-own — Inspired by remocn (MIT)
 - **Cube Rotate** (`cube3D`) — MIT — gre (gl-transitions) — NOT Remotion paid cube()
 - **Stereo Viewer** (`stereoViewer`) — BSD-2-Clause — Ted Schundler (gl-transitions)
+- **Light Leak Burn (film)** (`lightLeakFilm`) — Remotion — @remotion/light-leaks
+- **Light Leak (golden)** (`lightLeakGolden`) — Remotion — @remotion/light-leaks
+- **Light Leak (rose)** (`lightLeakRose`) — Remotion — @remotion/light-leaks
 - **Wobble / Jello** (`jiggleWobble`) — MIT — Animate.css
+- **Spotlight Reveal** (`spotlightReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Letterbox Reveal** (`letterboxReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Liquid Wave** (`liquidWave`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Monogram Spin Reveal** (`monogramSpinReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Monogram Scale + Rotate** (`monogramScaleRotate`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Monogram Blur Reveal** (`monogramBlurReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Chapter Title Reveal** (`chapterTitleReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Quote Card Reveal** (`quoteCardReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Lower Third Bar** (`lowerThirdBar`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Polaroid Frame** (`polaroidFrame`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Circular Progress Ring** (`circularProgressReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates

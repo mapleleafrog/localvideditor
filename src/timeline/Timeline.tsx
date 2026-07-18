@@ -85,7 +85,7 @@ const ClipTrack: React.FC<{ clips: Clip[]; bpm: number; beatOffsetInFrames: numb
       items.push(
         <TransitionSeries.Transition
           key={`tr-${i}`}
-          presentation={getTransitionPresentation(clip.transitionToNext)}
+          presentation={getTransitionPresentation(clip.transitionToNext, { durationInFrames: clip.transitionDurationInFrames })}
           timing={linearTiming({ durationInFrames: clip.transitionDurationInFrames, easing: EASINGS[clip.transitionEasing ?? "linear"] })}
         />,
       );

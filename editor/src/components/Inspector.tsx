@@ -216,7 +216,7 @@ export const Inspector: React.FC = () => {
             </select>
           </Field>
           {(o.textAnimation ?? "none") !== "none" && (
-            <Field label="Stagger (frames)"><input type="number" min={0} value={o.textAnimationStagger ?? 3} onChange={(e) => patchOverlay(i, { textAnimationStagger: Math.max(0, +e.target.value) })} /></Field>
+            <Field label="Stagger (frames)"><input type="number" min={0} step={1} value={o.textAnimationStagger ?? 3} onChange={(e) => patchOverlay(i, { textAnimationStagger: Math.max(0, Math.round(+e.target.value)) })} /></Field>
           )}
         </>
       )}

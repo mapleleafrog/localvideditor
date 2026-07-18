@@ -133,13 +133,18 @@ const AnimatedChars: React.FC<{ o: Overlay }> = ({ o }) => {
   const stagger = Math.max(0, o.textAnimationStagger ?? 3);
   const ramp = 12; // frames for one unit to fully reveal
   const units = kind === "wordHighlight" ? o.text.split(/(\s+)/) : splitGraphemes(o.text);
+  // Only content units advance the stagger position, so whitespace separators (and the
+  // empty "" the word-split can emit) don't double the effective per-word/char delay.
+  let step = 0;
   return (
     <>
       {units.map((u, i) => {
-        const ws = /^\s+$/.test(u);
-        const p = clamp((f - i * stagger) / ramp);
+        const skip = u === "" || /^\s+$/.test(u);
+        const idx = step;
+        if (!skip) step += 1;
+        const p = clamp((f - idx * stagger) / ramp);
         return (
-          <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...(ws ? {} : charStyle(kind, p, f, i, stagger)) }}>
+          <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...(skip ? {} : charStyle(kind, p, f, idx, stagger)) }}>
             {u}
           </span>
         );

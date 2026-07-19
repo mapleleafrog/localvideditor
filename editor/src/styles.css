@@ -154,7 +154,10 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .fld input[type="color"] { height: 30px; padding: 2px; }
 .sld { display: flex; align-items: center; gap: 8px; }
 .sld input[type="range"] { flex: 1; accent-color: var(--accent); }
-.sld-num { width: 62px; flex: none; }
+/* flex-basis (not width) pins the number box, so the `.fld input { width:100% }` rule can't
+   inflate it to 100% and starve the range slider (which would collapse to just its thumb). */
+.sld-num { flex: 0 0 62px; width: 62px; }
+.sld input[type="range"] { min-width: 0; }
 .sld-disabled { opacity: 0.45; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; background: #2a1652; border: 1px solid var(--accent); border-radius: 12px; padding: 2px 4px 2px 9px; font-size: 11px; }

@@ -48,6 +48,10 @@ const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: numbe
           clip.strength ?? 1,
         )
       : {};
+  // Flip mirrors the media element itself — it carries no other transform, so this is safe (no
+  // transform-origin conflicts to worry about, unlike overlay motions in Layer.tsx).
+  const flipTransform = clip.flipX || clip.flipY ? `${clip.flipX ? "scaleX(-1) " : ""}${clip.flipY ? "scaleY(-1)" : ""}`.trim() : undefined;
+  const mediaStyle = flipTransform ? { ...FILL, transform: flipTransform } : FILL;
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <div style={{ width: "100%", height: "100%", ...motionStyle }}>
@@ -57,10 +61,10 @@ const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: numbe
             trimBefore={clip.trimBefore || undefined}
             trimAfter={clip.trimAfter || undefined}
             volume={clip.volume ?? 1}
-            style={FILL}
+            style={mediaStyle}
           />
         ) : (
-          <Img src={resolveSrc(clip.src)} style={FILL} />
+          <Img src={resolveSrc(clip.src)} style={mediaStyle} />
         )}
       </div>
     </AbsoluteFill>
@@ -180,6 +184,8 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         loop={o.loop}
         strength={o.strength}
         motionParams={o.motionParams}
+        flipX={o.flipX}
+        flipY={o.flipY}
         dataIndex={index}
         style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
       />
@@ -227,6 +233,8 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       z={o.z}
       scale={o.scale ?? 1}
       rotation={o.rotation ?? 0}
+      flipX={o.flipX}
+      flipY={o.flipY}
       dataIndex={index}
       centered
       style={{ left: `${o.x ?? 50}%`, top: `${o.y ?? 50}%`, opacity: o.opacity ?? 1 }}

@@ -51,6 +51,10 @@ const clipSchema = z.object({
   volume: z.number().min(0).max(1).default(1),
   /** Effect strength multiplier for this clip's motion (1 = normal). Optional — defaults to 1. */
   strength: z.number().min(0).optional(),
+  /** Mirror the media horizontally / vertically, in place (does not invert its motion's direction).
+   *  Optional — unset = not flipped, so existing clip literals stay valid. */
+  flipX: z.boolean().optional(),
+  flipY: z.boolean().optional(),
   /** Storyboard-only: a short shot title + free notes. Optional so existing clip literals
    *  (Root.tsx defaultProps, projects/*.json) stay valid; the render ignores these. */
   label: z.string().optional(),
@@ -114,6 +118,11 @@ const overlaySchema = z.object({
   /** Crisp pixel-art scaling (`image-rendering: pixelated`) for image layers. Optional — default is
    *  smooth (bilinear), so slow/sub-pixel motion doesn't snap to whole pixels (= choppy). */
   pixelated: z.boolean().optional(),
+  /** Mirror the layer's content horizontally / vertically, in place. Applied to an inner content
+   *  wrapper (NOT the outer motion transform) so it never interacts with a motion's own
+   *  transform-origin (e.g. bottom-anchored squashStretch/pendulum). Optional — unset = not flipped. */
+  flipX: z.boolean().optional(),
+  flipY: z.boolean().optional(),
 });
 
 // A soundtrack / sfx track layered under the whole timeline (rendered as <Audio>).

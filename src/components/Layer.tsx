@@ -90,6 +90,11 @@ interface LayerProps {
   scale?: number;
   /** Base rotation in degrees folded into the transform. */
   rotation?: number;
+  /** Mirror the CONTENT (children) horizontally / vertically, in place. Applied to an inner wrapper
+   *  with transformOrigin "center center" — decoupled from the main motion transform chain so it
+   *  never interacts with a motion's own transform-origin (e.g. bottom-anchored squashStretch). */
+  flipX?: boolean;
+  flipY?: boolean;
   params?: Record<string, number>;
   /** Editor-only: stamps `data-ovl-index` so the canvas editor can find/measure this node. Ignored by render. */
   dataIndex?: number;
@@ -124,6 +129,8 @@ export const Layer: React.FC<LayerProps> = ({
   centered = false,
   scale,
   rotation,
+  flipX = false,
+  flipY = false,
   params = {},
   dataIndex,
   style,
@@ -192,6 +199,25 @@ export const Layer: React.FC<LayerProps> = ({
   if (ioBrightness !== 1) filters.push(`brightness(${ioBrightness})`);
   const filter = filters.length ? filters.join(" ") : undefined;
 
+  // Flip is applied to an INNER content wrapper, never the outer motion transform chain above —
+  // some motions (squashStretch/pendulum/eightBitHop) set transformOrigin: bottom/top center via
+  // motionRest, and a flip on that chain would mirror about that origin and displace the layer by
+  // a full height/width. transformOrigin: "center center" here keeps it always mirroring in place.
+  const content =
+    flipX || flipY ? (
+      <div
+        style={{
+          display: "inline-block",
+          transform: `${flipX ? "scaleX(-1) " : ""}${flipY ? "scaleY(-1)" : ""}`.trim(),
+          transformOrigin: "center center",
+        }}
+      >
+        {children}
+      </div>
+    ) : (
+      children
+    );
+
   return (
     <div
       {...(dataIndex != null ? { "data-ovl-index": dataIndex } : {})}
@@ -206,7 +232,7 @@ export const Layer: React.FC<LayerProps> = ({
         ...(transform ? { transform } : {}),
       }}
     >
-      {children}
+      {content}
     </div>
   );
 };

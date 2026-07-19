@@ -145,6 +145,12 @@ export const Inspector: React.FC = () => {
         </Field>
         <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
         <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
+        <Field label="Flip horizontal">
+          <input type="checkbox" checked={!!c.flipX} onChange={(e) => patchClip(i, { flipX: e.target.checked })} />
+        </Field>
+        <Field label="Flip vertical">
+          <input type="checkbox" checked={!!c.flipY} onChange={(e) => patchClip(i, { flipY: e.target.checked })} />
+        </Field>
 
         <Section title="Motion" defaultOpen={c.motion !== "none"}>
           <Field label="Motion">
@@ -295,6 +301,12 @@ export const Inspector: React.FC = () => {
         {o.type !== "fx" && (
           <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
         )}
+        <Field label="Flip horizontal">
+          <input type="checkbox" checked={!!o.flipX} onChange={(e) => patchOverlay(i, { flipX: e.target.checked })} />
+        </Field>
+        <Field label="Flip vertical">
+          <input type="checkbox" checked={!!o.flipY} onChange={(e) => patchOverlay(i, { flipY: e.target.checked })} />
+        </Field>
       </Section>
 
       <Section title="Effects (stacked)" defaultOpen={o.motions.length > 0} badge={o.motions.length || undefined}>

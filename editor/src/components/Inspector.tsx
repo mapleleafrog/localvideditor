@@ -3,6 +3,7 @@ import { useEditor } from "../store";
 import type { Overlay, MotionParam } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 import { FONT_OPTIONS } from "../../../src/timeline/fonts";
+import { useFxPrefs } from "../lib/fx-prefs";
 
 const IO_OPTS: [Overlay["enter"], string][] = [
   ["none", "none"],
@@ -106,6 +107,7 @@ const MotionAdder: React.FC<{ onAdd: (id: string) => void }> = ({ onAdd }) => (
 
 export const Inspector: React.FC = () => {
   const { project, selection, patchClip, patchOverlay, removeSelected, openBrowser } = useEditor();
+  const { pushRecent: pushRecentMotion } = useFxPrefs("motion");
 
   if (!selection) {
     return <div className="muted pad">Select a clip or layer to edit it.</div>;
@@ -299,7 +301,12 @@ export const Inspector: React.FC = () => {
           );
         })}
         <div className="fx-add-row">
-          <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+          <MotionAdder
+            onAdd={(id) => {
+              patchOverlay(i, { motions: [...o.motions, id] });
+              pushRecentMotion(id);
+            }}
+          />
           <button onClick={() => openBrowser({ mode: "overlay-add", index: i })}>Browse…</button>
         </div>
       </Section>

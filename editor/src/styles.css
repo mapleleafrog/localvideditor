@@ -433,10 +433,26 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .fxb-card-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .fxb-card-tags { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
 .fxb-tag-pill { font-size: 9px; padding: 1px 6px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
-.fxb-tier-dot { position: absolute; top: 6px; left: 6px; width: 7px; height: 7px; border-radius: 50%; }
+.fxb-tier-dot { position: absolute; bottom: 6px; left: 6px; width: 7px; height: 7px; border-radius: 50%; }
 .fxb-check { position: absolute; top: 4px; right: 6px; color: #6ee7a8; font-size: 12px; font-weight: 700; }
 .fxb-webgl { position: absolute; top: 4px; right: 6px; font-size: 11px; }
 .fxb-check + .fxb-webgl { right: 20px; }
+.fxb-fav {
+  position: absolute; top: 2px; left: 2px; z-index: 1; padding: 2px 5px; font-size: 12px; line-height: 1;
+  background: none; border: none; color: var(--muted);
+}
+.fxb-fav:hover { color: #ffd45e; border-color: transparent; }
+.fxb-fav.on { color: #ffd45e; }
+
+/* ===== curated shelves (favorites / recent / recommended / theme rows) above the category list ===== */
+.fxb-shelf { margin-bottom: 16px; }
+.fxb-shelf-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 8px; }
+.fxb-shelf-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.fxb-shelf-row .fxb-card { flex: 0 0 120px; }
+
+/* compact favorites rail in the Library Effects tab */
+.lib-favorites { margin-bottom: 10px; }
+.lib-favorites-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 5px; }
 
 /* ===== batch photo-arrange prompt (Assets tab, after a multi-photo import) ===== */
 .batch-arrange {

@@ -3,6 +3,8 @@ import { useEditor } from "../store";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 import type { MotionDef, TransitionDef } from "../lib/effects-bridge";
 import { FxPreview } from "./FxPreview";
+import { useFxPrefs } from "../lib/fx-prefs";
+import { weddingShelf, beatShelf, pixelShelf, RECOMMENDED } from "../lib/curated";
 import type { Overlay } from "../../../src/timeline/schema";
 
 const MOTIONS: MotionDef[] = readyMotions();
@@ -34,10 +36,12 @@ const Card: React.FC<{
   item: Item;
   hovered: boolean;
   applied: boolean;
+  favorite: boolean;
   onHover: (id: string | null) => void;
   onPick: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
   thumbClass: string;
-}> = ({ item, hovered, applied, onHover, onPick, thumbClass }) => (
+}> = ({ item, hovered, applied, favorite, onHover, onPick, onToggleFavorite, thumbClass }) => (
   <div
     className={"fxb-card" + (applied ? " applied" : "")}
     role="button"
@@ -53,6 +57,16 @@ const Card: React.FC<{
       }
     }}
   >
+    <button
+      className={"fxb-fav" + (favorite ? " on" : "")}
+      title={favorite ? "Remove from favorites" : "Add to favorites"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleFavorite(item.id);
+      }}
+    >
+      {favorite ? "★" : "☆"}
+    </button>
     {applied && <span className="fxb-check" title="Already applied">✓</span>}
     {item.engine === "webgl" && (
       <span className="fxb-webgl" title="WebGL — Studio/editor preview needs a flag; renders fine">⚡</span>
@@ -117,6 +131,24 @@ export const EffectBrowser: React.FC = () => {
   const cats = useMemo(() => Array.from(new Set(registry.map((m) => m.category))), [registry]);
   const { top: tagTop, rest: tagRest } = useMemo(() => topTags(registry), [registry]);
 
+  const fxKind = isTransitionMode ? "transition" : "motion";
+  const { favoriteIds, recentIds, isFavorite, toggleFavorite, pushRecent } = useFxPrefs(fxKind);
+  const registryIds = useMemo(() => new Set(registry.map((m) => m.id)), [registry]);
+  // Curated shelves are motion-only lists — they naturally come up empty (and hide) in
+  // clip-transition mode since none of their ids exist in the TRANSITIONS registry.
+  const shelves = useMemo(
+    () =>
+      [
+        { label: "★ Favorites", ids: favoriteIds.filter((id) => registryIds.has(id)) },
+        { label: "🕑 Recent", ids: recentIds.filter((id) => registryIds.has(id)) },
+        { label: "💍 Recommended", ids: RECOMMENDED.filter((id) => registryIds.has(id)) },
+        { label: "Wedding MV", ids: weddingShelf.filter((id) => registryIds.has(id)) },
+        { label: "Beat & energy", ids: beatShelf.filter((id) => registryIds.has(id)) },
+        { label: "Pixel & retro", ids: pixelShelf.filter((id) => registryIds.has(id)) },
+      ].filter((s) => s.ids.length > 0),
+    [favoriteIds, recentIds, registryIds],
+  );
+
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
@@ -157,16 +189,19 @@ export const EffectBrowser: React.FC = () => {
       if (o.motions.includes(id)) return; // already applied — no-op (removal stays in the Inspector)
       st.patchOverlay(b.index, { motions: [...o.motions, id] });
       st.flash(`Added ${id}`);
+      pushRecent(id);
       // stays open — user can keep stacking
     } else if (b.mode === "clip-motion") {
       const c = st.project.clips[b.index];
       if (!c) return;
       st.patchClip(b.index, { motion: id });
+      pushRecent(id);
       st.closeBrowser();
     } else {
       const c = st.project.clips[b.index];
       if (!c) return;
       st.patchClip(b.index, { transitionToNext: id });
+      pushRecent(id);
       st.closeBrowser();
     }
   };
@@ -231,34 +266,64 @@ export const EffectBrowser: React.FC = () => {
                   item={m}
                   hovered={!isTransitionMode && hoveredId === m.id}
                   applied={appliedIds.has(m.id)}
+                  favorite={isFavorite(m.id)}
                   onHover={setHoveredId}
                   onPick={pick}
+                  onToggleFavorite={toggleFavorite}
                   thumbClass="fxb-thumb"
                 />
               ))}
               {filtered.length === 0 && <span className="muted">no matches</span>}
             </div>
           ) : (
-            cats.map((c) => (
-              <div key={c} className="fxb-cat-section">
-                <div className="fxb-cat-title">{c}</div>
-                <div className="fxb-grid">
-                  {registry
-                    .filter((m) => m.category === c)
-                    .map((m) => (
-                      <Card
-                        key={m.id}
-                        item={m}
-                        hovered={hoveredId === m.id}
-                        applied={appliedIds.has(m.id)}
-                        onHover={setHoveredId}
-                        onPick={pick}
-                        thumbClass="fxb-thumb"
-                      />
-                    ))}
+            <>
+              {shelves.map((shelf) => (
+                <div key={shelf.label} className="fxb-shelf">
+                  <div className="fxb-shelf-title">{shelf.label}</div>
+                  <div className="fxb-shelf-row">
+                    {shelf.ids.map((id) => {
+                      const m = registry.find((r) => r.id === id);
+                      if (!m) return null;
+                      return (
+                        <Card
+                          key={`${shelf.label}:${id}`}
+                          item={m}
+                          hovered={hoveredId === m.id}
+                          applied={appliedIds.has(m.id)}
+                          favorite={isFavorite(m.id)}
+                          onHover={setHoveredId}
+                          onPick={pick}
+                          onToggleFavorite={toggleFavorite}
+                          thumbClass="fxb-thumb"
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+              {cats.map((c) => (
+                <div key={c} className="fxb-cat-section">
+                  <div className="fxb-cat-title">{c}</div>
+                  <div className="fxb-grid">
+                    {registry
+                      .filter((m) => m.category === c)
+                      .map((m) => (
+                        <Card
+                          key={m.id}
+                          item={m}
+                          hovered={hoveredId === m.id}
+                          applied={appliedIds.has(m.id)}
+                          favorite={isFavorite(m.id)}
+                          onHover={setHoveredId}
+                          onPick={pick}
+                          onToggleFavorite={toggleFavorite}
+                          thumbClass="fxb-thumb"
+                        />
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </div>

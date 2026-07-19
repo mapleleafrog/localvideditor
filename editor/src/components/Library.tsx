@@ -5,6 +5,7 @@ import { FxPreview } from "./FxPreview";
 import { AudioPanel } from "./AudioPanel";
 import { CanvasPanel } from "./CanvasPanel";
 import { AssetsPanel } from "./AssetsPanel";
+import { useFxPrefs } from "../lib/fx-prefs";
 
 const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
@@ -37,6 +38,13 @@ export const Library: React.FC = () => {
       return next;
     });
 
+  const { favoriteIds: favMotionIds, pushRecent: pushRecentMotion } = useFxPrefs("motion");
+  const { pushRecent: pushRecentTransition } = useFxPrefs("transition");
+  const favoriteMotions = useMemo(
+    () => favMotionIds.map((id) => MOTIONS.find((m) => m.id === id)).filter((m): m is (typeof MOTIONS)[number] => !!m),
+    [favMotionIds],
+  );
+
   const applyEffect = (id: string) => {
     if (!selection) return;
     if (selection.kind === "overlay") {
@@ -45,9 +53,13 @@ export const Library: React.FC = () => {
     } else {
       patchClip(selection.index, { motion: id });
     }
+    pushRecentMotion(id);
   };
   const applyTransition = (id: string) => {
-    if (selection?.kind === "clip") patchClip(selection.index, { transitionToNext: id });
+    if (selection?.kind === "clip") {
+      patchClip(selection.index, { transitionToNext: id });
+      pushRecentTransition(id);
+    }
   };
 
   const fxQ = fxQuery.trim().toLowerCase();
@@ -73,6 +85,19 @@ export const Library: React.FC = () => {
       <div className="lib-body">
         {tab === "effects" && (
           <>
+            {favoriteMotions.length > 0 && (
+              <div className="lib-favorites">
+                <div className="lib-favorites-title">★ Favorites</div>
+                <div className="lib-grid">
+                  {favoriteMotions.map((m) => (
+                    <button key={m.id} className="lib-item has-swatch" disabled={!selection} onClick={() => applyEffect(m.id)} title={m.category}>
+                      <EffectSwatch id={m.id} />
+                      <span className="lib-item-label">{m.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               className="lib-browse-all"
               disabled={!selection}

@@ -4,6 +4,7 @@ import type { Overlay, MotionParam } from "../../../src/timeline/schema";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 import { useFxPrefs } from "../lib/fx-prefs";
+import { respondsToStrength } from "../lib/strength";
 
 const IO_OPTS: [Overlay["enter"], string][] = [
   ["none", "none"],
@@ -56,12 +57,12 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 );
 
 const Slider: React.FC<{
-  value: number; min: number; max: number; step: number; onChange: (n: number) => void; suffix?: string;
-}> = ({ value, min, max, step, onChange, suffix }) => (
-  <div className="sld">
-    <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} />
+  value: number; min: number; max: number; step: number; onChange: (n: number) => void; suffix?: string; disabled?: boolean;
+}> = ({ value, min, max, step, onChange, suffix, disabled }) => (
+  <div className={"sld" + (disabled ? " sld-disabled" : "")}>
+    <input type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(e) => onChange(+e.target.value)} />
     <input
-      type="number" className="sld-num" min={min} max={max} step={step} value={value}
+      type="number" className="sld-num" min={min} max={max} step={step} value={value} disabled={disabled}
       onChange={(e) => onChange(+e.target.value)}
     />
     {suffix ? <span className="muted">{suffix}</span> : null}
@@ -170,9 +171,15 @@ export const Inspector: React.FC = () => {
             </select>
           </Field>
           <button onClick={() => openBrowser({ mode: "clip-motion", index: i })}>Browse…</button>
-          {c.motion !== "none" && (
-            <Field label="Effect strength"><Slider value={c.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchClip(i, { strength: v })} /></Field>
-          )}
+          {c.motion !== "none" && (() => {
+            const responds = respondsToStrength(c.motion);
+            return (
+              <Field label="Effect strength">
+                <Slider value={c.strength ?? 1} min={0} max={2} step={0.05} disabled={!responds} onChange={(v) => patchClip(i, { strength: v })} />
+                {!responds && <span className="muted" style={{ fontSize: 11 }}>no intensity for this effect</span>}
+              </Field>
+            );
+          })()}
         </Section>
 
         <Section title="Transition →next" defaultOpen={c.transitionToNext !== "none"}>
@@ -307,19 +314,38 @@ export const Inspector: React.FC = () => {
         <Field label="Flip vertical">
           <input type="checkbox" checked={!!o.flipY} onChange={(e) => patchOverlay(i, { flipY: e.target.checked })} />
         </Field>
+        {/* Note (not fixed here — pre-existing render-engine quirk): scaleStrength lerps opacity
+            toward 1, so additive low-opacity fx (beatFlash/grainLoop/crtScanlines) go fully opaque
+            at strength 0 instead of vanishing. See src/effects/compose.ts scaleStrength. */}
+        <Field label="Strength (all effects)">
+          <Slider value={o.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchOverlay(i, { strength: v })} />
+        </Field>
       </Section>
 
       <Section title="Effects (stacked)" defaultOpen={o.motions.length > 0} badge={o.motions.length || undefined}>
         {o.motions.length === 0 && <span className="muted">no effects</span>}
         {o.motions.map((m, mi) => {
           const p = o.motionParams?.[mi] ?? {};
+          const responds = respondsToStrength(m);
+          // An unset per-effect strength falls back to the layer-wide strength (see Layer.tsx's
+          // per-effect composition: `p?.strength ?? strength`) — show that inherited value here
+          // too, or the slider would contradict the layer-wide one (e.g. layer at 0.5 but every
+          // effect still reads 1.0).
           return (
             <div className="fx-item" key={mi}>
               <div className="fx-item-head">
                 <span className="fx-name" title={m}>{m}</span>
                 <button className="del" title="Remove effect" onClick={() => removeEffect(i, mi)}>×</button>
               </div>
-              <Field label="Strength"><Slider value={p.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => setMotionParam(i, mi, { strength: v })} /></Field>
+              <Field label="Strength">
+                <Slider
+                  value={p.strength ?? o.strength ?? 1}
+                  min={0} max={2} step={0.05}
+                  disabled={!responds}
+                  onChange={(v) => setMotionParam(i, mi, { strength: v })}
+                />
+                {!responds && <span className="muted" style={{ fontSize: 11 }}>no intensity for this effect</span>}
+              </Field>
               <Field label="Easing"><EasingSelect value={p.easing} onChange={(v) => setMotionParam(i, mi, { easing: v as MotionParam["easing"] })} /></Field>
               <Field label="Loop"><input type="checkbox" checked={!!p.loop} onChange={(e) => setMotionParam(i, mi, { loop: e.target.checked })} /></Field>
             </div>

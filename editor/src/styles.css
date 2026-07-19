@@ -155,6 +155,7 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .sld { display: flex; align-items: center; gap: 8px; }
 .sld input[type="range"] { flex: 1; accent-color: var(--accent); }
 .sld-num { width: 62px; flex: none; }
+.sld-disabled { opacity: 0.45; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; background: #2a1652; border: 1px solid var(--accent); border-radius: 12px; padding: 2px 4px 2px 9px; font-size: 11px; }
 .chip button { background: none; border: none; color: var(--muted); padding: 0 2px; cursor: pointer; font-size: 13px; }

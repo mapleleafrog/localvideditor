@@ -390,8 +390,10 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     className={"tl-block overlay" + (sel ? " on" : "")}
                     style={{ left: o.from * zoom, width: o.durationInFrames * zoom }}
                     onPointerDown={(e) => {
-                      if (e.button !== 0) return;
+                      // Clear the hover-tip timer BEFORE the button guard — a right-click must
+                      // still cancel the pending tooltip or it pops over the context menu.
                       onBlockHoverLeave();
+                      if (e.button !== 0) return;
                       select({ kind: "overlay", index: i });
                       startBlockDrag(
                         e,

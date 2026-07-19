@@ -107,10 +107,13 @@ export const ContextMenu: React.FC = () => {
       { label: "Copy", onClick: copySelected },
       { label: "Paste at playhead", disabled: !clipboard, onClick: () => pasteAt(frame) },
       "sep",
-      { label: "Bring forward", disabled: i === 0, onClick: () => reorderTo(i - 1) },
-      { label: "Send backward", disabled: i === overlayCount - 1, onClick: () => reorderTo(i + 1) },
-      { label: "Move to top", disabled: i === 0, onClick: () => reorderTo(0) },
-      { label: "Move to bottom", disabled: i === overlayCount - 1, onClick: () => reorderTo(overlayCount - 1) },
+      // Compositing truth (src/timeline/Timeline.tsx): overlays render sequentially into an
+      // AbsoluteFill with no zIndex, so index 0 paints FIRST (visual back) and the LAST index
+      // paints on top (visual front). "Forward/front" therefore means HIGHER index.
+      { label: "Bring forward", disabled: i === overlayCount - 1, onClick: () => reorderTo(i + 1) },
+      { label: "Send backward", disabled: i === 0, onClick: () => reorderTo(i - 1) },
+      { label: "Move to top (front)", disabled: i === overlayCount - 1, onClick: () => reorderTo(overlayCount - 1) },
+      { label: "Move to bottom (back)", disabled: i === 0, onClick: () => reorderTo(0) },
       "sep",
       { label: "Delete", danger: true, onClick: removeSelected },
     ];

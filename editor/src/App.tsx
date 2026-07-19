@@ -36,6 +36,7 @@ export const App: React.FC = () => {
   const onResize =
     (axis: "x" | "y", startVal: number, set: (n: number) => void, sign: 1 | -1, min: number, max: number) =>
     (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
       e.preventDefault();
       const origin = axis === "x" ? e.clientX : e.clientY;
       const el = e.currentTarget as HTMLElement;
@@ -66,10 +67,15 @@ export const App: React.FC = () => {
       // The Effect Browser is a focused modal context: it owns Escape (closes itself) and
       // swallows every other key here (no Space-play, no Delete, no Ctrl+K/D/S/Z…) — typing in
       // its search field is naturally safe too since this guard returns before the rest fires.
+      // Ctrl/⌘ combos the app normally suppresses must ALSO be preventDefault'd here, or the
+      // browser's native actions fire while the modal is open (Ctrl+S save-page, Ctrl+D bookmark).
+      // Plain keys are deliberately NOT prevented — typing in the search input must keep working.
       if (useEditor.getState().browser) {
         if (e.key === "Escape") {
           e.preventDefault();
           useEditor.getState().closeBrowser();
+        } else if ((e.ctrlKey || e.metaKey) && ["s", "d", "k"].includes(e.key.toLowerCase())) {
+          e.preventDefault();
         }
         return;
       }

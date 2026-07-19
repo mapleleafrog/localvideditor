@@ -207,9 +207,9 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .fx-add-row { display: flex; gap: 6px; }
 .fx-add-row select { flex: 1; }
 
-/* right-click layer context menu */
+/* right-click context menu — z above .tl-tip (150), below fxb backdrop (195) / sc (200) / toast (210) */
 .ctx-menu {
-  position: fixed; z-index: 100; min-width: 150px;
+  position: fixed; z-index: 160; min-width: 150px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
   padding: 4px; display: flex; flex-direction: column;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);

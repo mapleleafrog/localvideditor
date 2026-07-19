@@ -64,7 +64,8 @@ export function startBlockDrag(
   window.addEventListener("pointerup", up);
 }
 
-/** Drag/click on the ruler or playhead to scrub. Calls onSeek with the snapped frame. */
+/** Drag/click on the ruler or playhead to scrub. Calls onSeek with the snapped frame.
+ *  Left button only — right/middle-click must not teleport the playhead or attach listeners. */
 export function startScrub(
   e: React.PointerEvent,
   zoom: number,
@@ -73,6 +74,7 @@ export function startScrub(
   maxFrame: number,
   onSeek: (frame: number) => void,
 ) {
+  if (e.button !== 0) return;
   e.preventDefault();
   const toFrame = (clientX: number) =>
     Math.max(0, Math.min(maxFrame, Math.round((clientX - originLeft + scrollLeft) / zoom)));

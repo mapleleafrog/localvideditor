@@ -108,6 +108,7 @@ const MotionAdder: React.FC<{ onAdd: (id: string) => void }> = ({ onAdd }) => (
 export const Inspector: React.FC = () => {
   const { project, selection, patchClip, patchOverlay, removeSelected, openBrowser } = useEditor();
   const { pushRecent: pushRecentMotion } = useFxPrefs("motion");
+  const { pushRecent: pushRecentTransition } = useFxPrefs("transition");
 
   if (!selection) {
     return <div className="muted pad">Select a clip or layer to edit it.</div>;
@@ -147,7 +148,13 @@ export const Inspector: React.FC = () => {
 
         <Section title="Motion" defaultOpen={c.motion !== "none"}>
           <Field label="Motion">
-            <select value={c.motion} onChange={(e) => patchClip(i, { motion: e.target.value })}>
+            <select
+              value={c.motion}
+              onChange={(e) => {
+                patchClip(i, { motion: e.target.value });
+                if (e.target.value !== "none") pushRecentMotion(e.target.value);
+              }}
+            >
               <option value="none">none</option>
               {MOTION_CATS.map((cat) => (
                 <optgroup key={cat} label={cat}>
@@ -164,7 +171,13 @@ export const Inspector: React.FC = () => {
 
         <Section title="Transition →next" defaultOpen={c.transitionToNext !== "none"}>
           <Field label="Transition">
-            <select value={c.transitionToNext} onChange={(e) => patchClip(i, { transitionToNext: e.target.value })}>
+            <select
+              value={c.transitionToNext}
+              onChange={(e) => {
+                patchClip(i, { transitionToNext: e.target.value });
+                if (e.target.value !== "none") pushRecentTransition(e.target.value);
+              }}
+            >
               <option value="none">none</option>
               {TRANSITIONS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>

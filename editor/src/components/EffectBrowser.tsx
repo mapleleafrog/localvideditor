@@ -162,6 +162,12 @@ export const EffectBrowser: React.FC = () => {
   );
   const filtering = !!q || !!cat || activeTags.size > 0;
 
+  // Transitions have no motion formula — activating FxPreview with a transition id would run
+  // getMotion()'s console.warn fallback at rAF rate. Gate hover ONCE where hoveredId is consumed,
+  // covering the filtered grid, the shelves (Favorites/Recent DO hold transition entries in
+  // transition mode), and the category sections alike.
+  const effectiveHover = isTransitionMode ? null : hoveredId;
+
   if (!browser || !targetValid) return null;
 
   const title =
@@ -264,7 +270,7 @@ export const EffectBrowser: React.FC = () => {
                 <Card
                   key={m.id}
                   item={m}
-                  hovered={!isTransitionMode && hoveredId === m.id}
+                  hovered={effectiveHover === m.id}
                   applied={appliedIds.has(m.id)}
                   favorite={isFavorite(m.id)}
                   onHover={setHoveredId}
@@ -288,7 +294,7 @@ export const EffectBrowser: React.FC = () => {
                         <Card
                           key={`${shelf.label}:${id}`}
                           item={m}
-                          hovered={hoveredId === m.id}
+                          hovered={effectiveHover === m.id}
                           applied={appliedIds.has(m.id)}
                           favorite={isFavorite(m.id)}
                           onHover={setHoveredId}
@@ -311,7 +317,7 @@ export const EffectBrowser: React.FC = () => {
                         <Card
                           key={m.id}
                           item={m}
-                          hovered={hoveredId === m.id}
+                          hovered={effectiveHover === m.id}
                           applied={appliedIds.has(m.id)}
                           favorite={isFavorite(m.id)}
                           onHover={setHoveredId}

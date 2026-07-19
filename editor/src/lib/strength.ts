@@ -16,14 +16,21 @@ export function respondsToStrength(id: string): boolean {
   const style = getMotion(id);
   let responds = false;
   for (let f = 0; f <= 45 && !responds; f++) {
-    const t = f / 30;
-    const s = style({ progress: f / 45, frame: f, fps: 30, t, beat: beatKick(t, 120, 6, 0), z: 0.4, params: {} });
-    const scaled = scaleStrength(s, 0.4);
-    for (const k of new Set([...Object.keys(s), ...Object.keys(scaled)])) {
-      if ((s as Record<string, unknown>)[k] !== (scaled as Record<string, unknown>)[k]) {
-        responds = true;
-        break;
+    try {
+      const t = f / 30;
+      const s = style({ progress: f / 45, frame: f, fps: 30, t, beat: beatKick(t, 120, 6, 0), z: 0.4, params: {} });
+      const scaled = scaleStrength(s, 0.4);
+      for (const k of new Set([...Object.keys(s), ...Object.keys(scaled)])) {
+        if ((s as Record<string, unknown>)[k] !== (scaled as Record<string, unknown>)[k]) {
+          responds = true;
+          break;
+        }
       }
+    } catch {
+      // A future formula that throws on an edge-phase ctx must not crash the Inspector render —
+      // default to RESPONSIVE (leave the slider enabled) rather than mis-detecting or blowing up.
+      responds = true;
+      break;
     }
   }
   cache.set(id, responds);

@@ -82,13 +82,21 @@ export const ContextMenu: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
+    // Page scroll closes the menu (its anchor moved). But when the menu itself is tall enough to
+    // overflow (max-height + overflow-y:auto), scrolling INSIDE it to reach the bottom items must
+    // NOT close it — ignore scrolls originating within the menu.
+    const onScroll = (e: Event) => {
+      const m = ref.current;
+      if (m && (e.target === m || m.contains(e.target as Node))) return;
+      close();
+    };
     window.addEventListener("click", close);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("contextmenu", close);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("click", close);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("contextmenu", close);
       window.removeEventListener("keydown", onKey);
     };

@@ -147,10 +147,10 @@ export const Inspector: React.FC = () => {
         <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
         <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
         <Field label="Flip horizontal">
-          <input type="checkbox" checked={!!c.flipX} onChange={(e) => patchClip(i, { flipX: e.target.checked })} />
+          <input type="checkbox" checked={!!c.flipX} onChange={(e) => patchClip(i, { flipX: e.target.checked || undefined })} />
         </Field>
         <Field label="Flip vertical">
-          <input type="checkbox" checked={!!c.flipY} onChange={(e) => patchClip(i, { flipY: e.target.checked })} />
+          <input type="checkbox" checked={!!c.flipY} onChange={(e) => patchClip(i, { flipY: e.target.checked || undefined })} />
         </Field>
 
         <Section title="Motion" defaultOpen={c.motion !== "none"}>
@@ -309,10 +309,10 @@ export const Inspector: React.FC = () => {
           <Field label="Depth z"><Slider value={o.z} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { z: v })} /></Field>
         )}
         <Field label="Flip horizontal">
-          <input type="checkbox" checked={!!o.flipX} onChange={(e) => patchOverlay(i, { flipX: e.target.checked })} />
+          <input type="checkbox" checked={!!o.flipX} onChange={(e) => patchOverlay(i, { flipX: e.target.checked || undefined })} />
         </Field>
         <Field label="Flip vertical">
-          <input type="checkbox" checked={!!o.flipY} onChange={(e) => patchOverlay(i, { flipY: e.target.checked })} />
+          <input type="checkbox" checked={!!o.flipY} onChange={(e) => patchOverlay(i, { flipY: e.target.checked || undefined })} />
         </Field>
         {/* Note (not fixed here — pre-existing render-engine quirk): scaleStrength lerps opacity
             toward 1, so additive low-opacity fx (beatFlash/grainLoop/crtScanlines) go fully opaque

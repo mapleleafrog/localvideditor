@@ -177,6 +177,15 @@ export const Layer: React.FC<LayerProps> = ({
   const exitActive = exit !== "none" && durationInFrames != null && durationInFrames - f < exitDurationInFrames;
   const ioClip = exitActive ? xP.clip : eP.clip ?? xP.clip;
 
+  // fx full-frame layers render no children — their motion paints on THIS outer div (backgroundImage
+  // etc.), so an inner content-wrapper flip (below) would mirror an empty div = no-op. For those we
+  // fold the flip into the outer transform instead. This is safe for fx: atmospheric fx motions
+  // (weddingPetals/bokehLights/godRays/lensFlare/lightLeakWarm/sakuraPetals/sparkleField) are
+  // backgroundImage-based with the default center transform-origin — none set a bottom/top origin
+  // like the content-overlay motions (squashStretch/pendulum) that the inner-wrapper path guards.
+  const hasChildren = children != null && children !== false;
+  const flipStr = `${flipX ? "scaleX(-1) " : ""}${flipY ? "scaleY(-1)" : ""}`.trim();
+
   const baseParts: string[] = [];
   if (centered) baseParts.push("translate(-50%, -50%)");
   if (ioTx || ioTy) baseParts.push(`translate(${ioTx}px, ${ioTy}px)`);
@@ -185,6 +194,7 @@ export const Layer: React.FC<LayerProps> = ({
   if (scale != null && scale !== 1) baseParts.push(`scale(${scale})`);
   if (rotation) baseParts.push(`rotate(${rotation}deg)`);
   if (motionTransform) baseParts.push(String(motionTransform));
+  if (flipStr && !hasChildren) baseParts.push(flipStr); // fx: flip the full-frame background in place
   const transform = baseParts.length ? baseParts.join(" ") : undefined;
 
   // Combine every opacity source (base style · motions · enter/exit) into one value.
@@ -199,19 +209,15 @@ export const Layer: React.FC<LayerProps> = ({
   if (ioBrightness !== 1) filters.push(`brightness(${ioBrightness})`);
   const filter = filters.length ? filters.join(" ") : undefined;
 
-  // Flip is applied to an INNER content wrapper, never the outer motion transform chain above —
-  // some motions (squashStretch/pendulum/eightBitHop) set transformOrigin: bottom/top center via
-  // motionRest, and a flip on that chain would mirror about that origin and displace the layer by
-  // a full height/width. transformOrigin: "center center" here keeps it always mirroring in place.
+  // Flip on content overlays (text/image/video) is applied to an INNER content wrapper, never the
+  // outer motion transform chain above — some motions (squashStretch/pendulum/eightBitHop) set
+  // transformOrigin: bottom/top center via motionRest, and a flip on that chain would mirror about
+  // that origin and displace the layer by a full height/width. transformOrigin: "center center"
+  // here keeps it always mirroring in place. (fx layers have no children and flip via the outer
+  // transform instead — see hasChildren/flipStr above.)
   const content =
-    flipX || flipY ? (
-      <div
-        style={{
-          display: "inline-block",
-          transform: `${flipX ? "scaleX(-1) " : ""}${flipY ? "scaleY(-1)" : ""}`.trim(),
-          transformOrigin: "center center",
-        }}
-      >
+    flipStr && hasChildren ? (
+      <div style={{ display: "inline-block", transform: flipStr, transformOrigin: "center center" }}>
         {children}
       </div>
     ) : (

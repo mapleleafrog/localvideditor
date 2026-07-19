@@ -213,6 +213,10 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
   padding: 4px; display: flex; flex-direction: column;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* the item list keeps growing (flip/rotate/fit/reorder/…) — clamp + scroll so Delete stays
+     reachable on short viewports instead of overflowing off-screen. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 .ctx-menu button { text-align: left; background: none; border: none; border-radius: 5px; padding: 6px 10px; font-size: 12px; }
 .ctx-menu button:hover:not(:disabled) { background: var(--panel-2); border-color: transparent; }

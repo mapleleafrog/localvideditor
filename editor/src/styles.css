@@ -204,6 +204,8 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .fx-item-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
 .fx-name { font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fx-item input[type="checkbox"] { width: auto; }
+.fx-add-row { display: flex; gap: 6px; }
+.fx-add-row select { flex: 1; }
 
 /* right-click layer context menu */
 .ctx-menu {
@@ -234,6 +236,7 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .lib-body { padding: 10px; overflow: auto; flex: 1; min-height: 0; }
 .lib-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.lib-browse-all { width: 100%; margin-bottom: 6px; font-size: 11px; }
 .lib-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--cyan); margin: 12px 0 5px; }
 .lib-search { width: 100%; margin-bottom: 8px; }
 .lib-section { border: none; }
@@ -382,6 +385,48 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
   object-fit: contain; background: #0a0a10; border-radius: 4px;
 }
 .tl-tip-text { font-size: 11px; color: var(--text); max-width: 140px; word-break: break-word; }
+
+/* ===== pop-up Effect Browser ===== */
+.fxb-backdrop {
+  position: fixed; inset: 0; z-index: 195; background: rgba(8, 8, 12, 0.6);
+  display: grid; place-items: center; backdrop-filter: blur(2px);
+}
+.fxb-modal {
+  width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); overflow: hidden;
+}
+.fxb-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.fxb-head strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fxb-search { flex: 1; }
+.fxb-head button { font-size: 14px; padding: 4px 9px; }
+.fxb-filters { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.fxb-chips { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+.fxb-chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; }
+.fxb-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fxb-body { overflow: auto; padding: 12px 14px; flex: 1; min-height: 0; }
+.fxb-cat-section { margin-bottom: 16px; }
+.fxb-cat-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--cyan); margin-bottom: 8px; }
+.fxb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.fxb-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2);
+  cursor: pointer; text-align: center;
+}
+.fxb-card:hover { border-color: var(--accent); }
+.fxb-card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.fxb-card.applied { cursor: default; opacity: 0.75; }
+.fxb-thumb {
+  position: relative; width: 100%; aspect-ratio: 1 / 1; max-width: 110px; border-radius: 6px; overflow: hidden;
+  background: #0a0a10 center/contain no-repeat; background-image: url("/orange-mush.gif");
+}
+.fxb-card-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.fxb-card-tags { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.fxb-tag-pill { font-size: 9px; padding: 1px 6px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.fxb-tier-dot { position: absolute; top: 6px; left: 6px; width: 7px; height: 7px; border-radius: 50%; }
+.fxb-check { position: absolute; top: 4px; right: 6px; color: #6ee7a8; font-size: 12px; font-weight: 700; }
+.fxb-webgl { position: absolute; top: 4px; right: 6px; font-size: 11px; }
+.fxb-check + .fxb-webgl { right: 20px; }
 
 /* ===== batch photo-arrange prompt (Assets tab, after a multi-photo import) ===== */
 .batch-arrange {

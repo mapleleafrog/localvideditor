@@ -14,6 +14,12 @@ export type CtxTarget = { kind: "clip"; index: number } | { kind: "overlay"; ind
  *  an overlay can auto-seek the player — see CanvasOverlay — which would corrupt "split at playhead"). */
 export type CtxMenuState = { x: number; y: number; frame: number; target: CtxTarget };
 
+/** What the pop-up Effect Browser is picking for. */
+export type BrowserTarget =
+  | { mode: "overlay-add"; index: number }
+  | { mode: "clip-motion"; index: number }
+  | { mode: "clip-transition"; index: number };
+
 export interface EditorState {
   project: Project;
   /** Current project name — used for projects/<name>.json AND its public/media/<name>/ folder. */
@@ -60,6 +66,10 @@ export interface EditorState {
   ctxMenu: CtxMenuState | null;
   openCtxMenu: (x: number, y: number, frame: number, target: CtxTarget) => void;
   closeCtxMenu: () => void;
+  /** Pop-up Effect Browser (search/filter/shelves grid with live previews). */
+  browser: BrowserTarget | null;
+  openBrowser: (t: BrowserTarget) => void;
+  closeBrowser: () => void;
   setView: (v: "edit" | "storyboard") => void;
   select: (s: Selection) => void;
   setPlayhead: (f: number) => void;
@@ -121,6 +131,7 @@ export const useEditor = create<EditorState>()(
       toast: null,
       showShortcuts: false,
       ctxMenu: null,
+      browser: null,
 
       setProject: (project) => set({ project, selection: null }),
       setProjectName: (projectName) => set({ projectName }),
@@ -332,6 +343,9 @@ export const useEditor = create<EditorState>()(
       // overlay can auto-seek the player (CanvasOverlay).
       openCtxMenu: (x, y, frame, target) => set({ ctxMenu: { x, y, frame, target }, selection: target }),
       closeCtxMenu: () => set({ ctxMenu: null }),
+
+      openBrowser: (browser) => set({ browser }),
+      closeBrowser: () => set({ browser: null }),
 
       setView: (view) => set({ view }),
       select: (selection) => set({ selection }),

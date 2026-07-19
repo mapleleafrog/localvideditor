@@ -105,7 +105,7 @@ const MotionAdder: React.FC<{ onAdd: (id: string) => void }> = ({ onAdd }) => (
 );
 
 export const Inspector: React.FC = () => {
-  const { project, selection, patchClip, patchOverlay, removeSelected } = useEditor();
+  const { project, selection, patchClip, patchOverlay, removeSelected, openBrowser } = useEditor();
 
   if (!selection) {
     return <div className="muted pad">Select a clip or layer to edit it.</div>;
@@ -154,6 +154,7 @@ export const Inspector: React.FC = () => {
               ))}
             </select>
           </Field>
+          <button onClick={() => openBrowser({ mode: "clip-motion", index: i })}>Browse…</button>
           {c.motion !== "none" && (
             <Field label="Effect strength"><Slider value={c.strength ?? 1} min={0} max={2} step={0.05} onChange={(v) => patchClip(i, { strength: v })} /></Field>
           )}
@@ -166,6 +167,7 @@ export const Inspector: React.FC = () => {
               {TRANSITIONS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
+          <button onClick={() => openBrowser({ mode: "clip-transition", index: i })}>Browse…</button>
           {c.transitionToNext !== "none" && (
             <>
               <Field label="Transition (frames)"><input type="number" min={1} value={c.transitionDurationInFrames} onChange={(e) => patchClip(i, { transitionDurationInFrames: Math.max(1, +e.target.value) })} /></Field>
@@ -296,7 +298,10 @@ export const Inspector: React.FC = () => {
             </div>
           );
         })}
-        <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+        <div className="fx-add-row">
+          <MotionAdder onAdd={(id) => patchOverlay(i, { motions: [...o.motions, id] })} />
+          <button onClick={() => openBrowser({ mode: "overlay-add", index: i })}>Browse…</button>
+        </div>
       </Section>
     </div>
   );

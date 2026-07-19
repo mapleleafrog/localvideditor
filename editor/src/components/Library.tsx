@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useEditor } from "../store";
-import { readyMotions, readyTransitions, getMotion } from "../lib/effects-bridge";
-import { beatKick } from "../../../src/effects/helpers";
+import { readyMotions, readyTransitions } from "../lib/effects-bridge";
+import { FxPreview } from "./FxPreview";
 import { AudioPanel } from "./AudioPanel";
 import { CanvasPanel } from "./CanvasPanel";
 import { AssetsPanel } from "./AssetsPanel";
@@ -11,50 +11,19 @@ const CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 const matches = (q: string, ...fields: string[]) => fields.some((f) => f.toLowerCase().includes(q));
 
-const PREVIEW_FPS = 30;
-const PREVIEW_WINDOW = 45; // ~1.5s loop, long enough to read most motions
-
-/** Hover-only live preview: runs the actual motion formula over a small swatch via rAF, so you can
- *  tell "wiggle vs. bob vs. zoom" apart without clicking. Only the hovered tile animates — the other
- *  ~100 stay static, so this doesn't run 100 rAF loops at once. */
+/** Thin wrapper around FxPreview: per-tile hover state so a grid of ~100 tiles only ever runs ONE
+ *  rAF loop at a time (only the hovered tile is `active`). */
 const EffectSwatch: React.FC<{ id: string }> = ({ id }) => {
   const [hover, setHover] = useState(false);
-  const [style, setStyle] = useState<React.CSSProperties>({});
-  useEffect(() => {
-    if (!hover) {
-      setStyle({});
-      return;
-    }
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const elapsed = (now - start) / 1000;
-      const frame = Math.floor(elapsed * PREVIEW_FPS) % PREVIEW_WINDOW;
-      setStyle(
-        getMotion(id)({
-          progress: frame / PREVIEW_WINDOW,
-          frame,
-          fps: PREVIEW_FPS,
-          t: elapsed,
-          beat: beatKick(elapsed, 120, 6, 0),
-          z: 0.4,
-          params: {},
-        }),
-      );
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [id, hover]);
   return (
-    <span className="fx-swatch" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span className="fx-swatch-inner" style={style} />
+    <span onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <FxPreview id={id} active={hover} />
     </span>
   );
 };
 
 export const Library: React.FC = () => {
-  const { project, selection, patchOverlay, patchClip } = useEditor();
+  const { project, selection, patchOverlay, patchClip, openBrowser } = useEditor();
   const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio" | "canvas">("effects");
   const [fxQuery, setFxQuery] = useState("");
   const [trQuery, setTrQuery] = useState("");
@@ -104,6 +73,21 @@ export const Library: React.FC = () => {
       <div className="lib-body">
         {tab === "effects" && (
           <>
+            <button
+              className="lib-browse-all"
+              disabled={!selection}
+              title={selection ? "Open the full effect browser" : "Select a clip or layer first"}
+              onClick={() =>
+                selection &&
+                openBrowser(
+                  selection.kind === "overlay"
+                    ? { mode: "overlay-add", index: selection.index }
+                    : { mode: "clip-motion", index: selection.index },
+                )
+              }
+            >
+              ⊞ Browse all…
+            </button>
             <div className="lib-hint">
               {selection
                 ? selection.kind === "overlay" ? "Click to stack on the selected layer" : "Click to set the clip's motion"
@@ -147,6 +131,14 @@ export const Library: React.FC = () => {
         )}
         {tab === "transitions" && (
           <>
+            <button
+              className="lib-browse-all"
+              disabled={selection?.kind !== "clip"}
+              title={selection?.kind === "clip" ? "Open the full transition browser" : "Select a clip first"}
+              onClick={() => selection?.kind === "clip" && openBrowser({ mode: "clip-transition", index: selection.index })}
+            >
+              ⊞ Browse all…
+            </button>
             <div className="lib-hint">{selection?.kind === "clip" ? "Click to set the clip's transition" : "Select a clip first"}</div>
             <input
               className="lib-search"

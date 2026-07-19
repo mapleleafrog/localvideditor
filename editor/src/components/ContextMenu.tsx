@@ -20,6 +20,7 @@ export const ContextMenu: React.FC = () => {
   const removeSelected = useEditor((s) => s.removeSelected);
   const reorderOverlay = useEditor((s) => s.reorderOverlay);
   const select = useEditor((s) => s.select);
+  const openBrowser = useEditor((s) => s.openBrowser);
 
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -76,6 +77,9 @@ export const ContextMenu: React.FC = () => {
     const rel = frame - start;
     const splitDisabled = rel <= 0 || rel >= c.durationInFrames;
     items = [
+      { label: "Set motion…", onClick: () => openBrowser({ mode: "clip-motion", index: target.index }) },
+      { label: "Set transition → next…", onClick: () => openBrowser({ mode: "clip-transition", index: target.index }) },
+      "sep",
       { label: "Split at playhead", disabled: splitDisabled, onClick: () => splitSelected(frame) },
       { label: "Duplicate", onClick: duplicateSelected },
       { label: "Copy", onClick: copySelected },
@@ -96,6 +100,8 @@ export const ContextMenu: React.FC = () => {
       select({ kind: "overlay", index: clamped });
     };
     items = [
+      { label: "Add effect…", onClick: () => openBrowser({ mode: "overlay-add", index: i }) },
+      "sep",
       { label: "Split at playhead", disabled: splitDisabled, onClick: () => splitSelected(frame) },
       { label: "Duplicate", onClick: duplicateSelected },
       { label: "Copy", onClick: copySelected },

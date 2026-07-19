@@ -8,6 +8,7 @@ import { Topbar } from "./components/Topbar";
 import { Storyboard } from "./components/Storyboard";
 import { ShortcutsModal, Toast } from "./components/ShortcutsModal";
 import { ContextMenu } from "./components/ContextMenu";
+import { EffectBrowser } from "./components/EffectBrowser";
 import { useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
 import { saveProjectFile } from "./lib/api";
@@ -62,6 +63,17 @@ export const App: React.FC = () => {
     };
 
     const onKey = (e: KeyboardEvent) => {
+      // The Effect Browser is a focused modal context: it owns Escape (closes itself) and
+      // swallows every other key here (no Space-play, no Delete, no Ctrl+K/D/S/Z…) — typing in
+      // its search field is naturally safe too since this guard returns before the rest fires.
+      if (useEditor.getState().browser) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          useEditor.getState().closeBrowser();
+        }
+        return;
+      }
+
       const el = e.target as HTMLElement | null;
       const typing =
         !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
@@ -233,6 +245,7 @@ export const App: React.FC = () => {
       <ShortcutsModal />
       <Toast />
       <ContextMenu />
+      <EffectBrowser />
     </div>
   );
 };

@@ -8,6 +8,12 @@ export type Selection = { kind: "clip" | "overlay"; index: number } | null;
 /** Cut/copied item, held in memory for paste (transient — not undone or persisted). */
 export type Clipboard = { kind: "clip"; item: Clip } | { kind: "overlay"; item: Overlay } | null;
 
+/** What a right-click context menu is anchored to. */
+export type CtxTarget = { kind: "clip"; index: number } | { kind: "overlay"; index: number };
+/** Transient right-click menu state. `frame` is captured by the caller BEFORE selecting (selecting
+ *  an overlay can auto-seek the player — see CanvasOverlay — which would corrupt "split at playhead"). */
+export type CtxMenuState = { x: number; y: number; frame: number; target: CtxTarget };
+
 export interface EditorState {
   project: Project;
   /** Current project name — used for projects/<name>.json AND its public/media/<name>/ folder. */
@@ -50,6 +56,10 @@ export interface EditorState {
   /** Keyboard cheat-sheet overlay. */
   showShortcuts: boolean;
   toggleShortcuts: (v?: boolean) => void;
+  /** Generic right-click context menu (timeline blocks/lanes, canvas nodes). */
+  ctxMenu: CtxMenuState | null;
+  openCtxMenu: (x: number, y: number, frame: number, target: CtxTarget) => void;
+  closeCtxMenu: () => void;
   setView: (v: "edit" | "storyboard") => void;
   select: (s: Selection) => void;
   setPlayhead: (f: number) => void;
@@ -110,6 +120,7 @@ export const useEditor = create<EditorState>()(
       clipboard: null,
       toast: null,
       showShortcuts: false,
+      ctxMenu: null,
 
       setProject: (project) => set({ project, selection: null }),
       setProjectName: (projectName) => set({ projectName }),
@@ -315,6 +326,12 @@ export const useEditor = create<EditorState>()(
 
       flash: (msg) => set({ toast: { msg, n: ++toastN } }),
       toggleShortcuts: (v) => set((s) => ({ showShortcuts: v ?? !s.showShortcuts })),
+
+      // Opening a context menu also selects its target (so menu actions operate on it) — the
+      // caller must capture `frame` from the live player BEFORE calling this, since selecting an
+      // overlay can auto-seek the player (CanvasOverlay).
+      openCtxMenu: (x, y, frame, target) => set({ ctxMenu: { x, y, frame, target }, selection: target }),
+      closeCtxMenu: () => set({ ctxMenu: null }),
 
       setView: (view) => set({ view }),
       select: (selection) => set({ selection }),

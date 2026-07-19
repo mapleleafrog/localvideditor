@@ -7,6 +7,7 @@ import { Inspector } from "./components/Inspector";
 import { Topbar } from "./components/Topbar";
 import { Storyboard } from "./components/Storyboard";
 import { ShortcutsModal, Toast } from "./components/ShortcutsModal";
+import { ContextMenu } from "./components/ContextMenu";
 import { useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
 import { saveProjectFile } from "./lib/api";
@@ -231,6 +232,7 @@ export const App: React.FC = () => {
 
       <ShortcutsModal />
       <Toast />
+      <ContextMenu />
     </div>
   );
 };

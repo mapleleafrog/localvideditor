@@ -35,7 +35,7 @@ type Gesture = { kind: "move" | "scale" | "rotate"; sx: number; sy: number; cx: 
  *  angle-from-center — both pivot on the element CENTER, matching the Timeline's transform-origin
  *  (so x/y stay put while scaling/rotating; only dragging the body moves it). */
 export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
-  const { project, selection, select, patchOverlay } = useEditor();
+  const { project, selection, select, patchOverlay, openCtxMenu } = useEditor();
   const overlays = project.overlays;
   const compW = project.width ?? 1920;
   const frame = useCurrentPlayerFrame(playerRef);
@@ -134,6 +134,7 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   const startGesture = (kind: Gesture["kind"]) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     if (!selOverlay) return;
@@ -186,7 +187,12 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
             className="cv-hit"
             style={{ position: "absolute", left: g.left, top: g.top, width: g.width, height: g.height, transform: `rotate(${g.rot}deg)`, pointerEvents: "auto" }}
             title={o.type === "text" ? o.text : o.src}
-            onPointerDown={(e) => { e.stopPropagation(); select({ kind: "overlay", index: i }); }}
+            onPointerDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); select({ kind: "overlay", index: i }); }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openCtxMenu(e.clientX, e.clientY, frame, { kind: "overlay", index: i });
+            }}
           />
         );
       })}
@@ -199,7 +205,16 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
             className="cv-frame"
             style={{ position: "absolute", left: g.left, top: g.top, width: g.width, height: g.height, transform: `rotate(${g.rot}deg)`, pointerEvents: "none" }}
           >
-            <div className="cv-body" style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "move" }} {...handle("move")} />
+            <div
+              className="cv-body"
+              style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "move" }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openCtxMenu(e.clientX, e.clientY, frame, { kind: "overlay", index: selIndex });
+              }}
+              {...handle("move")}
+            />
             {CORNERS.map(([n, fx, fy]) => (
               <div
                 key={n}

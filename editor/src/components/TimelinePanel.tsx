@@ -96,7 +96,7 @@ const TimelineTip: React.FC<{ project: Project; preview: HoverPreview }> = ({ pr
 };
 
 export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
-  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected } =
+  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected, openCtxMenu } =
     useEditor();
   const scrollRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -196,19 +196,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   };
   const moveOverlay = (i: number, dir: -1 | 1) => reorderTo(i, i + dir);
 
-  // right-click layer menu + drag-to-reorder lanes
-  const [menu, setMenu] = useState<{ x: number; y: number; index: number } | null>(null);
+  // drag-to-reorder lanes (right-click menu is the global singleton <ContextMenu/>, mounted in App)
   const dragLane = useRef<number | null>(null);
-  useEffect(() => {
-    if (!menu) return;
-    const close = () => setMenu(null);
-    window.addEventListener("click", close);
-    window.addEventListener("scroll", close, true);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("scroll", close, true);
-    };
-  }, [menu]);
   const onRulerDown = (e: React.PointerEvent) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -296,8 +285,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
-                select({ kind: "overlay", index: i });
-                setMenu({ x: e.clientX, y: e.clientY, index: i });
+                e.stopPropagation();
+                openCtxMenu(e.clientX, e.clientY, phFrame(), { kind: "overlay", index: i });
               }}
             >
               <span className="ovl-label">
@@ -363,13 +352,19 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     }}
                     onMouseEnter={(e) => onBlockHoverEnter("clip", i, e)}
                     onMouseLeave={onBlockHoverLeave}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openCtxMenu(e.clientX, e.clientY, phFrame(), { kind: "clip", index: i });
+                    }}
                     title={`${c.src} · ${c.durationInFrames}f` + (c.transitionToNext !== "none" ? ` · →${c.transitionToNext}` : "")}
                   >
                     <span className="tl-block-label">{c.src}</span>
                     {c.transitionToNext !== "none" && <span className="tl-trans">⇥</span>}
                     <span
                       className="tl-handle right"
-                      onPointerDown={(e) =>
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return;
                         startBlockDrag(
                           e,
                           "right",
@@ -378,8 +373,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                           (s) => patchClip(i, { durationInFrames: capDur(s.durationInFrames) }),
                           1,
                           snap(),
-                        )
-                      }
+                        );
+                      }}
                     />
                   </div>
                 );
@@ -395,6 +390,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     className={"tl-block overlay" + (sel ? " on" : "")}
                     style={{ left: o.from * zoom, width: o.durationInFrames * zoom }}
                     onPointerDown={(e) => {
+                      if (e.button !== 0) return;
                       onBlockHoverLeave();
                       select({ kind: "overlay", index: i });
                       startBlockDrag(
@@ -409,11 +405,17 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                     }}
                     onMouseEnter={(e) => onBlockHoverEnter("overlay", i, e)}
                     onMouseLeave={onBlockHoverLeave}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openCtxMenu(e.clientX, e.clientY, phFrame(), { kind: "overlay", index: i });
+                    }}
                     title={`${o.type === "text" ? o.text : o.src} · from ${o.from}f · ${o.durationInFrames}f`}
                   >
                     <span
                       className="tl-handle left"
-                      onPointerDown={(e) =>
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return;
                         startBlockDrag(
                           e,
                           "left",
@@ -422,13 +424,14 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                           (s) => patchOverlay(i, { from: s.from, durationInFrames: capDur(s.durationInFrames) }),
                           1,
                           snap(),
-                        )
-                      }
+                        );
+                      }}
                     />
                     <span className="tl-block-label">{o.type === "text" ? o.text || "text" : o.type === "fx" ? `fx · ${o.motions[0] ?? "empty"}` : o.src}</span>
                     <span
                       className="tl-handle right"
-                      onPointerDown={(e) =>
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return;
                         startBlockDrag(
                           e,
                           "right",
@@ -437,8 +440,8 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
                           (s) => patchOverlay(i, { durationInFrames: capDur(s.durationInFrames) }),
                           1,
                           snap(),
-                        )
-                      }
+                        );
+                      }}
                     />
                   </div>
                 </div>
@@ -451,15 +454,6 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
       </div>
 
       <TimelineTip project={project} preview={hoverPreview} />
-
-      {menu && (
-        <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
-          <button disabled={menu.index === 0} onClick={() => { reorderTo(menu.index, 0); setMenu(null); }}>Move to top</button>
-          <button disabled={menu.index === 0} onClick={() => { moveOverlay(menu.index, -1); setMenu(null); }}>Move up</button>
-          <button disabled={menu.index === overlayCount - 1} onClick={() => { moveOverlay(menu.index, 1); setMenu(null); }}>Move down</button>
-          <button disabled={menu.index === overlayCount - 1} onClick={() => { reorderTo(menu.index, overlayCount - 1); setMenu(null); }}>Move to bottom</button>
-        </div>
-      )}
     </div>
   );
 };

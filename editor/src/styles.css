@@ -251,9 +251,16 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .lib-item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .fx-swatch {
   position: relative; width: 22px; height: 22px; flex: none; border-radius: 4px; overflow: hidden;
-  background: #0a0a10 center/cover no-repeat; background-image: url("/orange-mush.gif");
+  background: #0a0a10;
 }
-.fx-swatch-inner { position: absolute; inset: 0; }
+/* The sprite lives HERE, not on the outer .fx-swatch/.fxb-thumb frame — this inner span is the
+   element that actually receives the motion's transform/filter/opacity style, so the moving
+   preview must be the one showing the sprite (a transform on an empty transparent overlay would
+   be invisible). */
+.fx-swatch-inner {
+  position: absolute; inset: 0;
+  background: center/cover no-repeat; background-image: url("/orange-mush.gif");
+}
 
 /* ===== audio / beat-sync panel ===== */
 .audio-panel { position: relative; min-height: 120px; }
@@ -418,8 +425,11 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .fxb-card.applied { cursor: default; opacity: 0.75; }
 .fxb-thumb {
   position: relative; width: 100%; aspect-ratio: 1 / 1; max-width: 110px; border-radius: 6px; overflow: hidden;
-  background: #0a0a10 center/contain no-repeat; background-image: url("/orange-mush.gif");
+  background: #0a0a10;
 }
+/* Bigger modal thumb wants the whole sprite visible (contain), unlike the small Library swatch's
+   tighter cover crop — override just the shared .fx-swatch-inner's background-size here. */
+.fxb-thumb .fx-swatch-inner { background-size: contain; }
 .fxb-card-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .fxb-card-tags { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
 .fxb-tag-pill { font-size: 9px; padding: 1px 6px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }

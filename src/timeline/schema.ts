@@ -33,8 +33,45 @@ const motionPick = enumOf(["none", ...MOTION_IDS]); // "none" = no full-frame mo
 const transitionPick = enumOf(["none", ...TRANSITION_IDS]);
 const bgMotionPick = enumOf(["none", ...BG_IDS]);
 
+// --- Polaroid montage ("Carried Stacks") -----------------------------------------------------
+// A clip of type "montage" renders a scrapbook page on which sprite stagehands carry in stacks of
+// polaroid prints; the top print of every stack peels away in sync on the beat grid, revealing
+// the next pair. Chapters = one carry-in / peel run / carry-out each. See montage.ts / Montage.tsx.
+const montagePhotoSchema = z.object({
+  /** Photo file in public/ or public/media/. */
+  src: z.string().default("clip-a.svg"),
+  /** Handwritten caption on the print's white margin (year / place). */
+  caption: z.string().default(""),
+  /** Aspect (w/h) of the photo window inside the frame. 1 = square, 1.33 = 4:3 scan, 0.75 = portrait. */
+  aspect: z.number().positive().optional(),
+});
+const montageStackSchema = z.object({
+  photos: z.array(montagePhotoSchema).default([]),
+});
+const montageChapterSchema = z.object({
+  /** Year stamp shown top-right for the whole chapter (e.g. "1996 → 1999"). */
+  title: z.string().default(""),
+  /** One stack per sprite; stacks are laid out left→right and peel in sync. */
+  stacks: z.array(montageStackSchema).default([]),
+  /** On-screen handwritten note per reveal (index 0 = the pair first shown, 1 = after the first peel…). */
+  notes: z.array(z.string()).default([]),
+});
+export const montageSchema = z.object({
+  chapters: z.array(montageChapterSchema).default([]),
+  /** Beats each print is held before the next peel (peels land on the project's beat grid). */
+  peelBeats: z.number().positive().default(2),
+  /** How the top print leaves: hinged page swing / flick off-frame with spin / corner lift and float. */
+  peelStyle: z.enum(["swing", "flick", "lift"]).default("swing"),
+  /** Sprite that carries the stacks (GIF in public/). */
+  sprite: z.string().default("orange-mush.gif"),
+  /** Scrapbook page look. */
+  paper: z.enum(["cream", "kraft", "white", "night"]).default("cream"),
+  /** Draw a hand-doodled heart on the page. */
+  doodle: z.boolean().default(true),
+});
+
 const clipSchema = z.object({
-  type: z.enum(["image", "video"]).default("image"),
+  type: z.enum(["image", "video", "montage"]).default("image"),
   /** A file in public/ (e.g. "clip-a.svg") or public/media/ (e.g. "media/photo.jpg"). */
   src: z.string().default("clip-a.svg"),
   durationInFrames: z.number().int().positive().default(90),
@@ -59,6 +96,8 @@ const clipSchema = z.object({
    *  (Root.tsx defaultProps, projects/*.json) stay valid; the render ignores these. */
   label: z.string().optional(),
   note: z.string().optional(),
+  /** Used when type = montage (see montageSchema). Optional so image/video clip literals stay valid. */
+  montage: montageSchema.optional(),
 });
 
 const overlaySchema = z.object({
@@ -169,4 +208,8 @@ export type Clip = z.infer<typeof clipSchema>;
 export type Overlay = z.infer<typeof overlaySchema>;
 export type AudioTrack = z.infer<typeof audioTrackSchema>;
 export type MotionParam = z.infer<typeof motionParamSchema>;
+export type Montage = z.infer<typeof montageSchema>;
+export type MontageChapter = z.infer<typeof montageChapterSchema>;
+export type MontageStack = z.infer<typeof montageStackSchema>;
+export type MontagePhoto = z.infer<typeof montagePhotoSchema>;
 export type Background = z.infer<typeof projectSchema>["background"];

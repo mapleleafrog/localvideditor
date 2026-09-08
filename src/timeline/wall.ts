@@ -107,29 +107,39 @@ export const shortAngle = (u: number, v: number) => (((v - u + 180) % 360) + 360
 export const normAngle = (deg: number) => (((deg + 180) % 360) + 360) % 360 - 180;
 
 // ---------------------------------------------------------------------------------------------
-// 1. The three eases. e(0)=0, e(1)=1, e'(0)=e'(1)=0 for all of them — measured, not asserted
+// 1. The four eases. e(0)=0, e(1)=1, e'(0)=e'(1)=0 for all of them — measured, not asserted
 //    (check:wall group 1). There is no `linear` precisely so the invariant is absolute.
 //
-//      ease    peak slope           overshoot
-//      sine    1.5708 @ p=0.500     none
-//      cubic   3.0000 @ p=0.500     none      (a SNAP ease: 1.91x sine's peak at equal duration)
-//      settle  1.8780 @ p=0.544     +2.51% @ p=0.878   (use only at >= 1.0 s)
+//    `smooth` (the DEFAULT) additionally has e''(0)=e''(1)=0: zero ACCELERATION at both ends. A
+//    sine ease has zero velocity at the ends but its acceleration PEAKS there (0.5*pi^2*cos(pi p)),
+//    so the camera departs and lands with a shove — that is exactly the "forceful arrival" a viewer
+//    feels. The quintic smootherstep 6p^5 - 15p^4 + 10p^3 ramps acceleration from zero, so a glide
+//    eases in and eases out with no perceptible onset. It is a little faster mid-glide at equal
+//    duration (1.875 vs 1.571), which suggestGlideSeconds accounts for.
+//
+//      ease    peak slope           overshoot        endpoint accel
+//      smooth  1.8750 @ p=0.500     none             0 (C2)         <- default
+//      sine    1.5708 @ p=0.500     none             +-4.93 (C1)
+//      cubic   3.0000 @ p=0.500     none             +-12 (C1)      (a SNAP ease)
+//      settle  1.8780 @ p=0.544     +2.51% @ p=0.878 +-4.93 (C1)    (use only at >= 1.0 s)
 // ---------------------------------------------------------------------------------------------
 
-export type EaseId = "sine" | "cubic" | "settle";
-export const EASE_IDS: readonly EaseId[] = ["sine", "cubic", "settle"];
+export type EaseId = "smooth" | "sine" | "cubic" | "settle";
+export const EASE_IDS: readonly EaseId[] = ["smooth", "sine", "cubic", "settle"];
+export const DEFAULT_EASE: EaseId = "smooth";
 
 /** Overshoot amplitude of `settle`. A polynomial term that vanishes to 2nd order at BOTH ends. */
 export const SETTLE_A = 9;
 
 export const EASE: Record<EaseId, (p: number) => number> = {
+  smooth: (p) => p * p * p * (p * (p * 6 - 15) + 10),
   sine: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p),
   cubic: (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2),
   settle: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p) + SETTLE_A * Math.pow(p, 6) * Math.pow(1 - p, 2),
 };
 
 export const ease = (id: string | undefined, p: number): number =>
-  (EASE[(id ?? "sine") as EaseId] ?? EASE.sine)(clamp(p));
+  (EASE[(id ?? DEFAULT_EASE) as EaseId] ?? EASE[DEFAULT_EASE])(clamp(p));
 
 // ---------------------------------------------------------------------------------------------
 // 2. Item geometry. `itemBox` is the treatment-inclusive OUTER box, and it is AUTHORITATIVE:
@@ -385,7 +395,8 @@ export const sceneCam = (s: WallSceneLike): Cam => ({
   rot: finite(s.rotation, 0),
 });
 
-const easeIdOf = (v: string | undefined): EaseId => (v === "cubic" || v === "settle" ? v : "sine");
+const easeIdOf = (v: string | undefined): EaseId =>
+  v === "sine" || v === "cubic" || v === "settle" ? v : DEFAULT_EASE;
 
 export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number, H: number): WallSchedule => {
   const w = wall ?? {};
@@ -408,7 +419,7 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
     const s = finite(sec, 0);
     return s <= 0 ? 0 : Math.max(1, Math.round(s * f));
   };
-  const wholeSeg = (kind: "hold" | "glide", a: Cam, b: Cam, scene: number, easing: EaseId = "sine") =>
+  const wholeSeg = (kind: "hold" | "glide", a: Cam, b: Cam, scene: number, easing: EaseId = DEFAULT_EASE) =>
     ({ kind, a, b, easing, arc: 0, scene, whole: true }) as const;
 
   if (scenes.length) {
@@ -472,8 +483,9 @@ export const segIndexAt = (sched: WallSchedule, frame: number) => {
 export const ARC_GAIN = 0.22;
 /** Zoom leads position by 10% — a real operator sizes the frame first and lets the pan settle. */
 export const ZOOM_LEAD = 0.1;
-/** Mid-glide pull-back: reads as lift/travel/land AND reduces optical flow at the fastest instant. */
-export const LIFT_GAIN = 0.075;
+/** Mid-glide pull-back: reads as lift/travel/land AND reduces optical flow at the fastest instant.
+ *  Kept small: at 0.075 the dip read as a "push" into every scene; 0.035 is felt, not seen. */
+export const LIFT_GAIN = 0.035;
 
 /** Asymmetric lift envelope: peak 1.0 @ p=0.4424, EXACT 0 at both ends with ~0 endpoint
  *  derivatives (0.678 @ p=0.25 vs 0.397 @ p=0.75 — pull out fast, ride, land gently).
@@ -622,19 +634,23 @@ export const cameraAt = (
 // ---------------------------------------------------------------------------------------------
 // 9. Two velocity numbers, two purposes, because they scale differently with fps.
 //
-// How glides read (sine ease, 30 fps): <=18 px/frame glassy; 18-34 the SWEET SPOT; 34-55
-// energetic (fine detail starts to strobe, the fibre gain drops automatically); >55 a whip.
+// How glides read (30 fps): <=18 px/frame glassy; 18-34 brisk; 34-55 energetic (fine detail
+// starts to strobe, the fibre gain drops automatically); >55 a whip. The romantic register for
+// this project lives in the GLASSY band, so the default target sits inside it.
 // ---------------------------------------------------------------------------------------------
+
+/** Peak slope of the default `smooth` ease — the factor between mean and peak glide speed. */
+export const PEAK_SLOPE = 1.875;
 
 /** JUDDER — px per FRAME. This is what strobes, and it is fps-dependent. Drives the editor chip. */
 export const peakVelocity = (a: Cam, b: Cam, sec: number, fps: number) =>
-  sec <= 0 ? Infinity : ((Math.PI / 2) * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / (fps * sec);
+  sec <= 0 ? Infinity : (PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / (fps * sec);
 
-/** FEEL — targets px per SECOND, so the suggestion is identical at 30 and 60 fps. */
-export const V_TARGET_PER_SEC = 900;
+/** FEEL — targets PEAK px per SECOND, so the suggestion is identical at 30 and 60 fps. */
+export const V_TARGET_PER_SEC = 480;
 
 /** What "Set as scene" writes: the tool's default is always a move a motion designer would sign
- *  off, and the user has to work to make a bad one. 900 px/s == 30 px/frame at 30 fps (the top of
- *  the sweet spot) and 15 px/frame at 60 fps — cleaner for free, which is right. */
+ *  off, and the user has to work to make a bad one. 480 px/s peak == 16 px/frame at 30 fps (inside
+ *  the glassy band) and 8 px/frame at 60 fps — cleaner for free, which is right. */
 export const suggestGlideSeconds = (a: Cam, b: Cam) =>
-  clamp(((Math.PI / 2) * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / V_TARGET_PER_SEC, 0.35, 4.0);
+  clamp((PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / V_TARGET_PER_SEC, 0.6, 6.0);

@@ -64,6 +64,7 @@ const {
   shortAngle,
   peakVelocity,
   suggestGlideSeconds,
+  V_TARGET_PER_SEC,
   liftShape,
 } = W_;
 
@@ -113,7 +114,7 @@ const randScene = () => ({
   rotation: rr(-200, 200),
   holdSeconds: pick([0, 0.6, 1.2, 1.8, 2.4]),
   glideSeconds: pick([0, 0.4, 0.8, 1.5, 2.4]),
-  easing: pick(["sine", "cubic", "settle"]),
+  easing: pick(["smooth", "sine", "cubic", "settle"]),
   arc: pick([0, 0, 0.6, -0.4, 1, -1]),
 });
 const randWall = (nItems, nScenes) => ({
@@ -175,9 +176,19 @@ startGroup(1, "ease endpoints, derivatives, settle peak");
   ok(flips === 1, `settle must flip from ascending to descending EXACTLY once (got ${flips} flips)`);
   ok(descending, "settle must end on its descending tail");
   ok(EASE.settle(1) === 1, "settle returns to exactly 1");
-  // unknown ids fall back to sine, and p is clamped
-  ok(ease("nope", 0.3) === EASE.sine(0.3), "unknown ease id falls back to sine");
+  // unknown ids fall back to the default (smooth), and p is clamped
+  ok(ease("nope", 0.3) === EASE.smooth(0.3), "unknown ease id falls back to smooth");
+  ok(ease(undefined, 0.3) === EASE.smooth(0.3), "undefined ease id falls back to smooth");
   ok(ease("sine", -5) === 0 && ease("sine", 5) === 1, "ease clamps p");
+  // smooth is C2: zero ACCELERATION at both ends (second central difference), unlike sine.
+  {
+    // e'''(0) = 60 for the quintic, so e''(h) ~ 60h: sample at 1e-4 (0.006) and allow 0.02.
+    const h = 1e-4;
+    const acc = (f, p) => (f(p + h) - 2 * f(p) + f(p - h)) / (h * h);
+    ok(Math.abs(acc(EASE.smooth, h)) < 0.02, `smooth e''(0) ~ 0 (got ${acc(EASE.smooth, h).toFixed(4)})`);
+    ok(Math.abs(acc(EASE.smooth, 1 - h)) < 0.02, `smooth e''(1) ~ 0 (got ${acc(EASE.smooth, 1 - h).toFixed(4)})`);
+    ok(Math.abs(acc(EASE.sine, h)) > 4, "sine e''(0) is NOT zero (the shove smooth removes)");
+  }
   // the lift envelope: exact 0 at both ends, peak 1 near 0.44, asymmetric
   ok(liftShape(0) === 0 && liftShape(1) < 1e-30, "lift shape is 0 at both ends");
   ok(liftShape(0.25) > liftShape(0.75), "lift shape is asymmetric (pull out fast, land gently)");
@@ -504,11 +515,12 @@ startGroup(8, "speed: 0 on holds and both sides of a hard cut, non-zero mid-glid
   const roll = { kind: "glide", from: 0, to: 45, a: { x: 0, y: 0, zoom: 1, rot: 0 }, b: { x: 0, y: 0, zoom: 1, rot: 30 }, easing: "sine", arc: 0, scene: 0, whole: false };
   ok(segSpeed(roll, 22, W, H) > 1, "a pure roll must not score speed 0");
   // the velocity numbers
-  ok(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, 1.5, 30) > 29, "860 px over 1.5 s at 30 fps peaks around 30 px/frame");
+  // 860 px over 1.5 s with the default `smooth` ease peaks at 1.875 * 860 / 45 = 35.8 px/frame.
+  ok(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, 1.5, 30) > 35, "860 px over 1.5 s at 30 fps peaks around 36 px/frame");
   const sug = suggestGlideSeconds({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 });
-  near(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, sug, 30), 30, 1e-6, "the suggested glide lands at 30 px/frame at 30 fps");
-  near(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, sug, 60), 15, 1e-6, "and at 15 px/frame at 60 fps — px/SECOND is the feel target");
-  ok(suggestGlideSeconds({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 0, y: 0, zoom: 1, rot: 0 }) === 0.35, "a zero-length move clamps to the 0.35 s floor");
+  near(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, sug, 30), V_TARGET_PER_SEC / 30, 1e-6, `the suggested glide peaks at ${V_TARGET_PER_SEC / 30} px/frame at 30 fps`);
+  near(peakVelocity({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 860, y: 0, zoom: 1, rot: 0 }, sug, 60), V_TARGET_PER_SEC / 60, 1e-6, `and at ${V_TARGET_PER_SEC / 60} px/frame at 60 fps — px/SECOND is the feel target`);
+  ok(suggestGlideSeconds({ x: 0, y: 0, zoom: 1, rot: 0 }, { x: 0, y: 0, zoom: 1, rot: 0 }) === 0.6, "a zero-length move clamps to the 0.6 s floor");
 }
 
 // =============================================================================================

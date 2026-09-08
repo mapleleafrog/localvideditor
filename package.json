@@ -48,6 +48,7 @@
     "credits": "node scripts/gen-credits.mjs",
     "gen:portal": "node scripts/gen-portal.mjs",
     "check:portal": "node scripts/gen-portal.mjs --check",
+    "check:wall": "node scripts/check-wall.mjs",
     "editor": "vite --config editor/vite.config.ts",
     "editor:build": "vite build --config editor/vite.config.ts",
     "typecheck": "tsc",

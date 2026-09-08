@@ -33,45 +33,98 @@ const motionPick = enumOf(["none", ...MOTION_IDS]); // "none" = no full-frame mo
 const transitionPick = enumOf(["none", ...TRANSITION_IDS]);
 const bgMotionPick = enumOf(["none", ...BG_IDS]);
 
-// --- Polaroid montage ("Carried Stacks") -----------------------------------------------------
-// A clip of type "montage" renders a scrapbook page on which sprite stagehands carry in stacks of
-// polaroid prints; the top print of every stack peels away in sync on the beat grid, revealing
-// the next pair. Chapters = one carry-in / peel run / carry-out each. See montage.ts / Montage.tsx.
-const montagePhotoSchema = z.object({
-  /** Photo file in public/ or public/media/. */
-  src: z.string().default("clip-a.svg"),
-  /** Handwritten caption on the print's white margin (year / place). */
-  caption: z.string().default(""),
-  /** Aspect (w/h) of the photo window inside the frame. 1 = square, 1.33 = 4:3 scan, 0.75 = portrait. */
+// --- Wall ("collage wall with a keyframed camera") --------------------------------------------
+// A clip of type "wall" pins photos, props and hand-font text anywhere on an UNBOUNDED wall
+// (negative coordinates included) and walks a camera across it through an ordered list of scenes
+// (camera keyframes, in SECONDS — the beat grid is deliberately not involved).
+// Pure maths: wall.ts (schedule / camera / fit-all / boxes). Look: wall-paper.ts. Render: Wall.tsx.
+const wallItemSchema = z.object({
+  type: z.enum(["image", "text"]).default("image"),
+  /** public/ or public/media/ ref. .gif -> <Gif>, .webm/.mp4/.mov -> <OffthreadVideo>, else <Img>. */
+  src: z.string().default(""),
+  text: z.string().default(""),
+  /** CENTRE, wall units. 1 unit = 1 composition px at zoom 1. Negative is legal — the wall has no
+   *  origin corner and the camera is never clamped. */
+  x: z.number().default(0),
+  y: z.number().default(0),
+  /** OUTER card width in wall units (the frame treatment is included). */
+  width: z.number().positive().default(560),
+  /** Intrinsic w/h of the source, written by the editor at import (imageNaturalSize /
+   *  videoNaturalSize). Clamped to [0.2, 5] at every read; unset -> 1. */
   aspect: z.number().positive().optional(),
+  rotation: z.number().default(0),
+  opacity: z.number().min(0).max(1).default(1),
+  /** Parallax factor. 1 = the wall plane, <1 recedes, >1 comes forward. POSITION ONLY — it never
+   *  changes the item's rendered size (the camera layer's scale(zoom*depth) is cancelled by the
+   *  item's own scale(1/depth)). */
+  depth: z.number().min(0.2).max(3).default(1),
+  frame: z.enum(["none", "polaroid", "matte", "taped", "torn"]).default("none"),
+  /** Handwritten caption on a polaroid/matte margin; ignored by other treatments and by text. */
+  caption: z.string().default(""),
+  filter: z.enum(["none", "sepia", "faded", "bw", "warm", "cool"]).default("none"),
+  filterStrength: z.number().min(0).max(1).default(1),
+  /** Stacked registry effects — composed exactly like an overlay's. */
+  motions: z.array(enumOf(MOTION_IDS)).default([]),
+  /** Per-effect settings, index-aligned with `motions` (the SAME schema overlays use). */
+  motionParams: z.array(motionParamSchema).optional(),
+  windowInFrames: z.number().int().positive().default(90),
+  /** GIF / video playback speed. */
+  playbackRate: z.number().positive().optional(),
+  /** Force PNG frame extraction so WebM/MOV alpha survives. Unset = auto by extension. */
+  alpha: z.boolean().optional(),
+  /** Stable look seed (tape angles, torn ring, frame tint). Written once at create time — a seed
+   *  must never carry a frame term or the print boils. */
+  seed: z.number().int().optional(),
+  pixelated: z.boolean().optional(),
+  flipX: z.boolean().optional(),
+  flipY: z.boolean().optional(),
+  /** Editor-only name in the item list; the render ignores it. */
+  label: z.string().optional(),
+  // text only
+  fontSize: z.number().positive().default(96), // wall units
+  fontFamily: enumOf([...FONT_IDS]).optional(),
+  color: z.string().default("#3a3226"),
+  align: z.enum(["left", "center", "right"]).default("center"),
 });
-const montageStackSchema = z.object({
-  photos: z.array(montagePhotoSchema).default([]),
+
+const wallSceneSchema = z.object({
+  name: z.string().default(""),
+  x: z.number().default(0),
+  y: z.number().default(0),
+  zoom: z.number().positive().default(1),
+  rotation: z.number().default(0),
+  /** 0 = a "via" scene: the camera flows through the pose without stopping. */
+  holdSeconds: z.number().min(0).default(1.8),
+  /** Glide INTO this scene. On scene 0 this is the INTRO glide, used only when `intro` is on. */
+  glideSeconds: z.number().min(0).default(1.5),
+  easing: z.enum(["sine", "cubic", "settle"]).default("sine"),
+  /** Path bow. 0 = provably identical to a straight lerp. Sign picks the side of travel
+   *  (+ = left of the direction of travel). Deterministic and LOCAL. */
+  arc: z.number().min(-1).max(1).default(0),
 });
-const montageChapterSchema = z.object({
-  /** Year stamp shown top-right for the whole chapter (e.g. "1996 → 1999"). */
-  title: z.string().default(""),
-  /** One stack per sprite; stacks are laid out left→right and peel in sync. */
-  stacks: z.array(montageStackSchema).default([]),
-  /** On-screen handwritten note per reveal (index 0 = the pair first shown, 1 = after the first peel…). */
-  notes: z.array(z.string()).default([]),
-});
-export const montageSchema = z.object({
-  chapters: z.array(montageChapterSchema).default([]),
-  /** Beats each print is held before the next peel (peels land on the project's beat grid). */
-  peelBeats: z.number().positive().default(2),
-  /** How the top print leaves: hinged page swing / flick off-frame with spin / corner lift and float. */
-  peelStyle: z.enum(["swing", "flick", "lift"]).default("swing"),
-  /** Sprite that carries the stacks (GIF in public/). */
-  sprite: z.string().default("orange-mush.gif"),
-  /** Scrapbook page look. */
+
+export const wallSchema = z.object({
+  /** ARRAY ORDER IS PAINT ORDER — depth is parallax only and never reorders. */
+  items: z.array(wallItemSchema).default([]),
+  scenes: z.array(wallSceneSchema).default([]),
   paper: z.enum(["cream", "kraft", "white", "night"]).default("cream"),
-  /** Draw a hand-doodled heart on the page. */
-  doodle: z.boolean().default(true),
+  fibre: z.number().min(0).max(1).default(1),
+  finish: z.number().min(0).max(1).default(1),
+  breathing: z.number().min(0).max(1).default(0.55),
+  intro: z.boolean().default(true),
+  introHoldSeconds: z.number().min(0).default(0.8),
+  outro: z.boolean().default(true),
+  outroSeconds: z.number().min(0).default(2.4),
+  outroHoldSeconds: z.number().min(0).default(1.5),
+  viewfinder: z.boolean().default(false),
+  handFont: z.enum(["caveat", "yomogi", "zenKurenaido"]).default("caveat"),
+  /** Margin fraction for the whole-wall "fit all" pose (intro/outro/Fit-all/thumbnails). */
+  fitPadding: z.number().min(0).max(0.4).default(0.06),
+  timecodeOffsetInFrames: z.number().int().nonnegative().default(0),
 });
 
 const clipSchema = z.object({
-  type: z.enum(["image", "video", "montage"]).default("image"),
+  type: z.enum(["image", "video", "wall"]).default("image"),
   /** A file in public/ (e.g. "clip-a.svg") or public/media/ (e.g. "media/photo.jpg"). */
   src: z.string().default("clip-a.svg"),
   durationInFrames: z.number().int().positive().default(90),
@@ -96,8 +149,8 @@ const clipSchema = z.object({
    *  (Root.tsx defaultProps, projects/*.json) stay valid; the render ignores these. */
   label: z.string().optional(),
   note: z.string().optional(),
-  /** Used when type = montage (see montageSchema). Optional so image/video clip literals stay valid. */
-  montage: montageSchema.optional(),
+  /** Used when type = wall (see wallSchema). Optional so image/video clip literals stay valid. */
+  wall: wallSchema.optional(),
 });
 
 const overlaySchema = z.object({
@@ -208,8 +261,7 @@ export type Clip = z.infer<typeof clipSchema>;
 export type Overlay = z.infer<typeof overlaySchema>;
 export type AudioTrack = z.infer<typeof audioTrackSchema>;
 export type MotionParam = z.infer<typeof motionParamSchema>;
-export type Montage = z.infer<typeof montageSchema>;
-export type MontageChapter = z.infer<typeof montageChapterSchema>;
-export type MontageStack = z.infer<typeof montageStackSchema>;
-export type MontagePhoto = z.infer<typeof montagePhotoSchema>;
+export type Wall = z.infer<typeof wallSchema>;
+export type WallItem = z.infer<typeof wallItemSchema>;
+export type WallScene = z.infer<typeof wallSceneSchema>;
 export type Background = z.infer<typeof projectSchema>["background"];

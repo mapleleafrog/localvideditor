@@ -17,6 +17,7 @@ import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
 import { resolveFontFamily } from "./fonts";
+import { WallClip } from "./Wall";
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 
@@ -24,15 +25,21 @@ const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "c
 const resolveSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
 
 // --- one clip: full-frame media with its clip-local motion (Ken Burns etc.) ---
-const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: number }> = ({
+const ClipContent: React.FC<{ clip: Clip; absStart: number; bpm: number; beatOffsetInFrames: number }> = ({
   clip,
+  absStart,
   bpm,
   beatOffsetInFrames,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const progress = clamp(frame / clip.durationInFrames);
-  const t = frame / fps;
+  // A wall clip carries its own camera on an ABSOLUTE clock (breathing / item motions / the REC
+  // blink must not restart at a cut), so a beat-reactive clip.motion on it pulses on the same grid.
+  // image/video keep the pre-existing clip-local t DELIBERATELY — changing it would alter every
+  // existing render using beatPulse/beatShake on a clip.
+  const isWall = clip.type === "wall" && !!clip.wall;
+  const t = isWall ? (absStart + frame) / fps : frame / fps;
   const motionStyle =
     clip.motion && clip.motion !== "none"
       ? scaleStrength(
@@ -55,7 +62,15 @@ const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: numbe
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <div style={{ width: "100%", height: "100%", ...motionStyle }}>
-        {clip.type === "video" ? (
+        {isWall ? (
+          <WallClip
+            wall={clip.wall!}
+            absStart={absStart}
+            clipDurationInFrames={clip.durationInFrames}
+            bpm={bpm}
+            beatOffsetInFrames={beatOffsetInFrames}
+          />
+        ) : clip.type === "video" ? (
           <OffthreadVideo
             src={resolveSrc(clip.src)}
             trimBefore={clip.trimBefore || undefined}
@@ -63,8 +78,13 @@ const ClipContent: React.FC<{ clip: Clip; bpm: number; beatOffsetInFrames: numbe
             volume={clip.volume ?? 1}
             style={mediaStyle}
           />
-        ) : (
+        ) : clip.src ? (
+          // A type:"wall" clip with a missing payload falls through here — never-throw, matching
+          // getMotion's contract. An EMPTY src renders a flat fill: <Img src=""> would reject its
+          // delayRender handle and hard-fail the render.
           <Img src={resolveSrc(clip.src)} style={mediaStyle} />
+        ) : (
+          <AbsoluteFill style={{ backgroundColor: "#111" }} />
         )}
       </div>
     </AbsoluteFill>
@@ -79,13 +99,19 @@ const ClipTrack: React.FC<{ clips: Clip[]; bpm: number; beatOffsetInFrames: numb
 }) => {
   if (!clips.length) return null;
   const items: React.ReactNode[] = [];
+  // ABSOLUTE start of each clip: Σ previous durations − Σ previous transitions. Byte-equivalent to
+  // TransitionSeries' internal start frames, to calculateTimelineMetadata's `transTotal` predicate
+  // and to editor/src/lib/timeline-utils.ts#clipStarts — four sites, ONE rule. A wall clip needs it
+  // because TransitionSeries.Sequence makes useCurrentFrame() clip-local.
+  let abs = 0;
   clips.forEach((clip, i) => {
+    const hasTr = Boolean(clip.transitionToNext) && clip.transitionToNext !== "none" && i < clips.length - 1;
     items.push(
       <TransitionSeries.Sequence key={`seq-${i}`} durationInFrames={clip.durationInFrames}>
-        <ClipContent clip={clip} bpm={bpm} beatOffsetInFrames={beatOffsetInFrames} />
+        <ClipContent clip={clip} absStart={abs} bpm={bpm} beatOffsetInFrames={beatOffsetInFrames} />
       </TransitionSeries.Sequence>,
     );
-    if (clip.transitionToNext && clip.transitionToNext !== "none" && i < clips.length - 1) {
+    if (hasTr) {
       items.push(
         <TransitionSeries.Transition
           key={`tr-${i}`}
@@ -94,6 +120,7 @@ const ClipTrack: React.FC<{ clips: Clip[]; bpm: number; beatOffsetInFrames: numb
         />,
       );
     }
+    abs += clip.durationInFrames - (hasTr ? clip.transitionDurationInFrames : 0);
   });
   return <TransitionSeries>{items}</TransitionSeries>;
 };

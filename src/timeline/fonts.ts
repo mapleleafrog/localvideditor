@@ -16,6 +16,10 @@ import { loadFont as loadNotoSerifJP } from "@remotion/google-fonts/NotoSerifJP"
 import { loadFont as loadZenMaruGothic } from "@remotion/google-fonts/ZenMaruGothic";
 import { loadFont as loadShipporiMincho } from "@remotion/google-fonts/ShipporiMincho";
 import { loadFont as loadNotoSansJP } from "@remotion/google-fonts/NotoSansJP";
+// Hand faces for wall captions / wall text items (see Wall.tsx, wall.handFont).
+import { loadFont as loadCaveat } from "@remotion/google-fonts/Caveat";
+import { loadFont as loadYomogi } from "@remotion/google-fonts/Yomogi";
+import { loadFont as loadZenKurenaido } from "@remotion/google-fonts/ZenKurenaido";
 
 // Options are inlined per call (not a shared const) so each font's weight/subset literal-union
 // types check — a widened `string[]` const would not be assignable to `("400"|"700"|…)[]`.
@@ -28,10 +32,32 @@ const LOADERS: Record<string, () => string> = {
     loadShipporiMincho("normal", { weights: ["700"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
   notoSansJP: () =>
     loadNotoSansJP("normal", { weights: ["700"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
+  // Caveat has NO `japanese` subset (Caveat.d.ts lists cyrillic-ext / cyrillic / latin-ext / latin
+  // only), so it is requested latin-only — ~4 chunks, versus ~120 for a JP hand face. The editor
+  // warns when a caption/text item under `caveat` contains kana or kanji.
+  caveat: () =>
+    loadCaveat("normal", { weights: ["500", "700"], subsets: ["latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
+  yomogi: () =>
+    loadYomogi("normal", { weights: ["400"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
+  zenKurenaido: () =>
+    loadZenKurenaido("normal", { weights: ["400"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
 };
 
-export const FONT_IDS = ["default", "notoSerifJP", "zenMaruGothic", "shipporiMincho", "notoSansJP"] as const;
+export const FONT_IDS = [
+  "default",
+  "notoSerifJP",
+  "zenMaruGothic",
+  "shipporiMincho",
+  "notoSansJP",
+  "caveat",
+  "yomogi",
+  "zenKurenaido",
+] as const;
 export type FontId = (typeof FONT_IDS)[number];
+
+/** The hand-written faces `wall.handFont` picks from (captions + wall text items). */
+export const HAND_FONT_IDS = ["caveat", "yomogi", "zenKurenaido"] as const;
+export type HandFontId = (typeof HAND_FONT_IDS)[number];
 
 export const FONT_OPTIONS: { id: FontId; label: string }[] = [
   { id: "default", label: "Default (monospace)" },
@@ -39,6 +65,9 @@ export const FONT_OPTIONS: { id: FontId; label: string }[] = [
   { id: "zenMaruGothic", label: "Zen Maru Gothic (rounded)" },
   { id: "shipporiMincho", label: "Shippori Mincho (mincho)" },
   { id: "notoSansJP", label: "Noto Sans JP (sans)" },
+  { id: "caveat", label: "Caveat (hand — latin only)" },
+  { id: "yomogi", label: "Yomogi (hand — JP)" },
+  { id: "zenKurenaido", label: "Zen Kurenaido (hand — JP)" },
 ];
 
 const cache = new Map<string, string>();
@@ -56,4 +85,16 @@ export const resolveFontFamily = (id?: string): string => {
   const family = load();
   cache.set(id, family);
   return family;
+};
+
+/** Same resolution, but with an EXPLICIT fallback stack: a hand font that never arrives (an
+ *  offline render can't fetch fonts.gstatic.com) degrades to a script face rather than to
+ *  monospace. Used for wall captions and wall text items.
+ *
+ *  An unset / "default" / unknown id must NOT prepend "monospace" — that would win the cascade and
+ *  invert the whole point of this function, and "the wall text came out monospace" is precisely the
+ *  diagnostic for a failed Caveat fetch (design §12.4). So the script stack is returned alone. */
+export const resolveHandFontFamily = (id?: string): string => {
+  const fam = resolveFontFamily(id);
+  return fam === "monospace" ? '"Segoe Script", cursive' : `${fam}, "Segoe Script", cursive`;
 };

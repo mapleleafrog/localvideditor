@@ -9,18 +9,10 @@ export { CATALOG } from "./catalog";
 export { depthShadow, depthScale, bevel } from "./depth";
 export { composeStyles, scaleStrength } from "./compose";
 export { EASINGS, EASING_NAMES, ease, type EasingName } from "./easing";
-
-const IDENTITY: NonNullable<MotionDef["style"]> = () => ({});
-
-/** Resolve a motion's style fn. Unknown/todo -> identity (never throws). */
-export const getMotion = (id: string): NonNullable<MotionDef["style"]> => {
-  const m = motions[id];
-  if (!m || m.status !== "ready" || !m.style) {
-    console.warn(`[soranji-vfx] motion "${id}" not ready -> identity`);
-    return IDENTITY;
-  }
-  return m.style;
-};
+// `getMotion` is DECLARED in ./get-motion, not here, so ./stack can import it without an
+// index <-> stack module cycle. Re-exported so every existing import site is unchanged.
+export { getMotion, IDENTITY } from "./get-motion";
+export { stackMotions, type MotionParam, type StackCtx } from "./stack";
 
 /** Resolve a transition presentation. Unknown/todo -> fade (never throws). */
 export const getTransitionPresentation = (id: string, params?: Record<string, unknown>) => {

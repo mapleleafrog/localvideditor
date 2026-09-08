@@ -1,10 +1,11 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { getMotion, depthShadow, composeStyles, scaleStrength, ease, type EasingName } from "../effects";
+import { depthShadow, stackMotions, ease, type EasingName, type MotionParam } from "../effects";
 import { beatKick, clamp, lerp, quantize } from "../effects/helpers";
 
-/** Per-effect settings (index-aligned with the motion ids). */
-export type MotionParam = { loop?: boolean; strength?: number; easing?: EasingName };
+/** Per-effect settings (index-aligned with the motion ids). Declared in `effects/stack.ts`
+ *  alongside the stacker that reads it; re-exported here so existing importers are unchanged. */
+export type { MotionParam };
 
 export type TransitionKind =
   | "none"
@@ -152,13 +153,16 @@ export const Layer: React.FC<LayerProps> = ({
   const ids = motionIds && motionIds.length ? motionIds : motionId ? [motionId] : [];
   // Per-effect: each motion gets its own loop (progress sawtooth), easing (progress curve), and
   // strength (magnitude). A per-effect value falls back to the layer-level loop/strength.
-  const perEffect = ids.map((id, i) => {
-    const p = motionParams?.[i];
-    const looped = (p?.loop ?? loop) ? f / win - Math.floor(f / win) : clamp(f / win);
-    const progress = ease(p?.easing ?? "linear", looped);
-    return scaleStrength(getMotion(id)({ progress, frame, fps, t, beat, z: zz, params }), p?.strength ?? strength);
-  });
-  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = composeStyles(perEffect);
+  // The loop itself lives in effects/stack.ts so wall items compose through the SAME code path.
+  const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = stackMotions(
+    ids,
+    motionParams,
+    { frame, fps, t, beat, z: zz, params },
+    f,
+    win,
+    loop,
+    strength,
+  );
 
   // --- enter / exit transitions (element-scoped: fade / slide / zoom / pop / rotate / spin / blur / flash / wipe / iris / typewriter) ---
   const eP = enter !== "none" ? ioPart(enter, ease(enterEasing, clamp(f / Math.max(1, enterDurationInFrames))), width, height) : {};

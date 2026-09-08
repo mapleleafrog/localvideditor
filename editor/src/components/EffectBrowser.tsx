@@ -108,9 +108,16 @@ export const EffectBrowser: React.FC = () => {
     }
   }, [browser]);
 
+  // `index` means a different array per mode — a wall item's index addresses clips[clip].wall.items,
+  // NOT clips[index]. Validating it as a clip would have let a pick fall through to the transition
+  // branch and rewrite an unrelated clip's transitionToNext.
   const targetValid =
     !!browser &&
-    (browser.mode === "overlay-add" ? !!project.overlays[browser.index] : !!project.clips[browser.index]);
+    (browser.mode === "overlay-add"
+      ? !!project.overlays[browser.index]
+      : browser.mode === "wall-item-add"
+        ? !!project.clips[browser.clip]?.wall?.items?.[browser.index]
+        : !!project.clips[browser.index]);
 
   // Target vanished (deleted/undone) while open — close in an effect, not during render.
   useEffect(() => {
@@ -173,9 +180,11 @@ export const EffectBrowser: React.FC = () => {
   const title =
     browser.mode === "overlay-add"
       ? `Add effect — ${overlayLabel(project.overlays[browser.index], browser.index)}`
-      : browser.mode === "clip-motion"
-        ? `Set motion — Clip ${browser.index + 1}`
-        : `Transition — Clip ${browser.index + 1} → ${browser.index + 2}`;
+      : browser.mode === "wall-item-add"
+        ? `Add effect — wall item ${browser.index + 1} (clip ${browser.clip + 1})`
+        : browser.mode === "clip-motion"
+          ? `Set motion — Clip ${browser.index + 1}`
+          : `Transition — Clip ${browser.index + 1} → ${browser.index + 2}`;
 
   const toggleTag = (t: string) =>
     setActiveTags((s) => {
@@ -197,6 +206,15 @@ export const EffectBrowser: React.FC = () => {
       st.flash(`Added ${id}`);
       pushRecent(id);
       // stays open — user can keep stacking
+    } else if (b.mode === "wall-item-add") {
+      // Wall items stack effects exactly like an overlay (same motions/motionParams pair), so the
+      // browser stays open with a ✓ badge and a re-click is a no-op.
+      const it = st.project.clips?.[b.clip]?.wall?.items?.[b.index];
+      if (!it) return;
+      if ((it.motions ?? []).includes(id)) return;
+      st.patchWallItem(b.clip, b.index, { motions: [...(it.motions ?? []), id] });
+      st.flash(`Added ${id}`);
+      pushRecent(id);
     } else if (b.mode === "clip-motion") {
       const c = st.project.clips[b.index];
       if (!c) return;
@@ -213,7 +231,11 @@ export const EffectBrowser: React.FC = () => {
   };
 
   const appliedIds =
-    browser.mode === "overlay-add" ? new Set(project.overlays[browser.index]?.motions ?? []) : new Set<string>();
+    browser.mode === "overlay-add"
+      ? new Set(project.overlays[browser.index]?.motions ?? [])
+      : browser.mode === "wall-item-add"
+        ? new Set(project.clips[browser.clip]?.wall?.items?.[browser.index]?.motions ?? [])
+        : new Set<string>();
 
   return (
     <div className="fxb-backdrop" onPointerDown={() => closeBrowser()}>

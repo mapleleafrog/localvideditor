@@ -3,12 +3,16 @@ import { useEditor } from "../store";
 import type { Clip } from "../../../src/timeline/schema";
 import { readyTransitions } from "../lib/effects-bridge";
 import { fmtTime } from "../lib/timeline-utils";
+import { fitDurationPatch, wallFitStatus, wallOf, wallSummary } from "../lib/wall-edit";
+import { WallMiniMap } from "./WallMiniMap";
 
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 
 /** Vite serves the project's public/ at "/", so local clip srcs resolve there. */
 const boardSrc = (src: string) => (/^https?:\/\//.test(src) ? src : "/" + src.replace(/^\/+/, ""));
+/** Checked AFTER isWall — this regex would misfire on a leftover `.mp4` src on a converted clip. */
 const isVideo = (c: Clip) => c.type === "video" || /\.(mp4|webm|mov|m4v)$/i.test(c.src);
+const isWall = (c: Clip) => c.type === "wall";
 
 /** Same shape as TimelinePanel's newClip + the storyboard text fields. */
 const newClip = (): Clip => ({
@@ -17,8 +21,18 @@ const newClip = (): Clip => ({
   label: "", note: "",
 });
 
-const Thumb: React.FC<{ clip: Clip }> = ({ clip }) => {
+const Thumb: React.FC<{ clip: Clip; W: number; H: number; fps: number }> = ({ clip, W, H, fps }) => {
   const [err, setErr] = useState(false);
+  // Wall FIRST: it shows the whole wall AND where scene 1 looks, in one small SVG with no Player —
+  // and a wall clip's `src` is empty (or stale), which the checks below would render as "no footage".
+  if (isWall(clip)) {
+    return (
+      <div className="sb-thumb sb-thumb-wall">
+        <WallMiniMap wall={wallOf(clip)} W={W} H={H} fps={fps} width={220} height={124} highlight={0} showScenes />
+        <span className="sb-badge">🧱 wall</span>
+      </div>
+    );
+  }
   const src = clip.src ? boardSrc(clip.src) : "";
   if (!src || err) {
     return <div className="sb-thumb placeholder">{clip.label || "no footage"}</div>;
@@ -32,9 +46,13 @@ const Thumb: React.FC<{ clip: Clip }> = ({ clip }) => {
 /** Clip-tied storyboard: each card IS a clip on the timeline. Reorder / add / delete / label / annotate
  *  here and it changes the real edit; effects, titles and overlays are layered in the Edit tab. */
 export const Storyboard: React.FC = () => {
-  const { project, selection, patchClip, addClip, reorderClip, select, removeSelected } = useEditor();
+  const { project, selection, patchClip, addClip, reorderClip, select, removeSelected, setView, setWallClip } =
+    useEditor();
   const clips = project.clips;
   const fps = project.fps ?? 30;
+  const compW = project.width ?? 1920;
+  const compH = project.height ?? 1080;
+  const fits = wallFitStatus(project);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
@@ -65,6 +83,9 @@ export const Storyboard: React.FC = () => {
       <div className="sb-grid">
         {clips.map((c, i) => {
           const sel = selection?.kind === "clip" && selection.index === i;
+          const wall = isWall(c);
+          const summary = wall ? wallSummary(wallOf(c), fps, compW, compH) : null;
+          const fit = wall ? fits.find((f) => f.clip === i) ?? null : null;
           return (
             <div
               key={i}
@@ -96,7 +117,7 @@ export const Storyboard: React.FC = () => {
                 onDragEnd={() => setDragIndex(null)}
                 title="Drag to reorder"
               >
-                <Thumb clip={c} />
+                <Thumb clip={c} W={compW} H={compH} fps={fps} />
               </div>
 
               <div className="sb-dur">
@@ -124,13 +145,46 @@ export const Storyboard: React.FC = () => {
                 onClick={stop}
                 onChange={(e) => patchClip(i, { note: e.target.value })}
               />
-              <input
-                className="sb-srcfield"
-                placeholder="src — clip-a.svg or media/photo.jpg"
-                value={c.src}
-                onClick={stop}
-                onChange={(e) => patchClip(i, { src: e.target.value })}
-              />
+              {/* A wall clip has no `src` — an editable path field there would invite typing
+                  something nothing reads. It gets a read-only summary and its two real actions. */}
+              {wall && summary ? (
+                <div className="sb-wall" onClick={stop}>
+                  <span className="muted">{summary.text}</span>
+                  {fit && <span className={"wall-fit " + fit.state}>{fit.label}</span>}
+                  <span className="sb-wall-actions">
+                    <button
+                      title="Arrange the wall and set camera scenes"
+                      onClick={() => {
+                        select({ kind: "clip", index: i });
+                        setWallClip(i);
+                        setView("wall");
+                      }}
+                    >
+                      Edit wall
+                    </button>
+                    <button
+                      title="Set the clip length to exactly what the camera schedule needs"
+                      disabled={!fit || fit.state === "fit"}
+                      // Shared patch — it applies project.durationInFrames' cap, like every other
+                      // retime path in the app.
+                      onClick={() => {
+                        const p = fitDurationPatch(useEditor.getState().project, i);
+                        if (p) patchClip(i, p);
+                      }}
+                    >
+                      ⟲ Fit
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <input
+                  className="sb-srcfield"
+                  placeholder="src — clip-a.svg or media/photo.jpg"
+                  value={c.src}
+                  onClick={stop}
+                  onChange={(e) => patchClip(i, { src: e.target.value })}
+                />
+              )}
 
               {i < clips.length - 1 && (
                 <div className="sb-trans" onClick={stop}>

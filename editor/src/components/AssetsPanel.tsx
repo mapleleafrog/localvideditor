@@ -6,6 +6,14 @@ import { listMedia, uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
 import type { AudioTrack } from "../../../src/timeline/schema";
+import {
+  importWidth,
+  isWallClip,
+  newSeed,
+  newWallClip,
+  newWallItemFromAsset,
+  scatterIntoWall,
+} from "../lib/wall-edit";
 
 // Fallback list until /api/media responds (the dev server scans public/ + public/media/).
 const FALLBACK_ASSETS = ["clip-a.svg", "clip-b.svg", "orange-mush.gif", "pixel-mush.gif", "passport_pic_TJH.png"];
@@ -66,11 +74,65 @@ export const AssetsPanel: React.FC = () => {
 
   // Add an asset as a layer at its NATIVE size (scaled down only if bigger than the frame).
   // Video files become video layers; everything else an image layer.
+  //
+  // IN THE WALL VIEW the same click adds a WALL ITEM at the frame centre instead — otherwise
+  // clicking a photo while arranging a wall would silently create a timeline overlay that is
+  // invisible until you switch back to Edit.
   const addAsset = async (ref: string) => {
     const vid = isVideo(ref);
+    const st0 = useEditor.getState();
+    const wallMode = st0.view === "wall" && isWallClip(st0.project, st0.wallClip);
     const { w, h } = await (vid ? videoNaturalSize : imageNaturalSize)(srcUrl(ref));
+    if (wallMode) {
+      // Re-read + re-validate after the await: the clip may have been reordered, removed or undone
+      // while the natural size was loading.
+      const st = useEditor.getState();
+      const ci = st.wallClip;
+      if (st.view !== "wall" || ci == null || !isWallClip(st.project, ci)) return;
+      const cam = st.wallCam;
+      st.addWallItem(
+        ci,
+        newWallItemFromAsset(ref, {
+          x: cam.x,
+          y: cam.y,
+          width: importWidth(w, st.project.width ?? 1920, cam.zoom),
+          aspect: w > 0 && h > 0 ? w / h : undefined,
+          seed: newSeed(),
+          label: ref,
+        }),
+      );
+      return;
+    }
     addOverlay(mediaOverlay(ref, placeWidth(w, h, compW, compH, Math.round(compW * 0.5)), vid ? "video" : "image"));
   };
+  /**
+   * The shortest path in the app from a folder of photos to a finished camera montage: lay the refs
+   * out as clusters on a wall, generate ONE scene per cluster (framed by the same `fitAll` the
+   * intro/outro use, timed by `suggestGlideSeconds`), append a fitted wall clip and open it.
+   *
+   * Aspects are probed first so `fitAll` frames the real cards — a wrong aspect would frame a
+   * cluster around boxes that are not the shape of the photos in them.
+   */
+  const buildWall = async (refs: string[]) => {
+    const probed = await Promise.all(
+      refs.map(async (src) => {
+        const { w, h } = await imageNaturalSize(srcUrl(src));
+        return { src, aspect: w > 0 && h > 0 ? w / h : undefined, label: src };
+      }),
+    );
+    // Read the store fresh AFTER the awaits — the clip list may have changed while probing.
+    const st = useEditor.getState();
+    const W = st.project.width ?? 1920;
+    const H = st.project.height ?? 1080;
+    const wall = scatterIntoWall(probed, { W, H });
+    const index = (st.project.clips ?? []).length;
+    st.addClip(newWallClip(st.project.fps ?? 30, W, H, wall));
+    st.select({ kind: "clip", index });
+    st.setWallClip(index);
+    st.setView("wall");
+    st.flash(`Wall built — ${probed.length} photos, ${(wall.scenes ?? []).length} scenes`);
+  };
+
   const [assets, setAssets] = useState<string[]>(FALLBACK_ASSETS);
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -168,6 +230,16 @@ export const AssetsPanel: React.FC = () => {
               }}
             >
               ▦ Grid
+            </button>
+            <button
+              className="lib-item"
+              title="A collage wall with a keyframed camera — clusters of photos plus one scene per cluster"
+              onClick={() => {
+                void buildWall(batch);
+                setBatch(null);
+              }}
+            >
+              🧱 Wall
             </button>
             <button className="lib-item" onClick={() => setBatch(null)}>
               Skip

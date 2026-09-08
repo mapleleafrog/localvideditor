@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerRef } from "@remotion/player";
 import { staticFile } from "remotion";
 import { useEditor } from "../store";
@@ -8,6 +8,9 @@ import { startBlockDrag, startScrub } from "../lib/drag";
 import { useCurrentPlayerFrame } from "../lib/useCurrentPlayerFrame";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
+import { newWallClip, wallFitStatus, wallOf, wallSummary } from "../lib/wall-edit";
+import { importPhotosToWall } from "../lib/wall-import";
+import { WallMiniMap } from "./WallMiniMap";
 
 const RULER_H = 24;
 const LANE_H = 40;
@@ -69,24 +72,48 @@ type HoverPreview = { kind: "clip" | "overlay"; index: number; left: number; top
  *  would need seeking a hidden <video> to the hovered position); first-frame already answers
  *  "what is this clip" for the common case. */
 const TimelineTip: React.FC<{ project: Project; preview: HoverPreview }> = ({ project, preview }) => {
+  // A broken/absent src used to render an empty box with no explanation. One `failed` src is enough:
+  // only one tip is on screen at a time. (Hook runs before the early return — rules of hooks.)
+  const [failed, setFailed] = useState<string | null>(null);
+  const media = (src: string, video: boolean) => {
+    if (!src || failed === src) return <div className="tl-tip-text">{src ? `can't load ${src}` : "(no source)"}</div>;
+    return video ? (
+      <video className="tl-tip-media" src={previewUrl(src)} muted preload="metadata" onError={() => setFailed(src)} />
+    ) : (
+      <img className="tl-tip-media" src={previewUrl(src)} alt="" onError={() => setFailed(src)} />
+    );
+  };
   if (!preview) return null;
   let body: React.ReactNode;
   if (preview.kind === "clip") {
     const c = project.clips[preview.index];
     if (!c) return null;
-    body =
-      c.type === "video" ? (
-        <video className="tl-tip-media" src={previewUrl(c.src)} muted preload="metadata" />
-      ) : (
-        <img className="tl-tip-media" src={previewUrl(c.src)} alt="" />
+    // Wall BEFORE the video/image ternary: a wall clip's `src` is empty (or a stale path left over
+    // from a converted clip), so the ternary would show a broken image for the richest clip type.
+    if (c.type === "wall") {
+      const wall = wallOf(c);
+      body = (
+        <WallMiniMap
+          wall={wall}
+          W={project.width ?? 1920}
+          H={project.height ?? 1080}
+          fps={project.fps ?? 30}
+          width={220}
+          height={132}
+          highlight={0}
+          showScenes
+          title={wallSummary(wall, project.fps ?? 30, project.width ?? 1920, project.height ?? 1080).text}
+        />
       );
+    } else {
+      body = media(c.src, c.type === "video");
+    }
   } else {
     const o = project.overlays[preview.index];
     if (!o) return null;
     if (o.type === "text") body = <div className="tl-tip-text">{o.text || "(empty text)"}</div>;
     else if (o.type === "fx") body = <div className="tl-tip-text">fx: {(o.motions ?? []).join(", ") || "no effects"}</div>;
-    else if (o.type === "video") body = <video className="tl-tip-media" src={previewUrl(o.src)} muted preload="metadata" />;
-    else body = <img className="tl-tip-media" src={previewUrl(o.src)} alt="" />;
+    else body = media(o.src, o.type === "video");
   }
   return (
     <div className="tl-tip" style={{ left: preview.left, top: preview.top }}>
@@ -96,7 +123,7 @@ const TimelineTip: React.FC<{ project: Project; preview: HoverPreview }> = ({ pr
 };
 
 export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
-  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected, openCtxMenu } =
+  const { project, zoom, selection, select, patchClip, patchOverlay, addClip, addOverlay, addAudio, reorderOverlay, setZoom, splitSelected, duplicateSelected, openCtxMenu, setView, setWallClip } =
     useEditor();
   const scrollRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -105,6 +132,10 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
   const maxDur = project.durationInFrames && project.durationInFrames > 0 ? project.durationInFrames : Infinity;
   const capDur = (n: number) => Math.min(maxDur, n);
   const starts = clipStarts(project);
+  // One function, three surfaces (this badge, the Scenes strip header, the Storyboard card) — so an
+  // upstream retime shows on EVERY wall block, not only the selected one. MEMOISED: it solves
+  // `fitAll` per wall clip, and this panel re-renders on every playhead tick during playback.
+  const fits = useMemo(() => wallFitStatus(project), [project]);
   const innerW = total * zoom + 80;
   const overlayCount = project.overlays.length;
   const [dropping, setDropping] = useState(false);
@@ -168,6 +199,25 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
       if (isAudioFile(f.name)) addAudio(audioTrack(r.ref));
       else addClip(newClip(r.ref, isVideoFile(f.name) ? "video" : "image"));
     }
+  };
+
+  /** Append a fitted wall clip and open it. Reads the store fresh so it can't act on a stale list. */
+  const addWall = () => {
+    const st = useEditor.getState();
+    const p = st.project;
+    const index = (p.clips ?? []).length;
+    st.addClip(newWallClip(p.fps ?? 30, p.width ?? 1920, p.height ?? 1080));
+    st.select({ kind: "clip", index });
+    st.setWallClip(index);
+    st.setView("wall");
+    st.flash("Added a wall clip — drop photos from the Assets tab");
+  };
+
+  /** Open a wall clip in the Wall view (double-click on its block, or the context menu). */
+  const openWall = (i: number) => {
+    select({ kind: "clip", index: i });
+    setWallClip(i);
+    setView("wall");
   };
 
   const [playing, setPlaying] = useState(false);
@@ -243,6 +293,7 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
         </button>
         <span className="sep" />
         <button onClick={() => addClip(newClip())} title="Append a clip to the track">+ Clip</button>
+        <button onClick={addWall} title="Append a collage-wall clip and open the Wall view">+ Wall</button>
         <button onClick={() => addOverlay(newOverlay("text", phFrame()))} title="Add a text layer at the playhead">+ Text</button>
         <button onClick={() => addOverlay(newOverlay("image", phFrame(), Math.round((project.width ?? 1920) * 0.5)))} title="Add an image layer at the playhead">+ Image</button>
         <button onClick={() => addOverlay(newOverlay("fx", phFrame()))} title="Full-frame effect layer at the playhead (petals, bokeh, light-leaks…)">+ FX</button>
@@ -341,25 +392,53 @@ export const TimelinePanel: React.FC<{ playerRef: React.RefObject<PlayerRef | nu
             <div className="tl-lane" style={{ height: LANE_H }}>
               {project.clips.map((c, i) => {
                 const sel = selection?.kind === "clip" && selection.index === i;
+                const isWall = c.type === "wall";
+                const wallSum = isWall
+                  ? wallSummary(wallOf(c), fps, project.width ?? 1920, project.height ?? 1080)
+                  : null;
+                const fit = isWall ? fits.find((f) => f.clip === i) ?? null : null;
                 return (
                   <div
                     key={i}
-                    className={"tl-block clip" + (sel ? " on" : "")}
+                    className={"tl-block clip" + (isWall ? " wall" : "") + (sel ? " on" : "")}
                     style={{ left: starts[i] * zoom, width: c.durationInFrames * zoom }}
                     onPointerDown={() => {
                       onBlockHoverLeave();
                       select({ kind: "clip", index: i });
                     }}
+                    onDoubleClick={() => { if (isWall) openWall(i); }}
                     onMouseEnter={(e) => onBlockHoverEnter("clip", i, e)}
                     onMouseLeave={onBlockHoverLeave}
+                    // A wall block accepts image drops itself; stopPropagation keeps the lane's
+                    // "make a new clip" drop handler from also firing for the same files.
+                    onDragOver={isWall ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+                    onDrop={
+                      isWall
+                        ? (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDropping(false);
+                            void importPhotosToWall(i, Array.from(e.dataTransfer.files));
+                          }
+                        : undefined
+                    }
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       openCtxMenu(e.clientX, e.clientY, phFrame(), { kind: "clip", index: i });
                     }}
-                    title={`${c.src} · ${c.durationInFrames}f` + (c.transitionToNext !== "none" ? ` · →${c.transitionToNext}` : "")}
+                    title={
+                      isWall && wallSum
+                        ? `Wall · ${wallSum.text} · ${c.durationInFrames}f${fit ? ` · ${fit.label}` : ""} — double-click to open, drop photos to add items`
+                        : `${c.src} · ${c.durationInFrames}f` + (c.transitionToNext !== "none" ? ` · →${c.transitionToNext}` : "")
+                    }
                   >
-                    <span className="tl-block-label">{c.src}</span>
+                    <span className="tl-block-label">
+                      {isWall && wallSum ? `🧱 Wall · ${wallSum.items} items · ${wallSum.scenes} scenes` : c.src}
+                    </span>
+                    {fit && fit.state !== "fit" && (
+                      <span className={"tl-fit " + fit.state} title={fit.label}>{fit.state === "short" ? "⚠" : "ⓘ"}</span>
+                    )}
                     {c.transitionToNext !== "none" && <span className="tl-trans">⇥</span>}
                     <span
                       className="tl-handle right"

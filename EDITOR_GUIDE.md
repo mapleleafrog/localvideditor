@@ -21,7 +21,7 @@ The dev server also exposes the in-app render + persistence endpoints (`/api/ren
 
 ```
 ┌────────────────────────── Topbar ──────────────────────────┐
-│ undo/redo · ⌨ shortcuts · Save · Export · Import · ⏺ Render  │
+│ Edit | Storyboard | Wall · undo/redo · ⌨ · Save · Export · ⏺ Render │
 ├──────────┬────────────────────────────────┬─────────────────┤
 │ Library  │          Preview (Player)       │   Inspector     │
 │ Effects  │   exact composition + on-canvas │  props of the   │
@@ -58,11 +58,56 @@ to select that clip (it carries into the Edit tab). Changes here are the same da
 arrange + annotate your shots in Storyboard, then switch to Edit to layer effects/titles/transitions and render.
 (Overlays/titles/fx are edited in the Edit tab, not shown as storyboard cards.)
 
+## Wall mode
+
+Toggle **Edit | Storyboard | Wall** in the top bar (the button reads **+ Create a wall clip** until the
+project has one). A **wall clip** (`clip.type: "wall"`) is a free-growing collage wall: photos, props and
+hand-font text pinned anywhere on unbounded paper, walked by a **keyframed camera**. Nothing on the wall
+animates by default — the movement *is* the camera, timed in seconds (holds + glides), not beats.
+
+**The viewport is the renderer.** The centre panel mounts a real `<Player component={Timeline}>` on a derived
+project whose wall carries one synthetic scene at your authoring camera — so the pixels under the drag handles
+are produced by the shipping renderer. **Overscan** (`1× / 1.6× / 2.5×`) lets you see the wall around the shot;
+it enlarges the Player's *composition size*, never the camera zoom, so the recorded frame is exactly the bright
+centred rectangle and every zoom-dependent look (paper fibre, shadow lift) is identical to the MP4.
+
+| Panel | What it is |
+|---|---|
+| Left rail | The usual **Library**. In Wall mode an **Assets** tile click adds a *wall item* at the frame centre. |
+| Centre | Nav bar (**⤢ Fit all** · **⤡ Fit selection** · **1:1** · hand · roll slider · overscan · **▶ Live** · wall-clip picker · **+ Photos…** · live camera readout), the Player, the gesture/handle overlay, and the always-on **minimap** (items by depth, numbered scene frusta, the real glide paths). |
+| Right rail | **Wall inspector** — the selected item (position, width, rotation, opacity, **depth**, frame treatment, caption, filter, flip, text/font, stacked effects, paint order) plus the wall globals (paper, fibre, finish, breathing, intro/outro, viewfinder, hand font, fit padding). |
+| Footer | **Scenes strip** — the authoring loop below. |
+
+**The loop.** ① Pan/zoom/roll until the recorded frame holds what you want. ② Drop photos (OS drag, **+ Photos…**,
+or an Assets tile) and arrange them — drag, corner-scale, rotate, `Shift`-marquee for a group, align/distribute.
+③ **⊕ Set as scene** (or `Enter`) appends a camera keyframe with a glide duration a motion designer would sign
+off. ④ Pan to the next area and repeat. ⑤ **⟲ Fit clip duration** makes the clip exactly as long as the schedule.
+
+Each scene card carries a minimap thumb, its hold and glide seconds, easing, arc, and a **colour-banded px/frame
+speed chip** — hover it for *"1.5 s over 1010 screen px — 35 px/frame. Suggested 1.76 s."*, click to apply.
+**⌖** jumps the camera to the scene, **⟳** updates its pose from the viewport *keeping the timing*, **▸** plays
+that scene in Live mode, **⧉** duplicates, **×** deletes, and cards reorder by drag or ◀ ▶.
+
+**Camera navigation is not undoable** (pan/zoom/roll is transient); item edits and scene keyframes are.
+
+Outside the Wall view a wall clip shows up as: a `🧱 Wall · N items · M scenes` timeline block (double-click to
+open, drop photos on it to add items, right-click for **Edit wall… / Fit duration to scenes / Fit camera to all
+items / Add photos…**), a minimap card in the **Storyboard**, and a **Wall** section in the Edit **Inspector**.
+Flip and Split are greyed for a wall clip (no media element to mirror; both halves would restart the schedule)
+and the clip **Motion** section is hidden — the wall has its own camera. A **fit badge** (`✓ fit` /
+`⚠ cuts the camera short by 15f` / `ⓘ holds the last framing for 40f`) appears on every wall block, the
+Storyboard card and the strip header; fitting is always a manual button, never automatic.
+
+Fastest start: import a folder of photos in **Assets** → choose **🧱 Wall** in the arrange prompt. That scatters
+them into clusters, generates one scene per cluster with suggested glide timings, appends a fitted wall clip and
+opens it.
+
 ## Common workflows
 
 | Goal | How |
 |---|---|
 | Plan the shot order | **Storyboard** tab → drag cards to sequence, set each shot's duration, label + note it |
+| Build a collage wall | **+ Wall** on the timeline (or **Wall** in the topbar) → drop photos → arrange → **⊕ Set as scene** per area → **⟲ Fit clip duration**. Or import photos in **Assets** and pick **🧱 Wall**. |
 | Add a photo/clip | **+ Clip** (timeline / Storyboard **+ Add shot**) or click an **Assets** item; set `src` in the Inspector (e.g. `media/photo.jpg`) |
 | Add a title | **+ Text**, then edit text/font/color/glow in the Inspector |
 | Add full-frame atmosphere | **+ FX** → a full-frame layer; stack Wedding motions (petals, bokeh, light-leaks) or scanlines on it. Renders on top of the clips and alpha-exports for compositing. |
@@ -102,6 +147,21 @@ Press **`?`** (or the **⌨** button in the topbar) anytime for the in-app cheat
 | `Ctrl/Cmd + S` | Save the project to `projects/<name>.json` |
 | `+` / `−` | Zoom the timeline in / out (`Ctrl`+wheel zooms at the cursor) |
 | `?` | Toggle the shortcuts cheat sheet |
+
+**Wall mode** replaces the single-key map above (so `S` can't blade the clip under the playhead while you are
+arranging photos); the `Ctrl/Cmd` combos are unchanged.
+
+| Key | Action (Wall) |
+|---|---|
+| `Space` | Hold to pan (in **Live** it plays / pauses) |
+| `F` / `Shift + F` | Fit all items / fit the selection |
+| `1` / `0` | Zoom 1:1 / reset camera roll |
+| `H` | Sticky hand (pan) tool |
+| `[` / `]` | Send backward / bring forward (array order *is* paint order) |
+| `←↑→↓` | Nudge the selection 1 wall unit (`Shift` = 10) |
+| `Enter` | Set the current framing as a scene |
+| `Alt` | Hold to disable snapping while dragging |
+| `Delete` | Delete the selected item(s) |
 
 (Single-key shortcuts are suppressed while typing in a field; `Ctrl/Cmd` combos still work, except copy/paste which defer to the focused field.)
 
@@ -154,10 +214,20 @@ editor/
       ShortcutsModal.tsx keyboard cheat-sheet overlay (?) + transient action Toast
       Inspector.tsx     per-item prop editor incl. effect multi-select + transition picker
       Library.tsx       registry-driven Effects / Transitions / Assets browsers
+      fields.tsx        shared Field / Slider / Section / EasingSelect / EffectStack primitives
+      WallView.tsx      wall viewport: nav bar + the authoring <Player> (overscan) + drop handling
+      WallOverlay.tsx   wall gestures: hit boxes, move/scale/rotate, snapping, marquee + group ops
+      WallMiniMap.tsx   pure-SVG plan view (items, scene frusta, real glide paths) — 4 call sites
+      WallInspector.tsx wall item props + the wall globals (commit-on-blur fields)
+      WallScenes.tsx    the Scenes strip: set/update/jump/play scenes + the px/frame speed chip
     lib/
       effects-bridge.ts single import surface for the effect registry (auto-updating pickers)
       coords.ts         screen px <-> composition %/scale mapping
+      fit.ts            useContainFit — the exact-composition-aspect box (Preview + WallView)
       timeline-utils.ts duration + clip start positions (mirrors calculateTimelineMetadata)
+      wall-edit.ts      wall defaults, immutable rebuild helpers, authoringProject, fit status
+      wall-coords.ts    thin adapter over src/timeline/wall.ts for the editor's gestures
+      wall-import.ts    photos -> wall items (upload + aspect probe + async re-validation)
       api.ts            client for the dev-server render/save/media endpoints
 ```
 
@@ -166,6 +236,7 @@ Reuses, unchanged: `src/timeline/Timeline.tsx` (+ `calculateTimelineMetadata`), 
 
 ## Not yet built (Phase 2)
 
-Multi-track grouping & marquee multi-select; keyframeable transforms; an `<Audio>` soundtrack with real
-beat-sync (`@remotion/media-utils`); asset upload UI. The registry-driven design means new VFX/transitions
-need **no** editor changes.
+Multi-track grouping & marquee multi-select **on the timeline** (the Wall view has its own marquee +
+group ops); keyframeable transforms; **real waveform** beat-sync (BPM/offset beat-sync and an `<Audio>`
+soundtrack already ship — see the Audio tab). The registry-driven design means new VFX/transitions need
+**no** editor changes.

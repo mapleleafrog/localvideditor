@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave } from "../store";
+import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave, migrate } from "../store";
+import type { Project } from "../../../src/timeline/schema";
 import { renderVideo, saveProjectFile, deleteProject } from "../lib/api";
 import { ensureProjectName, safeName } from "../lib/names";
+import { firstWallClip, newWallClip } from "../lib/wall-edit";
 
 type RenderState =
   | { phase: "idle" }
@@ -17,6 +19,7 @@ export const Topbar: React.FC = () => {
   const view = useEditor((s) => s.view);
   const setView = useEditor((s) => s.setView);
   const toggleShortcuts = useEditor((s) => s.toggleShortcuts);
+  const wallIndex = firstWallClip(project);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
   const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
   const [note, setNote] = useState<string | null>(null);
@@ -91,11 +94,36 @@ export const Topbar: React.FC = () => {
     if (!file) return;
     try {
       const text = await file.text();
-      setProject(JSON.parse(text));
+      // Through the SAME sanitiser the autosave seed goes through. Import is the one path that can
+      // actually carry a foreign `clip.type` in from a file, and it was the unguarded one — a clip
+      // whose type has no matching <option> renders a blank select whose first touch silently
+      // rewrites it to `image`, destroying the payload (a wall's items and scenes, say).
+      setProject(migrate(JSON.parse(text) as Project));
       flash(`Imported ${file.name}`);
     } catch (err) {
       flash(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  /** Open the Wall view on the project's first wall clip, creating one at the end of the track when
+   *  there isn't one yet. Reads the store fresh so it can't act on a stale clip list. */
+  const onWall = () => {
+    const st = useEditor.getState();
+    const p = st.project;
+    const existing = firstWallClip(p);
+    if (existing >= 0) {
+      st.setWallClip(existing);
+      st.select({ kind: "clip", index: existing });
+      st.setView("wall");
+      return;
+    }
+    const clip = newWallClip(p.fps ?? 30, p.width ?? 1920, p.height ?? 1080);
+    const index = (p.clips ?? []).length;
+    st.addClip(clip);
+    st.setWallClip(index);
+    st.select({ kind: "clip", index });
+    st.setView("wall");
+    flash("Added a wall clip — drop photos from the Assets tab");
   };
 
   const onReset = () => {
@@ -113,6 +141,13 @@ export const Topbar: React.FC = () => {
       <span className="view-toggle">
         <button className={view === "edit" ? "on" : ""} onClick={() => setView("edit")}>Edit</button>
         <button className={view === "storyboard" ? "on" : ""} onClick={() => setView("storyboard")}>Storyboard</button>
+        <button
+          className={view === "wall" ? "on" : ""}
+          onClick={onWall}
+          title={wallIndex >= 0 ? "Edit the collage wall + camera scenes" : "Create a wall clip and start arranging"}
+        >
+          {wallIndex >= 0 ? "Wall" : "+ Create a wall clip"}
+        </button>
       </span>
 
       <span className="sep" />

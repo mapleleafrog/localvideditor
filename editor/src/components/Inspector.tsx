@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 import { useEditor } from "../store";
-import type { Overlay, MotionParam } from "../../../src/timeline/schema";
-import { readyMotions, readyTransitions } from "../lib/effects-bridge";
+import type { Clip, Overlay } from "../../../src/timeline/schema";
+import { readyTransitions } from "../lib/effects-bridge";
 import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 import { useFxPrefs } from "../lib/fx-prefs";
 import { respondsToStrength } from "../lib/strength";
+// Field / Slider / Section / EasingSelect (+ the shared EffectStack) live in fields.tsx so the
+// overlay, clip and wall inspectors render the same controls from one implementation.
+import { EasingSelect, EffectStack, Field, MOTIONS, MOTION_CATS, Section, Slider } from "./fields";
+import { DEFAULT_WALL, cloneWall, fitDurationPatch, wallFitFor, wallOf, wallSummary } from "../lib/wall-edit";
 
 const IO_OPTS: [Overlay["enter"], string][] = [
   ["none", "none"],
@@ -32,82 +36,11 @@ const TEXT_ANIM_OPTS: [string, string][] = [
   ["wordHighlight", "Word highlight"],
 ];
 
-const MOTIONS = readyMotions().map((m) => ({ id: m.id, name: m.name, category: m.category }));
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
-const MOTION_CATS = Array.from(new Set(MOTIONS.map((m) => m.category)));
-
-const EASING_OPTS: [string, string][] = [
-  ["linear", "Linear"],
-  ["easeIn", "Ease in"],
-  ["easeOut", "Ease out"],
-  ["easeInOut", "Ease in-out"],
-  ["easeOutIn", "Ease out-in"],
-];
-const EasingSelect: React.FC<{ value?: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
-  <select value={value ?? "linear"} onChange={(e) => onChange(e.target.value)}>
-    {EASING_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-  </select>
-);
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="fld">
-    <label>{label}</label>
-    {children}
-  </div>
-);
-
-const Slider: React.FC<{
-  value: number; min: number; max: number; step: number; onChange: (n: number) => void; suffix?: string; disabled?: boolean;
-}> = ({ value, min, max, step, onChange, suffix, disabled }) => (
-  <div className={"sld" + (disabled ? " sld-disabled" : "")}>
-    <input type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(e) => onChange(+e.target.value)} />
-    <input
-      type="number" className="sld-num" min={min} max={max} step={step} value={value} disabled={disabled}
-      onChange={(e) => onChange(+e.target.value)}
-    />
-    {suffix ? <span className="muted">{suffix}</span> : null}
-  </div>
-);
-
-/** Collapsible group — cuts down the constant scrolling on layers with lots of props/effects.
- *  State is a controlled <details> (not a bare `open` prop) so re-renders while editing a field
- *  don't fight the user's manual expand/collapse. */
-const Section: React.FC<{ title: string; defaultOpen?: boolean; badge?: number; children: React.ReactNode }> = ({
-  title,
-  defaultOpen = true,
-  badge,
-  children,
-}) => {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <details className="insp-section" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary className="insp-sub">
-        {title}
-        {!!badge && <span className="insp-badge">{badge}</span>}
-      </summary>
-      <div className="insp-section-body">{children}</div>
-    </details>
-  );
-};
-
-const MotionAdder: React.FC<{ onAdd: (id: string) => void }> = ({ onAdd }) => (
-  <select
-    value=""
-    onChange={(e) => { if (e.target.value) onAdd(e.target.value); }}
-  >
-    <option value="">+ add effect…</option>
-    {MOTION_CATS.map((cat) => (
-      <optgroup key={cat} label={cat}>
-        {MOTIONS.filter((m) => m.category === cat).map((m) => (
-          <option key={m.id} value={m.id}>{m.name}</option>
-        ))}
-      </optgroup>
-    ))}
-  </select>
-);
 
 export const Inspector: React.FC = () => {
-  const { project, selection, patchClip, patchOverlay, removeSelected, openBrowser } = useEditor();
+  const { project, selection, patchClip, patchOverlay, removeSelected, openBrowser, setView, setWallClip } =
+    useEditor();
   const { pushRecent: pushRecentMotion } = useFxPrefs("motion");
   const { pushRecent: pushRecentTransition } = useFxPrefs("transition");
 
@@ -117,42 +50,119 @@ export const Inspector: React.FC = () => {
 
   const maxDur = project.durationInFrames && project.durationInFrames > 0 ? project.durationInFrames : Infinity;
 
-  // Per-effect param helpers (motionParams is index-aligned with motions).
-  const setMotionParam = (oi: number, mi: number, patch: Partial<MotionParam>) => {
-    const ov = project.overlays[oi];
-    const params: MotionParam[] = (ov.motionParams ?? []).slice();
-    while (params.length < ov.motions.length) params.push({});
-    params[mi] = { ...params[mi], ...patch };
-    patchOverlay(oi, { motionParams: params });
-  };
-  const removeEffect = (oi: number, mi: number) => {
-    const ov = project.overlays[oi];
-    const params = (ov.motionParams ?? []).filter((_, k) => k !== mi);
-    patchOverlay(oi, { motions: ov.motions.filter((_, k) => k !== mi), motionParams: params.length ? params : undefined });
-  };
+  // Explicit, and BEFORE the clip branch: the selection union has three members now, so the
+  // overlay fallthrough at the bottom must never receive a wall item (that would patch an
+  // unrelated overlay at the same index). Wall items are edited in the Wall view's inspector.
+  if (selection.kind === "wallItem") {
+    return <div className="muted pad">Wall item — switch to the Wall view to edit it.</div>;
+  }
 
   if (selection.kind === "clip") {
     const c = project.clips[selection.index];
     if (!c) return <div className="muted pad">Clip gone.</div>;
     const i = selection.index;
+    // A wall clip is authored in the Wall view: its content is the wall payload (items + camera
+    // scenes), not a `src`, and its camera IS its motion.
+    const isWall = c.type === "wall";
+    const wall = isWall ? wallOf(c) : null;
+    const fit = isWall ? wallFitFor(project, i) : null;
+    const summary = wall ? wallSummary(wall, project.fps ?? 30, project.width ?? 1920, project.height ?? 1080) : null;
+    /** The one shared "fit the clip to the camera schedule" patch (it applies the project's fixed
+     *  duration as a cap) — the Scenes strip, the Storyboard card and the context menu call it too. */
+    const fitWall = (k: number) => {
+      const p = fitDurationPatch(useEditor.getState().project, k);
+      if (p) patchClip(k, p);
+    };
+    const openWall = () => {
+      setWallClip(i);
+      setView("wall");
+    };
     return (
       <div className="insp">
         <div className="insp-head">Clip {i + 1} <button className="del" onClick={removeSelected}>Delete</button></div>
         <Field label="Type">
-          <select value={c.type} onChange={(e) => patchClip(i, { type: e.target.value as "image" | "video" })}>
+          {/* `as Clip["type"]` with an <option> per member: a clip whose type has no matching
+              option renders a BLANK select whose first touch silently rewrites it — which would
+              destroy a wall clip's payload. */}
+          <select
+            value={c.type}
+            onChange={(e) => {
+              const t = e.target.value as Clip["type"];
+              // Switching TO wall seeds a complete payload in the SAME patch (one undo step) —
+              // zod defaults never run on the <Player inputProps> path, so a bare type change
+              // would leave the clip with no wall at all.
+              patchClip(i, t === "wall" ? { type: t, wall: c.wall ?? cloneWall(DEFAULT_WALL) } : { type: t });
+            }}
+          >
             <option value="image">image</option>
             <option value="video">video</option>
+            <option value="wall">wall</option>
           </select>
         </Field>
-        <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
-        <Field label="Duration (frames)"><input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} /></Field>
+        {/* A wall clip has no media element — its content is the wall payload. Showing an editable
+            `src` here would invite typing a path that nothing reads. */}
+        {!isWall && (
+          <Field label="Source"><input value={c.src} onChange={(e) => patchClip(i, { src: e.target.value })} placeholder="clip-a.svg or media/x.jpg" /></Field>
+        )}
+        <Field label="Duration (frames)">
+          <input type="number" min={1} max={Number.isFinite(maxDur) ? maxDur : undefined} value={c.durationInFrames} onChange={(e) => patchClip(i, { durationInFrames: Math.min(maxDur, Math.max(1, +e.target.value)) })} />
+          {/* Manual, never automatic: an auto-refit would fold into the same 600ms undo step and
+              fight the block's right-drag handle. */}
+          {fit && (
+            <>
+              <button
+                title="Set the clip length to exactly what the camera schedule needs"
+                disabled={fit.state === "fit"}
+                onClick={() => fitWall(i)}
+              >
+                ⟲ Fit to scenes ({fit.need}f)
+              </button>
+              <span className={"wall-fit " + fit.state} title={fit.label}>{fit.label}</span>
+            </>
+          )}
+        </Field>
+        {/* A wall has no media element to mirror, and mirroring the page would mirror the
+            handwriting — disabled rather than hidden, so the menu/field shape stays constant. */}
         <Field label="Flip horizontal">
-          <input type="checkbox" checked={!!c.flipX} onChange={(e) => patchClip(i, { flipX: e.target.checked || undefined })} />
+          <input
+            type="checkbox"
+            checked={!isWall && !!c.flipX}
+            disabled={isWall}
+            title={isWall ? "A wall has no media element to mirror" : undefined}
+            onChange={(e) => patchClip(i, { flipX: e.target.checked || undefined })}
+          />
+          {isWall && <span className="muted" style={{ fontSize: 11 }}>no media element to mirror</span>}
         </Field>
         <Field label="Flip vertical">
-          <input type="checkbox" checked={!!c.flipY} onChange={(e) => patchClip(i, { flipY: e.target.checked || undefined })} />
+          <input
+            type="checkbox"
+            checked={!isWall && !!c.flipY}
+            disabled={isWall}
+            title={isWall ? "A wall has no media element to mirror" : undefined}
+            onChange={(e) => patchClip(i, { flipY: e.target.checked || undefined })}
+          />
         </Field>
 
+        {isWall && wall && summary && (
+          <Section title="Wall" defaultOpen>
+            <div className="muted" style={{ fontSize: 11 }}>{summary.text}</div>
+            {fit && <div className={"wall-fit " + fit.state}>{fit.label}</div>}
+            <div className="wall-insp-actions">
+              <button onClick={openWall} title="Arrange the wall and set camera scenes">Edit wall…</button>
+              <button
+                disabled={!fit || fit.state === "fit"}
+                onClick={() => fitWall(i)}
+                title="Set the clip length to exactly what the camera schedule needs"
+              >
+                ⟲ Fit duration to scenes
+              </button>
+            </div>
+          </Section>
+        )}
+
+        {/* HIDDEN, not disabled, for a wall clip: a clip motion is a second camera, and it would
+            fight the wall's own (design §7.8 / F-30). */}
+        {!isWall && (
         <Section title="Motion" defaultOpen={c.motion !== "none"}>
           <Field label="Motion">
             <select
@@ -181,6 +191,7 @@ export const Inspector: React.FC = () => {
             );
           })()}
         </Section>
+        )}
 
         <Section title="Transition →next" defaultOpen={c.transitionToNext !== "none"}>
           <Field label="Transition">
@@ -322,45 +333,13 @@ export const Inspector: React.FC = () => {
         </Field>
       </Section>
 
-      <Section title="Effects (stacked)" defaultOpen={o.motions.length > 0} badge={o.motions.length || undefined}>
-        {o.motions.length === 0 && <span className="muted">no effects</span>}
-        {o.motions.map((m, mi) => {
-          const p = o.motionParams?.[mi] ?? {};
-          const responds = respondsToStrength(m);
-          // An unset per-effect strength falls back to the layer-wide strength (see Layer.tsx's
-          // per-effect composition: `p?.strength ?? strength`) — show that inherited value here
-          // too, or the slider would contradict the layer-wide one (e.g. layer at 0.5 but every
-          // effect still reads 1.0).
-          return (
-            <div className="fx-item" key={mi}>
-              <div className="fx-item-head">
-                <span className="fx-name" title={m}>{m}</span>
-                <button className="del" title="Remove effect" onClick={() => removeEffect(i, mi)}>×</button>
-              </div>
-              <Field label="Strength">
-                <Slider
-                  value={p.strength ?? o.strength ?? 1}
-                  min={0} max={2} step={0.05}
-                  disabled={!responds}
-                  onChange={(v) => setMotionParam(i, mi, { strength: v })}
-                />
-                {!responds && <span className="muted" style={{ fontSize: 11 }}>no intensity for this effect</span>}
-              </Field>
-              <Field label="Easing"><EasingSelect value={p.easing} onChange={(v) => setMotionParam(i, mi, { easing: v as MotionParam["easing"] })} /></Field>
-              <Field label="Loop"><input type="checkbox" checked={!!p.loop} onChange={(e) => setMotionParam(i, mi, { loop: e.target.checked })} /></Field>
-            </div>
-          );
-        })}
-        <div className="fx-add-row">
-          <MotionAdder
-            onAdd={(id) => {
-              patchOverlay(i, { motions: [...o.motions, id] });
-              pushRecentMotion(id);
-            }}
-          />
-          <button onClick={() => openBrowser({ mode: "overlay-add", index: i })}>Browse…</button>
-        </div>
-      </Section>
+      <EffectStack
+        motions={o.motions}
+        motionParams={o.motionParams}
+        fallbackStrength={o.strength}
+        onChange={(patch) => patchOverlay(i, patch)}
+        onBrowse={() => openBrowser({ mode: "overlay-add", index: i })}
+      />
     </div>
   );
 };

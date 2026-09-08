@@ -26,7 +26,16 @@ export const computeDuration = (p: Project, audioEnd = 0): number => {
   return Math.max(clipsTotal - transTotal, overlayEnd, audioEnd, 1);
 };
 
-/** Absolute start frame of each clip on the (sequential, transition-overlapped) clip track. */
+/** Absolute start frame of each clip on the (sequential, transition-overlapped) clip track.
+ *
+ *  `clipStarts(p)[i]` IS the wall clip's `absStart` contract. Four sites implement the same overlap
+ *  rule and MUST stay in sync — do not "optimise" one of them out of step:
+ *    1. here (the editor: fit status, block placement, the Wall view's Live seek),
+ *    2. `ClipTrack`'s accumulator in src/timeline/Timeline.tsx, which threads absStart into the
+ *       wall so breathing / item motions / the timecode run on ABSOLUTE composition seconds
+ *       (`TransitionSeries.Sequence` makes useCurrentFrame() clip-LOCAL),
+ *    3. `calculateTimelineMetadata`'s `transTotal`,
+ *    4. `computeDuration` above. */
 export const clipStarts = (p: Project): number[] => {
   const starts: number[] = [];
   let acc = 0;

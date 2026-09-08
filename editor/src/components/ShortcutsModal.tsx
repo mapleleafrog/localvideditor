@@ -5,7 +5,7 @@ import { useEditor } from "../store";
 const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 type Row = { keys: string[]; label: string };
-type Group = { title: string; rows: Row[] };
+type Group = { title: string; rows: Row[]; note?: string };
 
 const GROUPS: Group[] = [
   {
@@ -45,6 +45,30 @@ const GROUPS: Group[] = [
       { keys: ["⤢"], label: "Zoom to fit" },
       { keys: ["click"], label: "Ruler / empty lane = scrub" },
     ],
+  },
+  {
+    // The Wall view replaces the Edit map entirely while it is open (so `S` can't blade the clip
+    // under the playhead while you are arranging photos). Ctrl/⌘ combos above still apply.
+    title: "Wall",
+    rows: [
+      { keys: ["Space"], label: "Hold to pan (Live: play / pause)" },
+      { keys: ["F"], label: "Fit all items" },
+      { keys: ["Shift", "F"], label: "Fit the selection" },
+      { keys: ["1"], label: "Zoom 1:1" },
+      { keys: ["0"], label: "Reset camera roll" },
+      { keys: ["H"], label: "Hand (pan) tool" },
+      { keys: ["[", "]"], label: "Send backward / bring forward" },
+      { keys: ["←↑→↓"], label: "Nudge 1 wall unit (Shift = 10)" },
+      { keys: ["Enter"], label: "Set as scene" },
+      { keys: ["Alt"], label: "Hold to disable snapping" },
+      { keys: ["Del"], label: "Delete selected item(s)" },
+      { keys: [MOD, "D"], label: "Duplicate item" },
+      { keys: [MOD, "C"], label: "Copy item" },
+      { keys: [MOD, "V"], label: "Paste item" },
+      { keys: ["Shift", "drag"], label: "Marquee select (Alt+Shift replaces)" },
+      { keys: ["Alt", "drag"], label: "Roll the camera (empty wall)" },
+    ],
+    note: "Delete / ⌘D / ⌘C act on wall ITEMS only here — never the clip. Camera navigation is not undoable; scene keyframes and item edits are.",
   },
 ];
 
@@ -91,6 +115,7 @@ export const ShortcutsModal: React.FC = () => {
                   <span className="sc-label">{r.label}</span>
                 </div>
               ))}
+              {g.note && <div className="sc-note muted">{g.note}</div>}
             </div>
           ))}
         </div>

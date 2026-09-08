@@ -24,7 +24,11 @@ const EffectSwatch: React.FC<{ id: string }> = ({ id }) => {
 };
 
 export const Library: React.FC = () => {
-  const { project, selection, patchOverlay, patchClip, openBrowser } = useEditor();
+  const { project, selection, patchOverlay, patchClip, patchWallItem, openBrowser, flash } = useEditor();
+  // A wall clip's camera IS its motion — a clip.motion on top would be a second camera fighting it.
+  // The Inspector hides the Motion section for wall clips; these two entry points must refuse too.
+  const isWallClipSelected = selection?.kind === "clip" && project.clips[selection.index]?.type === "wall";
+  const WALL_HINT = "A wall clip has its own camera — stack effects on wall items in the Wall view instead";
   const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio" | "canvas">("effects");
   const [fxQuery, setFxQuery] = useState("");
   const [trQuery, setTrQuery] = useState("");
@@ -45,13 +49,23 @@ export const Library: React.FC = () => {
     [favMotionIds],
   );
 
+  // EXPLICIT per kind — never an "overlay, else it must be a clip" binary. With a wall item
+  // selected, the old else-branch wrote `motion` onto clips[itemIndex], i.e. a silent edit to an
+  // unrelated clip. Each branch names the kind it handles and unknown kinds no-op.
   const applyEffect = (id: string) => {
     if (!selection) return;
     if (selection.kind === "overlay") {
       const o = project.overlays[selection.index];
+      if (!o) return;
       patchOverlay(selection.index, { motions: [...o.motions, id] });
-    } else {
+    } else if (selection.kind === "clip") {
+      if (isWallClipSelected) { flash(WALL_HINT); return; }
       patchClip(selection.index, { motion: id });
+    } else if (selection.kind === "wallItem") {
+      const it = project.clips?.[selection.clip]?.wall?.items?.[selection.index];
+      if (!it) return;
+      if ((it.motions ?? []).includes(id)) return; // already stacked — removal lives in the Inspector
+      patchWallItem(selection.clip, selection.index, { motions: [...(it.motions ?? []), id] });
     }
     pushRecentMotion(id);
   };
@@ -102,21 +116,27 @@ export const Library: React.FC = () => {
               className="lib-browse-all"
               disabled={!selection}
               title={selection ? "Open the full effect browser" : "Select a clip or layer first"}
-              onClick={() =>
-                selection &&
-                openBrowser(
-                  selection.kind === "overlay"
-                    ? { mode: "overlay-add", index: selection.index }
-                    : { mode: "clip-motion", index: selection.index },
-                )
-              }
+              onClick={() => {
+                // Same explicit-kind rule as applyEffect: a wallItem selection gets its OWN browser
+                // mode, never `clip-motion` on clips[itemIndex].
+                if (!selection) return;
+                if (selection.kind === "overlay") openBrowser({ mode: "overlay-add", index: selection.index });
+                else if (selection.kind === "clip") { if (isWallClipSelected) flash(WALL_HINT); else openBrowser({ mode: "clip-motion", index: selection.index }); }
+                else openBrowser({ mode: "wall-item-add", clip: selection.clip, index: selection.index });
+              }}
             >
               ⊞ Browse all…
             </button>
             <div className="lib-hint">
-              {selection
-                ? selection.kind === "overlay" ? "Click to stack on the selected layer" : "Click to set the clip's motion"
-                : "Select a clip or layer first"}
+              {!selection
+                ? "Select a clip or layer first"
+                : selection.kind === "overlay"
+                  ? "Click to stack on the selected layer"
+                  : selection.kind === "wallItem"
+                    ? "Click to stack on the selected wall item"
+                    : isWallClipSelected
+                      ? WALL_HINT
+                      : "Click to set the clip's motion"}
             </div>
             <input
               className="lib-search"

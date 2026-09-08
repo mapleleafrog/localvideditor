@@ -3,6 +3,8 @@ import { staticFile } from "remotion";
 import { useEditor } from "../store";
 import { clipStarts } from "../lib/timeline-utils";
 import { imageNaturalSize, placeWidth } from "../lib/image";
+import { fitAll, fitDurationPatch, wallFitFor, wallOf } from "../lib/wall-edit";
+import { importPhotosToWall, pickImageFiles } from "../lib/wall-import";
 
 type MenuItem = { label: string; disabled?: boolean; danger?: boolean; onClick: () => void } | "sep";
 
@@ -51,6 +53,12 @@ export const ContextMenu: React.FC = () => {
   const openBrowser = useEditor((s) => s.openBrowser);
   const patchOverlay = useEditor((s) => s.patchOverlay);
   const patchClip = useEditor((s) => s.patchClip);
+  const patchWallItem = useEditor((s) => s.patchWallItem);
+  const reorderWallItem = useEditor((s) => s.reorderWallItem);
+  const setView = useEditor((s) => s.setView);
+  const setWallClip = useEditor((s) => s.setWallClip);
+  const setWallCam = useEditor((s) => s.setWallCam);
+  const setWallFramed = useEditor((s) => s.setWallFramed);
 
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -113,13 +121,57 @@ export const ContextMenu: React.FC = () => {
     const starts = clipStarts(project);
     const start = starts[target.index] ?? 0;
     const rel = frame - start;
-    const splitDisabled = rel <= 0 || rel >= c.durationInFrames;
+    const isWall = c.type === "wall";
+    // A wall clip has its own camera schedule: splitting it would restart that schedule in both
+    // halves, it has no media element to mirror, and a clip motion would be a second camera
+    // fighting the first (design §7.8 / F-30). Greyed, not hidden — the menu shape stays constant.
+    const splitDisabled = isWall || rel <= 0 || rel >= c.durationInFrames;
+    const openWall = () => {
+      setWallClip(target.index);
+      setView("wall");
+    };
+    const fit = isWall ? wallFitFor(project, target.index) : null;
     items = [
-      { label: "Set motion…", onClick: () => openBrowser({ mode: "clip-motion", index: target.index }) },
+      ...(isWall
+        ? ([
+            { label: "Edit wall…", onClick: openWall },
+            {
+              label: `Fit duration to scenes${fit ? ` (${fit.need}f)` : ""}`,
+              disabled: !fit || fit.state === "fit",
+              // One shared patch (it applies project.durationInFrames' cap) — the four buttons
+              // that offer this action used to produce three different lengths.
+              onClick: () => {
+                const p = fitDurationPatch(useEditor.getState().project, target.index);
+                if (p) patchClip(target.index, p);
+              },
+            },
+            {
+              label: "Fit camera to all items",
+              onClick: () => {
+                const w = wallOf(project.clips[target.index]);
+                setWallCam(fitAll(w.items ?? [], project.width ?? 1920, project.height ?? 1080, w.fitPadding ?? 0.06));
+                // Claim the clip as ALREADY FRAMED, or the Wall view's open-framing effect would
+                // immediately overwrite this pose with scene 1 and the menu item would do nothing.
+                setWallFramed(target.index);
+                openWall();
+              },
+            },
+            {
+              label: "Add photos…",
+              onClick: () => void pickImageFiles().then((files) => importPhotosToWall(target.index, files)),
+            },
+            "sep",
+          ] as MenuItem[])
+        : []),
+      {
+        label: "Set motion…",
+        disabled: isWall,
+        onClick: () => openBrowser({ mode: "clip-motion", index: target.index }),
+      },
       { label: "Set transition → next…", onClick: () => openBrowser({ mode: "clip-transition", index: target.index }) },
       "sep",
-      { label: `${c.flipX ? "✓ " : ""}Flip horizontal`, onClick: () => patchClip(target.index, { flipX: !c.flipX }) },
-      { label: `${c.flipY ? "✓ " : ""}Flip vertical`, onClick: () => patchClip(target.index, { flipY: !c.flipY }) },
+      { label: `${c.flipX ? "✓ " : ""}Flip horizontal`, disabled: isWall, onClick: () => patchClip(target.index, { flipX: !c.flipX }) },
+      { label: `${c.flipY ? "✓ " : ""}Flip vertical`, disabled: isWall, onClick: () => patchClip(target.index, { flipY: !c.flipY }) },
       "sep",
       // Fit/Native size only make sense for a positioned image overlay (a resizable width) — clips
       // fill the whole frame, so these are always disabled here (kept for a consistent menu shape).
@@ -130,6 +182,49 @@ export const ContextMenu: React.FC = () => {
       { label: "Duplicate", onClick: duplicateSelected },
       { label: "Copy", onClick: copySelected },
       { label: "Paste", disabled: !clipboard, onClick: () => pasteAt(frame) },
+      "sep",
+      { label: "Delete", danger: true, onClick: removeSelected },
+    ];
+  } else if (target.kind === "wallItem") {
+    // A wall item addresses clips[clip].wall.items[index] — WITHOUT this branch it fell through to
+    // the overlay one and every action would have hit overlays[index], an unrelated layer.
+    const ci = target.clip;
+    const i = target.index;
+    const list = project.clips[ci]?.wall?.items ?? [];
+    const it = list[i];
+    if (!it) return null;
+    // Array order IS paint order: a HIGHER index paints later, i.e. in front.
+    const reorderTo = (to: number) => {
+      const clamped = Math.max(0, Math.min(list.length - 1, to));
+      if (clamped === i) return;
+      reorderWallItem(ci, i, clamped);
+    };
+    const setFrame = (f: NonNullable<typeof it.frame>) => patchWallItem(ci, i, { frame: f });
+    items = [
+      { label: "Add effect…", onClick: () => openBrowser({ mode: "wall-item-add", clip: ci, index: i }) },
+      "sep",
+      { label: `${it.flipX ? "✓ " : ""}Flip horizontal`, onClick: () => patchWallItem(ci, i, { flipX: !it.flipX || undefined }) },
+      { label: `${it.flipY ? "✓ " : ""}Flip vertical`, onClick: () => patchWallItem(ci, i, { flipY: !it.flipY || undefined }) },
+      { label: "Reset rotation", onClick: () => patchWallItem(ci, i, { rotation: 0 }) },
+      "sep",
+      { label: `Frame → none${it.frame === "none" ? " ✓" : ""}`, onClick: () => setFrame("none") },
+      { label: `Frame → polaroid${it.frame === "polaroid" ? " ✓" : ""}`, onClick: () => setFrame("polaroid") },
+      { label: `Frame → matte${it.frame === "matte" ? " ✓" : ""}`, onClick: () => setFrame("matte") },
+      { label: `Frame → taped${it.frame === "taped" ? " ✓" : ""}`, onClick: () => setFrame("taped") },
+      { label: `Frame → torn${it.frame === "torn" ? " ✓" : ""}`, onClick: () => setFrame("torn") },
+      "sep",
+      { label: "Depth → 0.9 (recedes)", onClick: () => patchWallItem(ci, i, { depth: 0.9 }) },
+      { label: "Depth → 1.0 (wall plane)", onClick: () => patchWallItem(ci, i, { depth: 1 }) },
+      { label: "Depth → 1.1 (forward)", onClick: () => patchWallItem(ci, i, { depth: 1.1 }) },
+      "sep",
+      { label: "Duplicate", onClick: duplicateSelected },
+      { label: "Copy", onClick: copySelected },
+      { label: "Paste", disabled: !clipboard, onClick: () => pasteAt(frame) },
+      "sep",
+      { label: "Bring forward", disabled: i === list.length - 1, onClick: () => reorderTo(i + 1) },
+      { label: "Send backward", disabled: i === 0, onClick: () => reorderTo(i - 1) },
+      { label: "Move to front", disabled: i === list.length - 1, onClick: () => reorderTo(list.length - 1) },
+      { label: "Move to back", disabled: i === 0, onClick: () => reorderTo(0) },
       "sep",
       { label: "Delete", danger: true, onClick: removeSelected },
     ];

@@ -11,6 +11,7 @@
 import type { CSSProperties } from "react";
 import { scaleStrength } from "../effects/compose";
 import { seededRandom } from "../effects/helpers";
+import { POLAROID } from "./wall";
 import type { Cam, Box, WallItemLike } from "./wall";
 
 const clamp = (v: number, lo = 0, hi = 1) => (v < lo ? lo : v > hi ? hi : v);
@@ -205,7 +206,7 @@ export const dualDropShadow = (lift: number, ink: string, k = 1) => {
 
 export type FrameId = "none" | "polaroid" | "matte" | "taped" | "torn";
 
-export const LIFT: Record<FrameId, number> = { none: 0.1, polaroid: 0.22, matte: 0.16, taped: 0.06, torn: 0.14 };
+export const LIFT: Record<FrameId, number> = { none: 0.1, polaroid: 0.36, matte: 0.16, taped: 0.06, torn: 0.14 };
 
 /** Wall units. >= 3 so a near-horizontal edge under a 0.22 deg breathing roll does not stair-step
  *  (design §4.5 rule 5 — no 1 px hard rims anywhere). */
@@ -256,6 +257,10 @@ export interface FrameCss {
    *  terminated in a 2 px, 43-level step). The child carries the polygon, the parent the blur, so
    *  the clip happens first and the blur then spreads freely outside it. */
   shadowInner?: CSSProperties;
+  /** Optional LAST child of `.wl-window`, painted OVER the media: an inset keyline/shadow on the
+   *  window itself is covered by a 100 % media element, so a treatment that wants the print to
+   *  read as sitting UNDER the frame must paint its rim on top. Set by `polaroid`. */
+  rim?: CSSProperties;
   /** Tape strips, children of `.wl-card` (empty for every treatment but `taped`). */
   tapes: CSSProperties[];
   /** Caption block on the margin, or null when this treatment has no margin to write on.
@@ -313,30 +318,44 @@ export const frameCss = (it: WallItemLike, paper: PaperPreset, box: Box, seed: n
   });
 
   if (id === "polaroid") {
-    const pad = 0.05 * w;
-    const L = 96 + (seededRandom(seed + 3) - 0.5) * 2.2; // seeded +-1.1 lightness
+    // An instant print: a thick off-white card with a fat bottom margin, the emulsion window cut
+    // slightly INTO the card (inner shadow + keyline, so the photo reads as under the frame, not
+    // painted on it), a faint diagonal gloss, and a heavier ambient shadow (LIFT 0.28) so the
+    // card sits OFF the paper. Margins come from wall.ts#POLAROID — the same constants itemBox()
+    // budgets with, so the window height reconstructs the box exactly (check:wall group 13).
+    const pad = POLAROID.side * w;
+    const bottom = POLAROID.bottom * w;
+    const L = 97 + (seededRandom(seed + 3) - 0.5) * 2.2; // seeded +-1.1 lightness
     return {
       card: {
         position: "absolute",
         inset: 0,
-        background: `hsl(42 18% ${L.toFixed(2)}%)`,
+        backgroundColor: `hsl(44 20% ${L.toFixed(2)}%)`,
+        backgroundImage: "linear-gradient(165deg, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,.035) 100%)",
         borderRadius: CARD_RADIUS,
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.05), inset 0 1px 2px rgba(0,0,0,.06)",
+        boxShadow: "inset 0 0 0 1px rgba(80,60,30,.16), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.05)",
       },
       window: {
         position: "absolute",
         left: pad,
         right: pad,
         top: pad,
-        // == 0.90 * (w / aspect): the window height itemBox() budgeted, by construction.
-        height: box.h - pad - 0.18 * w,
+        // == (1 - 2*side) * (w / aspect): the window height itemBox() budgeted, by construction.
+        height: box.h - pad - bottom,
         overflow: "hidden",
         isolation: "isolate",
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.09)",
+      },
+      // Painted over the emulsion: a hairline + a soft top-edge shadow, so the photo reads as cut
+      // into the card rather than stuck on it.
+      rim: {
+        position: "absolute",
+        inset: 0,
+        boxShadow: "inset 0 0 0 1.5px rgba(0,0,0,.18), inset 0 3px 8px rgba(0,0,0,.28)",
+        pointerEvents: "none",
       },
       shadow: baseShadow,
       tapes: [],
-      caption: captionStyle(box.h - 0.18 * w, 0.18 * w),
+      caption: { ...captionStyle(box.h - bottom, bottom), fontSize: 0.075 * w, opacity: 0.8 },
     };
   }
 

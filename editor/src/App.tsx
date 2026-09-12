@@ -264,6 +264,20 @@ export const App: React.FC = () => {
               st.flash("Select an item on the wall to delete it");
             }
             break;
+          case "PageUp":
+          case "PageDown": {
+            // Step the selected scene card (footer strip) and jump the camera to it.
+            e.preventDefault();
+            const scenes = wall.scenes ?? [];
+            if (!scenes.length) break;
+            const cur = scenes.findIndex((sc) => sc.id != null && sc.id === st.wallScene);
+            const next = e.key === "PageDown" ? Math.min(scenes.length - 1, cur + 1) : Math.max(0, cur < 0 ? 0 : cur - 1);
+            const sc = scenes[next];
+            st.setWallScene(sc.id ?? null);
+            if (ci != null) st.select({ kind: "clip", index: ci });
+            st.setWallCam({ x: sc.x, y: sc.y, zoom: sc.zoom, rot: sc.rotation });
+            break;
+          }
           case "?":
             e.preventDefault();
             st.toggleShortcuts();

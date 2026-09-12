@@ -1,19 +1,33 @@
-// Wall inspector — the selected item's properties, plus the wall/camera globals.
+// Wall inspector — the selected item's properties, the selected SCENE's timing (in seconds), and
+// the wall globals — the right rail of the Wall view.
 //
 // Built from the shared fields.tsx primitives so it looks and behaves like the overlay inspector,
 // with one deliberate difference: EVERY text and number field here is LOCALLY CONTROLLED and
 // COMMITS ON BLUR/ENTER (see CommitText / CommitNum below). zundo's 600 ms leading-edge handleSet
 // would otherwise fold "typing in caption A" and "typing in caption B" into a single history entry.
 // One field = one patch = one undo step.
+//
+// Sections, top to bottom:
+//   Scene N     — when a scene card is selected in the footer strip and no item is selected:
+//                 hold / glide-in seconds, easing, arc, the speed chip, re-frame / play / dup / del.
+//   Photo       — the selected item's look (source, size, rotation, opacity, frame, caption, filter).
+//   Appear      — PowerPoint-style timing: appear in scene X (+ stagger + entrance), leave after Y (+ exit).
+//   Effects     — the stacked registry motions (run from the appear frame).
+//   Advanced    — aspect, position, depth, mirror, pixelated, paint order, duplicate / delete.
+//   Wall settings — camera globals + paper & finish + the viewport roll (collapsed).
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { staticFile } from "remotion";
 import { useEditor } from "../store";
-import type { WallItem } from "../../../src/timeline/schema";
+import type { WallItem, WallScene } from "../../../src/timeline/schema";
 import { FONT_OPTIONS } from "../../../src/timeline/fonts";
-import { itemBox, itemDepth } from "../../../src/timeline/wall";
-import { hasJapanese, wallOf, wallSummary, wallTiming } from "../lib/wall-edit";
+import { TRANSITION_KINDS, type TransitionKind } from "../../../src/effects/io";
+import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
+import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
+import { clipStarts } from "../lib/timeline-utils";
+import { camFromScene, hasJapanese, sceneOptions, scheduleWall, wallOf, wallSummary } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
 import { EffectStack, Field, Section, Slider } from "./fields";
+import { speedClass } from "./WallScenes";
 
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
 
@@ -121,17 +135,65 @@ export const CommitNum: React.FC<{
 
 const FRAMES: WallItem["frame"][] = ["none", "polaroid", "matte", "taped", "torn"];
 const FILTERS: WallItem["filter"][] = ["none", "sepia", "faded", "bw", "warm", "cool"];
+const SCENE_EASINGS: WallScene["easing"][] = ["smooth", "sine", "cubic", "settle"];
+const IO_LABEL: Record<TransitionKind, string> = {
+  none: "none",
+  fade: "fade",
+  slideLeft: "slide from right",
+  slideRight: "slide from left",
+  slideUp: "slide from below",
+  slideDown: "slide from above",
+  zoom: "zoom",
+  pop: "pop",
+  rotateIn: "rotate in",
+  spin: "spin",
+  blurIn: "blur",
+  flash: "flash",
+  wipe: "wipe",
+  iris: "iris",
+  typewriter: "typewriter",
+};
+
+const IoSelect: React.FC<{ value: TransitionKind; onChange: (k: TransitionKind) => void }> = ({ value, onChange }) => (
+  <select value={value} onChange={(e) => onChange(e.target.value as TransitionKind)}>
+    {TRANSITION_KINDS.map((k) => (
+      <option key={k} value={k}>
+        {IO_LABEL[k]}
+      </option>
+    ))}
+  </select>
+);
+
+const EaseSelect: React.FC<{ value: EasingName | undefined; onChange: (v: EasingName | undefined) => void }> = ({ value, onChange }) => (
+  <select value={value ?? ""} onChange={(e) => onChange((e.target.value || undefined) as EasingName | undefined)}>
+    <option value="">linear</option>
+    {EASING_NAMES.filter((n) => n !== "linear").map((n) => (
+      <option key={n} value={n}>
+        {n}
+      </option>
+    ))}
+  </select>
+);
 
 export const WallInspector: React.FC = () => {
   const project = useEditor((s) => s.project);
   const wallClip = useEditor((s) => s.wallClip);
   const selection = useEditor((s) => s.selection);
   const wallSel = useEditor((s) => s.wallSel);
+  const wallCam = useEditor((s) => s.wallCam);
+  const setWallCam = useEditor((s) => s.setWallCam);
+  const wallScene = useEditor((s) => s.wallScene);
+  const setWallScene = useEditor((s) => s.setWallScene);
+  const setLive = useEditor((s) => s.setWallLive);
+  const requestSeek = useEditor((s) => s.requestSeek);
   const patchWall = useEditor((s) => s.patchWall);
   const patchWallItem = useEditor((s) => s.patchWallItem);
   const reorderWallItem = useEditor((s) => s.reorderWallItem);
   const removeWallItem = useEditor((s) => s.removeWallItem);
   const duplicateWallItem = useEditor((s) => s.duplicateWallItem);
+  const addWallScene = useEditor((s) => s.addWallScene);
+  const patchWallScene = useEditor((s) => s.patchWallScene);
+  const removeWallScene = useEditor((s) => s.removeWallScene);
   const openBrowser = useEditor((s) => s.openBrowser);
   const setWallSel = useEditor((s) => s.setWallSel);
   const select = useEditor((s) => s.select);
@@ -150,15 +212,20 @@ export const WallInspector: React.FC = () => {
   // item). Memoised, and computed BEFORE the early return so the hook order never changes.
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sum = useMemo(() => wallSummary(wall, fps, W, H), [wall, fps, W, H]);
-  const t = useMemo(() => wallTiming(wall, fps, W, H), [wall, fps, W, H]);
+  const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
+  const starts = useMemo(() => clipStarts(project), [project]);
   if (!isWall || wallClip == null) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
   const ci = wallClip;
   const items = wall.items ?? [];
+  const scenes = wall.scenes ?? [];
+  const opts = sceneOptions(wall);
 
   const idx = selection?.kind === "wallItem" && selection.clip === ci ? selection.index : -1;
   const item = idx >= 0 ? items[idx] : undefined;
+  const si = item ? -1 : sceneIndexById(wall, wallScene ?? undefined);
+  const scene = si >= 0 ? scenes[si] : undefined;
 
   /** Re-read the source's intrinsic ratio (the same call AssetsPanel makes at import). Async, so
    *  the store is re-read and the item re-validated (same index, same src) before patching. */
@@ -187,6 +254,14 @@ export const WallInspector: React.FC = () => {
   };
 
   const patch = (p: Partial<WallItem>) => idx >= 0 && patchWallItem(ci, idx, p);
+  /** Clear an optional field rather than persisting a stale default. */
+  const unset = (k: keyof WallItem) => {
+    if (idx < 0 || !item) return;
+    const next = { ...item };
+    delete next[k];
+    patchWall(ci, { items: items.map((it, i) => (i === idx ? next : it)) });
+  };
+  const setOrUnset = <K extends keyof WallItem>(k: K, v: WallItem[K] | undefined) => (v === undefined ? unset(k) : patch({ [k]: v } as Partial<WallItem>));
 
   const box = item ? itemBox(item) : null;
   const nat = item ? measured[item.src] : undefined;
@@ -194,6 +269,107 @@ export const WallInspector: React.FC = () => {
   const effFont = item?.fontFamily ?? wall.handFont ?? "caveat";
   const cjkWarn = !!item && isText && hasJapanese(item.text ?? "") && effFont === "caveat";
   const capWarn = !!item && hasJapanese(item.caption ?? "") && (wall.handFont ?? "caveat") === "caveat";
+  const win = item ? itemWindow(sched, wall, item) : null;
+  const neverVisible = !!win && win.from >= win.to;
+  const secs = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+
+  // --- scene panel maths ---
+  const scenePanel = (() => {
+    if (!scene || si < 0) return null;
+    const a = si === 0 ? sched.whole : camFromScene(scenes[si - 1]);
+    const b = camFromScene(scene);
+    const glideLive = si === 0 ? wall.intro : true;
+    const v = peakVelocity(a, b, scene.glideSeconds, fps);
+    const suggested = suggestGlideSeconds(a, b);
+    const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
+    const appearing = items.filter((it) => it.appearIn === scene.id).length;
+    const leaving = items.filter((it) => it.leaveAfter === scene.id).length;
+    const absStart = starts[ci] ?? 0;
+    const playScene = () => {
+      setLive(true);
+      requestSeek(absStart + (sched.sceneFrames[si] ?? 0), { play: true, until: absStart + (sched.sceneEnds[si] ?? sched.total) });
+    };
+    return (
+      <Section title={`Scene ${si + 1} of ${scenes.length}`} defaultOpen>
+        <Field label="Name">
+          <CommitText value={scene.name ?? ""} placeholder={`x ${Math.round(scene.x)} y ${Math.round(scene.y)}`} onCommit={(v2) => patchWallScene(ci, si, { name: v2 })} />
+        </Field>
+        <div className="muted wi-lint">
+          starts at {secs((sched.sceneFrames[si] ?? 0) / fps)}s · ends {secs((sched.sceneEnds[si] ?? 0) / fps)}s
+          {appearing ? ` · ${appearing} object${appearing === 1 ? "" : "s"} appear here` : ""}
+          {leaving ? ` · ${leaving} leave after` : ""}
+        </div>
+        <Field label="Hold (seconds the camera stays)">
+          <div className="wi-row">
+            <CommitNum value={scene.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => patchWallScene(ci, si, { holdSeconds: n })} />
+            <span className="muted">{Math.round(scene.holdSeconds * fps)}f{scene.holdSeconds === 0 ? " · via (no stop)" : ""}</span>
+          </div>
+        </Field>
+        <Field label={si === 0 ? "Intro glide in (seconds)" : "Glide in from previous scene (seconds)"}>
+          <div className="wi-row">
+            <CommitNum
+              value={scene.glideSeconds}
+              min={0}
+              step={0.1}
+              suffix="s"
+              disabled={!glideLive}
+              title={glideLive ? undefined : "no glide into the first scene (intro is off)"}
+              onCommit={(n) => patchWallScene(ci, si, { glideSeconds: n })}
+            />
+            {glideLive && scene.glideSeconds > 0 && dist > 0 ? (
+              <button
+                className={"wsc-speed " + speedClass(v)}
+                title={`${scene.glideSeconds}s over ${dist} screen px — ${v.toFixed(0)} px/frame peak. Suggested ${suggested.toFixed(2)}s. Click to apply.`}
+                onClick={() => patchWallScene(ci, si, { glideSeconds: Math.round(suggested * 100) / 100 })}
+              >
+                ● {v.toFixed(0)} px/f → {suggested.toFixed(1)}s
+              </button>
+            ) : (
+              <span className="muted">{glideLive ? (dist ? "cut" : "no travel") : "off"}</span>
+            )}
+          </div>
+        </Field>
+        <Field label="Easing">
+          <select
+            value={scene.easing}
+            title="smooth = zero acceleration at both ends · cubic nearly doubles peak speed · settle overshoots (use at ≥ 1.0 s)"
+            onChange={(e) => patchWallScene(ci, si, { easing: e.target.value as WallScene["easing"] })}
+          >
+            {SCENE_EASINGS.map((e2) => (
+              <option key={e2} value={e2}>
+                {e2}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={`Path arc (${scene.arc})`}>
+          <Slider value={scene.arc} min={-1} max={1} step={0.05} onChange={(v2) => patchWallScene(ci, si, { arc: v2 })} />
+        </Field>
+        <Field label="Scene">
+          <div className="wi-row">
+            <button
+              title="Update this scene's framing from the viewport (timing kept)"
+              onClick={() => patchWallScene(ci, si, { x: wallCam.x, y: wallCam.y, zoom: wallCam.zoom, rotation: wallCam.rot })}
+            >
+              ⟳ Re-frame
+            </button>
+            <button title="Play this scene (Live)" onClick={playScene}>
+              ▸ Play
+            </button>
+            <button title="Duplicate scene" onClick={() => addWallScene(ci, { ...scene }, si + 1)}>
+              ⧉
+            </button>
+            <button className="del" title="Delete scene (objects that appeared here go back to always-on)" onClick={() => removeWallScene(ci, si)}>
+              ×
+            </button>
+          </div>
+          <button className="muted" onClick={() => setWallScene(null)} title="Deselect the scene">
+            done
+          </button>
+        </Field>
+      </Section>
+    );
+  })();
 
   return (
     <div className="insp">
@@ -201,122 +377,21 @@ export const WallInspector: React.FC = () => {
         <span>Wall · clip {ci + 1}</span>
         {wallSel.length > 1 && <span className="muted">{wallSel.length} selected</span>}
       </div>
-      <div className="muted wi-sum">
-        {sum.text} — intro {t.intro.toFixed(1)}s + scenes {t.scenes.toFixed(1)}s + outro {t.outro.toFixed(1)}s ={" "}
-        {t.total.toFixed(1)}s ({t.frames}f)
-      </div>
+      <div className="muted wi-sum">{sum.text}</div>
+
+      {scenePanel}
 
       {item && idx >= 0 ? (
         <>
-          <Section title={`Item ${idx + 1} of ${items.length}`} defaultOpen>
+          <Section title={`${isText ? "Text" : "Photo"} ${idx + 1} of ${items.length}`} defaultOpen>
             <Field label="Label (editor only)">
               <CommitText value={item.label ?? ""} placeholder={item.src || "item"} onCommit={(v) => patch({ label: v || undefined })} />
             </Field>
             {!isText && (
-              <>
-                <Field label="Source">
-                  <CommitText value={item.src} placeholder="media/photo.jpg" onCommit={(v) => patch({ src: v })} />
-                </Field>
-                <Field label="Aspect (intrinsic w/h)">
-                  <div className="wi-row">
-                    <CommitNum value={item.aspect ?? 1} step={0.01} min={0.2} max={5} onCommit={(v) => patch({ aspect: v })} />
-                    <button onClick={() => void rereadAspect(idx)} title="Read the file's real pixel ratio">
-                      ↻ Re-read
-                    </button>
-                  </div>
-                  {nat && (
-                    <span className="muted wi-lint">
-                      source {nat.w}×{nat.h} px · card {Math.round(item.width)} units
-                      {nat.w > 0 && item.width > nat.w ? " — upscaled, it will read soft" : ""}
-                    </span>
-                  )}
-                </Field>
-              </>
+              <Field label="Source">
+                <CommitText value={item.src} placeholder="media/photo.jpg" onCommit={(v) => patch({ src: v })} />
+              </Field>
             )}
-
-            <Field label="Position (wall units)">
-              <div className="wi-row">
-                <CommitNum value={item.x} onCommit={(v) => patch({ x: v })} suffix="x" />
-                <CommitNum value={item.y} onCommit={(v) => patch({ y: v })} suffix="y" />
-              </div>
-            </Field>
-            <Field label="Width (outer card)">
-              <div className="wi-row">
-                <CommitNum value={item.width} min={1} onCommit={(v) => patch({ width: v })} />
-                <span className="muted">→ {box ? Math.round(box.h) : 0} tall</span>
-              </div>
-            </Field>
-            <Field label="Rotation">
-              <Slider value={item.rotation ?? 0} min={-180} max={180} step={0.5} onChange={(v) => patch({ rotation: v })} />
-            </Field>
-            <Field label="Opacity">
-              <Slider value={item.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => patch({ opacity: v })} />
-            </Field>
-            <Field label="Depth (parallax)">
-              <Slider value={item.depth ?? 1} min={0.2} max={3} step={0.01} onChange={(v) => patch({ depth: v })} />
-              <span className="muted wi-lint">
-                drifts ×{(item.depth ?? 1).toFixed(2)} · size unchanged. Depth is parallax only — paint order is the
-                item list, so depth never reorders anything.
-              </span>
-            </Field>
-
-            <Field label="Frame treatment">
-              <select value={item.frame ?? "none"} onChange={(e) => patch({ frame: e.target.value as WallItem["frame"] })}>
-                {FRAMES.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Caption (polaroid / matte margin)">
-              <CommitText value={item.caption ?? ""} onCommit={(v) => patch({ caption: v })} />
-              {capWarn && (
-                <span className="wi-warn">Caveat has no Japanese glyphs — set the wall’s hand font to Yomogi or Zen Kurenaido.</span>
-              )}
-            </Field>
-            <Field label="Filter">
-              <select value={item.filter ?? "none"} onChange={(e) => patch({ filter: e.target.value as WallItem["filter"] })}>
-                {FILTERS.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Filter strength">
-              <Slider
-                value={item.filterStrength ?? 1}
-                min={0}
-                max={1}
-                step={0.05}
-                disabled={(item.filter ?? "none") === "none"}
-                onChange={(v) => patch({ filterStrength: v })}
-              />
-            </Field>
-
-            <Field label="Mirror">
-              <div className="wi-row">
-                <label className="wi-check">
-                  <input type="checkbox" checked={!!item.flipX} onChange={(e) => patch({ flipX: e.target.checked || undefined })} /> Flip H
-                </label>
-                <label className="wi-check">
-                  <input type="checkbox" checked={!!item.flipY} onChange={(e) => patch({ flipY: e.target.checked || undefined })} /> Flip V
-                </label>
-              </div>
-            </Field>
-            <Field label="Pixelated scaling">
-              <label className="wi-check">
-                <input
-                  type="checkbox"
-                  checked={!!item.pixelated}
-                  onChange={(e) => patch({ pixelated: e.target.checked || undefined })}
-                />{" "}
-                crisp (pixel art)
-              </label>
-              <span className="muted wi-lint">Nearest-neighbour — on a photo it will shimmer while the camera moves.</span>
-            </Field>
-
             {isText && (
               <>
                 <Field label="Text">
@@ -353,7 +428,193 @@ export const WallInspector: React.FC = () => {
                 </Field>
               </>
             )}
+            <Field label="Width (outer card)">
+              <div className="wi-row">
+                <CommitNum value={item.width} min={1} onCommit={(v) => patch({ width: v })} />
+                <span className="muted">→ {box ? Math.round(box.h) : 0} tall</span>
+              </div>
+            </Field>
+            <Field label="Rotation">
+              <Slider value={item.rotation ?? 0} min={-180} max={180} step={0.5} onChange={(v) => patch({ rotation: v })} />
+            </Field>
+            <Field label="Opacity">
+              <Slider value={item.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => patch({ opacity: v })} />
+            </Field>
+            {!isText && (
+              <>
+                <Field label="Frame treatment">
+                  <select value={item.frame ?? "none"} onChange={(e) => patch({ frame: e.target.value as WallItem["frame"] })}>
+                    {FRAMES.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Caption (polaroid / matte margin)">
+                  <CommitText value={item.caption ?? ""} onCommit={(v) => patch({ caption: v })} />
+                  {capWarn && (
+                    <span className="wi-warn">Caveat has no Japanese glyphs — set the wall’s hand font to Yomogi or Zen Kurenaido.</span>
+                  )}
+                </Field>
+                <Field label="Filter">
+                  <div className="wi-row">
+                    <select value={item.filter ?? "none"} onChange={(e) => patch({ filter: e.target.value as WallItem["filter"] })}>
+                      {FILTERS.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Slider
+                    value={item.filterStrength ?? 1}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    disabled={(item.filter ?? "none") === "none"}
+                    onChange={(v) => patch({ filterStrength: v })}
+                  />
+                </Field>
+              </>
+            )}
+          </Section>
 
+          <Section title="Appear" defaultOpen badge={item.appearIn || item.leaveAfter ? "timed" : undefined}>
+            {opts.length === 0 ? (
+              <span className="muted wi-lint">Set a scene first (⊕ Set as scene), then choose when this object appears.</span>
+            ) : (
+              <>
+                <Field label="Appears in scene">
+                  <select value={item.appearIn ?? ""} onChange={(e) => setOrUnset("appearIn", e.target.value || undefined)}>
+                    <option value="">always on the wall</option>
+                    {opts.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {item.appearIn && (
+                  <>
+                    <Field label="Delay after arrival (seconds)">
+                      <CommitNum value={item.appearDelaySeconds ?? 0} min={0} step={0.1} suffix="s" onCommit={(v) => setOrUnset("appearDelaySeconds", v || undefined)} />
+                    </Field>
+                    <Field label="Entrance">
+                      <div className="wi-row">
+                        <IoSelect value={item.enter ?? "none"} onChange={(k) => setOrUnset("enter", k === "none" ? undefined : k)} />
+                        <CommitNum
+                          value={item.enterSeconds ?? 0.5}
+                          min={0}
+                          step={0.1}
+                          suffix="s"
+                          disabled={(item.enter ?? "none") === "none"}
+                          onCommit={(v) => setOrUnset("enterSeconds", v === 0.5 ? undefined : v)}
+                        />
+                        <EaseSelect value={item.enterEasing} onChange={(v) => setOrUnset("enterEasing", v)} />
+                      </div>
+                      <span className="muted wi-lint">Stacked effects below also start when the object appears — springPop / bounceIn make good entrances too.</span>
+                    </Field>
+                  </>
+                )}
+                <Field label="Leaves after scene">
+                  <select value={item.leaveAfter ?? ""} onChange={(e) => setOrUnset("leaveAfter", e.target.value || undefined)}>
+                    <option value="">stays until the end</option>
+                    {opts.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {item.leaveAfter && (
+                  <Field label="Exit">
+                    <div className="wi-row">
+                      <IoSelect value={item.exit ?? "none"} onChange={(k) => setOrUnset("exit", k === "none" ? undefined : k)} />
+                      <CommitNum
+                        value={item.exitSeconds ?? 0.5}
+                        min={0}
+                        step={0.1}
+                        suffix="s"
+                        disabled={(item.exit ?? "none") === "none"}
+                        onCommit={(v) => setOrUnset("exitSeconds", v === 0.5 ? undefined : v)}
+                      />
+                      <EaseSelect value={item.exitEasing} onChange={(v) => setOrUnset("exitEasing", v)} />
+                    </div>
+                  </Field>
+                )}
+                {win && (
+                  <span className={neverVisible ? "wi-warn" : "muted wi-lint"}>
+                    {neverVisible
+                      ? "Never visible — it leaves before it appears (or the delay runs past the leave scene)."
+                      : `Visible ${secs(win.from / fps)}s → ${Number.isFinite(win.to) ? secs(win.to / fps) + "s" : "end"} of the clip.`}
+                  </span>
+                )}
+              </>
+            )}
+          </Section>
+
+          <EffectStack
+            motions={item.motions ?? []}
+            motionParams={item.motionParams}
+            onChange={(p) => patch(p)}
+            onBrowse={() => openBrowser({ mode: "wall-item-add", clip: ci, index: idx })}
+          />
+          <Field label="Effect window (frames)">
+            <CommitNum value={item.windowInFrames ?? 90} min={1} onCommit={(v) => patch({ windowInFrames: Math.round(v) })} />
+          </Field>
+
+          <Section title="Advanced" defaultOpen={false}>
+            {!isText && (
+              <Field label="Aspect (intrinsic w/h)">
+                <div className="wi-row">
+                  <CommitNum value={item.aspect ?? 1} step={0.01} min={0.2} max={5} onCommit={(v) => patch({ aspect: v })} />
+                  <button onClick={() => void rereadAspect(idx)} title="Read the file's real pixel ratio">
+                    ↻ Re-read
+                  </button>
+                </div>
+                {nat && (
+                  <span className="muted wi-lint">
+                    source {nat.w}×{nat.h} px · card {Math.round(item.width)} units
+                    {nat.w > 0 && item.width > nat.w ? " — upscaled, it will read soft" : ""}
+                  </span>
+                )}
+              </Field>
+            )}
+            <Field label="Position (wall units)">
+              <div className="wi-row">
+                <CommitNum value={item.x} onCommit={(v) => patch({ x: v })} suffix="x" />
+                <CommitNum value={item.y} onCommit={(v) => patch({ y: v })} suffix="y" />
+              </div>
+            </Field>
+            <Field label="Depth (parallax)">
+              <Slider value={item.depth ?? 1} min={0.2} max={3} step={0.01} onChange={(v) => patch({ depth: v })} />
+              <span className="muted wi-lint">
+                drifts ×{(item.depth ?? 1).toFixed(2)} · size unchanged. Depth is parallax only — paint order is the item
+                list, so depth never reorders anything.
+              </span>
+            </Field>
+            <Field label="Mirror">
+              <div className="wi-row">
+                <label className="wi-check">
+                  <input type="checkbox" checked={!!item.flipX} onChange={(e) => patch({ flipX: e.target.checked || undefined })} /> Flip H
+                </label>
+                <label className="wi-check">
+                  <input type="checkbox" checked={!!item.flipY} onChange={(e) => patch({ flipY: e.target.checked || undefined })} /> Flip V
+                </label>
+              </div>
+            </Field>
+            <Field label="Pixelated scaling">
+              <label className="wi-check">
+                <input
+                  type="checkbox"
+                  checked={!!item.pixelated}
+                  onChange={(e) => patch({ pixelated: e.target.checked || undefined })}
+                />{" "}
+                crisp (pixel art)
+              </label>
+              <span className="muted wi-lint">Nearest-neighbour — on a photo it will shimmer while the camera moves.</span>
+            </Field>
             <Field label="Paint order (array order)">
               <div className="wi-row">
                 <button disabled={idx <= 0} title="Send backward" onClick={() => reorderWallItem(ci, idx, idx - 1)}>
@@ -377,7 +638,6 @@ export const WallInspector: React.FC = () => {
                 Sort by depth
               </button>
             </Field>
-
             <Field label="Item">
               <div className="wi-row">
                 <button onClick={() => duplicateWallItem(ci, idx)}>⧉ Duplicate</button>
@@ -387,25 +647,26 @@ export const WallInspector: React.FC = () => {
               </div>
             </Field>
           </Section>
-
-          <EffectStack
-            motions={item.motions ?? []}
-            motionParams={item.motionParams}
-            onChange={(p) => patch(p)}
-            onBrowse={() => openBrowser({ mode: "wall-item-add", clip: ci, index: idx })}
-          />
-          <Field label="Effect window (frames)">
-            <CommitNum value={item.windowInFrames ?? 90} min={1} onCommit={(v) => patch({ windowInFrames: Math.round(v) })} />
-          </Field>
         </>
-      ) : (
+      ) : scene ? null : (
         <div className="muted wi-empty">
-          No item selected. Click one on the wall, drag a marquee with <span className="kbd">⇧</span>, or drop photos onto
-          the viewport.
+          Click a photo on the wall to edit it, or a scene card below to set its seconds. Drop photos onto the viewport to add
+          them. <span className="kbd">⇧</span>-drag for a marquee.
         </div>
       )}
 
-      <Section title="Camera" defaultOpen={!item}>
+      <Section title="Wall settings" defaultOpen={false}>
+        <Field label="Viewport roll (not saved)">
+          <div className="wi-row">
+            <Slider value={wallCam.rot} min={-180} max={180} step={0.5} onChange={(v) => setWallCam({ ...wallCam, rot: v })} />
+            <button title="Reset roll (0)" onClick={() => setWallCam({ ...wallCam, rot: 0 })}>
+              0°
+            </button>
+            <button title="Zoom 1:1 (1)" onClick={() => setWallCam({ ...wallCam, zoom: 1 })}>
+              1:1
+            </button>
+          </div>
+        </Field>
         <Field label="Breathing (handheld drift)">
           <Slider value={wall.breathing} min={0} max={1} step={0.05} onChange={(v) => patchWall(ci, { breathing: v })} />
         </Field>
@@ -452,9 +713,6 @@ export const WallInspector: React.FC = () => {
         <Field label="Fit padding (intro / outro / Fit all)">
           <Slider value={wall.fitPadding} min={0} max={0.4} step={0.01} onChange={(v) => patchWall(ci, { fitPadding: v })} />
         </Field>
-      </Section>
-
-      <Section title="Paper & finish" defaultOpen={false}>
         <Field label="Paper">
           <select value={wall.paper} onChange={(e) => patchWall(ci, { paper: e.target.value as typeof wall.paper })}>
             <option value="cream">cream</option>
@@ -469,9 +727,8 @@ export const WallInspector: React.FC = () => {
         <Field label="Finish (bloom / grain / vignette)">
           <Slider value={wall.finish} min={0} max={1} step={0.05} onChange={(v) => patchWall(ci, { finish: v })} />
           <span className="muted wi-lint">
-            Shown in ▶ Live only. The finish is a full-frame lens layer sized in % of the composition,
-            so under overscan its bloom and vignette would sit outside the recorded rectangle you are
-            framing against — grading against that is worse than not grading.
+            Shown in ▶ Live only. The finish is a full-frame lens layer sized in % of the composition, so under overscan
+            its bloom and vignette would sit outside the recorded rectangle you are framing against.
           </span>
         </Field>
         <Field label="Viewfinder">

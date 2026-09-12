@@ -4,7 +4,19 @@ import type { Project, Clip, Overlay, AudioTrack, Wall, WallItem, WallScene } fr
 import type { Cam } from "../../src/timeline/wall";
 import sampleProject from "../../projects/sample.json";
 import { clipStarts } from "./lib/timeline-utils";
-import { IDENTITY_CAM, duplicatedItem, fitDurationPatch, insertAt, mapAt, moveAt, removeAt, withWall } from "./lib/wall-edit";
+import {
+  IDENTITY_CAM,
+  clearSceneRefs,
+  duplicatedItem,
+  fitDurationPatch,
+  insertAt,
+  mapAt,
+  moveAt,
+  removeAt,
+  uniqueSceneId,
+  withSceneIds,
+  withWall,
+} from "./lib/wall-edit";
 
 const AUTOFIT_KEY = "soranji.wall.autofit";
 const readAutoFit = (): boolean => {
@@ -139,6 +151,9 @@ export interface EditorState {
   wallCam: Cam;
   /** Multi-selected wall item indices (marquee / shift-click). */
   wallSel: number[];
+  /** The scene card the footer strip has selected (by STABLE id, so a reorder/undo never
+   *  re-targets it). The inspector shows that scene's timing while no item is selected. */
+  wallScene: string | null;
   /** Seeing wall outside the recorded frame — applied as a COMPOSITION-SIZE change, never a zoom
    *  divide, so every zoom-dependent look term stays bit-identical to the render (design §0.4). */
   wallOverscan: WallOverscan;
@@ -158,6 +173,7 @@ export interface EditorState {
   setWallFramed: (ci: number | null) => void;
   setWallCam: (cam: Cam) => void;
   setWallSel: (sel: number[]) => void;
+  setWallScene: (id: string | null) => void;
   setWallOverscan: (k: WallOverscan) => void;
   setWallLive: (v: boolean) => void;
   setWallHand: (v: boolean) => void;
@@ -187,9 +203,14 @@ export const migrate = (p: Project): Project => ({
   ...p,
   clips: (p.clips ?? []).map((c) => {
     const { montage: _dropped, ...rest } = c as Clip & { montage?: unknown };
-    return (["image", "video", "wall"] as readonly string[]).includes(rest.type)
-      ? (rest as Clip)
-      : ({ ...rest, type: "image" } as Clip);
+    if (!(["image", "video", "wall"] as readonly string[]).includes(rest.type)) return { ...rest, type: "image" } as Clip;
+    // Scene ids (item `appearIn` / `leaveAfter` refs) are backfilled here, at the ONE load boundary,
+    // never in the memoised read path — an id must be persisted, not invented per render.
+    if (rest.type === "wall" && rest.wall) {
+      const wall = withSceneIds(rest.wall);
+      return wall === rest.wall ? (rest as Clip) : ({ ...rest, wall } as Clip);
+    }
+    return rest as Clip;
   }),
 });
 
@@ -286,6 +307,7 @@ export const useEditor = create<EditorState>()(
       wallClip: null,
       wallCam: { ...IDENTITY_CAM },
       wallSel: [],
+      wallScene: null,
       wallOverscan: 1.6,
       wallLive: false,
       wallHand: false,
@@ -296,7 +318,7 @@ export const useEditor = create<EditorState>()(
       // Import / Reset / Delete replace the whole project, so every index-bearing transient goes
       // with it — a stale wallClip would otherwise point into a different clip list.
       setProject: (project) =>
-        set({ project, selection: null, wallClip: null, wallSel: [], wallFramed: null }),
+        set({ project, selection: null, wallClip: null, wallSel: [], wallScene: null, wallFramed: null }),
       setProjectName: (projectName) => set({ projectName }),
 
       patchProject: (patch) => set((s) => ({ project: { ...s.project, ...patch } })),
@@ -414,11 +436,16 @@ export const useEditor = create<EditorState>()(
 
       addWallScene: (ci, scene, at) =>
         set((s) => {
+          // A duplicated scene arrives with the ORIGINAL's id; it gets a fresh one so `appearIn`
+          // refs stay unambiguous. The new scene becomes the strip's selection.
+          let id = scene.id;
           const project = withWall(s.project, ci, (w) => {
+            id = uniqueSceneId(w, scene.id);
+            const sc = { ...scene, id };
             const scenes = w.scenes ?? [];
-            return { ...w, scenes: at == null ? [...scenes, scene] : insertAt(scenes, at, scene) };
+            return { ...w, scenes: at == null ? [...scenes, sc] : insertAt(scenes, at, sc) };
           });
-          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit), wallScene: id ?? null } : {};
         }),
 
       patchWallScene: (ci, i, patch) =>
@@ -431,8 +458,16 @@ export const useEditor = create<EditorState>()(
 
       removeWallScene: (ci, i) =>
         set((s) => {
-          const project = withWall(s.project, ci, (w) => ({ ...w, scenes: removeAt(w.scenes ?? [], i) }));
-          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
+          // Items that appeared in / left after the deleted scene fall back to "always on the wall"
+          // in the SAME rebuild, so one Ctrl+Z restores both the scene and the refs.
+          const gone = s.project.clips?.[ci]?.wall?.scenes?.[i]?.id;
+          const project = withWall(s.project, ci, (w) => ({
+            ...w,
+            scenes: removeAt(w.scenes ?? [], i),
+            items: clearSceneRefs(w.items ?? [], gone),
+          }));
+          if (!project) return {};
+          return { project: withFit(project, ci, s.wallAutoFit), wallScene: s.wallScene === gone ? null : s.wallScene };
         }),
 
       reorderWallScene: (ci, from, to) =>
@@ -692,11 +727,13 @@ export const useEditor = create<EditorState>()(
         set((s) => ({
           wallClip,
           wallSel: [],
+          wallScene: s.wallClip === wallClip ? s.wallScene : null,
           selection: s.selection?.kind === "wallItem" && s.selection.clip !== wallClip ? null : s.selection,
         })),
       setWallFramed: (wallFramed) => set({ wallFramed }),
       setWallCam: (wallCam) => set({ wallCam }),
       setWallSel: (wallSel) => set({ wallSel }),
+      setWallScene: (wallScene) => set({ wallScene }),
       setWallOverscan: (wallOverscan) => set({ wallOverscan }),
       setWallLive: (wallLive) => set({ wallLive }),
       setWallHand: (wallHand) => set({ wallHand }),
@@ -720,7 +757,7 @@ export const useEditor = create<EditorState>()(
         set((s) =>
           view === "wall"
             ? { view }
-            : { view, selection: s.selection?.kind === "wallItem" ? null : s.selection, wallSel: [] },
+            : { view, selection: s.selection?.kind === "wallItem" ? null : s.selection, wallSel: [], wallScene: null },
         ),
       // `select` OWNS the selection/wallSel invariant — see reconcileWallSel.
       select: (selection) => set((s) => reconcileWallSel(s, selection)),

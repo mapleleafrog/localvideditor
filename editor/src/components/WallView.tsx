@@ -329,9 +329,6 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
         >
           ⤡ Fit selection
         </button>
-        <button title="Zoom 1:1 (1)" onClick={() => setWallCam({ ...wallCam, zoom: 1 })}>
-          1:1
-        </button>
         <button
           className={hand ? "on" : ""}
           title="Hand tool — every drag pans (H). Space also pans while held."
@@ -339,22 +336,6 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
         >
           ✋
         </button>
-
-        <span className="sep" />
-        <label className="wall-roll" title="Camera roll. Alt-drag on empty wall does the same.">
-          <span className="muted">roll</span>
-          <input
-            type="range"
-            min={-180}
-            max={180}
-            step={0.5}
-            value={wallCam.rot}
-            onChange={(e) => setWallCam({ ...wallCam, rot: +e.target.value })}
-          />
-          <button title="Reset roll (0)" onClick={() => setWallCam({ ...wallCam, rot: 0 })}>
-            0°
-          </button>
-        </label>
 
         <span className="sep" />
         <span className="view-toggle" title="Overscan — see the wall outside the recorded frame while arranging">

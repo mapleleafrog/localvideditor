@@ -523,6 +523,9 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 }
 .wo-hit:hover { border-color: rgba(0, 216, 255, 0.6); }
 .wo-hit.on { border-color: rgba(0, 216, 255, 0.8); background: rgba(0, 216, 255, 0.07); }
+/* not on the wall during the selected scene (appears later / already left) */
+.wo-hit.hidden-in-scene { border-color: rgba(255, 207, 112, 0.7); background: repeating-linear-gradient(45deg, rgba(20, 20, 26, 0.35) 0 6px, rgba(20, 20, 26, 0.55) 6px 12px); }
+.wo-hit.hidden-in-scene.on { border-color: rgba(0, 216, 255, 0.8); }
 .wo-frame { position: absolute; outline: 1px solid var(--accent); pointer-events: none; }
 .wo-corner {
   position: absolute; width: 10px; height: 10px; box-sizing: border-box; border-radius: 2px;
@@ -576,6 +579,15 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .wsc-card-head:active { cursor: grabbing; }
 .wsc-idx { width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; flex: none; }
 .wsc-name { flex: 1; min-width: 0; font-size: 11px; padding: 3px 5px; }
+.wsc-name-ro { flex: 1; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsc-card { cursor: pointer; }
+.wsc-card.on { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2); }
+.wsc-meta { font-size: 11px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.wsc-dot { font-size: 10px; }
+.wsc-dot.ok { color: #6ee7a8; }
+.wsc-dot.mid { color: #9fe0ff; }
+.wsc-dot.hot { color: #ffcf70; }
+.wsc-dot.bad { color: #ff8fa3; }
 .wsc-card .del { padding: 1px 7px; font-size: 12px; line-height: 1.2; }
 .wsc-mini { border-radius: 5px; overflow: hidden; }
 .wsc-row { display: flex; align-items: center; gap: 5px; font-size: 11px; }

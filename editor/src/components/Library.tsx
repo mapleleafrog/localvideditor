@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useEditor } from "../store";
 import { readyMotions, readyTransitions } from "../lib/effects-bridge";
 import { FxPreview } from "./FxPreview";
@@ -30,6 +30,11 @@ export const Library: React.FC = () => {
   const isWallClipSelected = selection?.kind === "clip" && project.clips[selection.index]?.type === "wall";
   const WALL_HINT = "A wall clip has its own camera — stack effects on wall items in the Wall view instead";
   const [tab, setTab] = useState<"effects" | "transitions" | "assets" | "audio" | "canvas">("effects");
+  // The Wall view is photos-first: opening it lands on Assets (the tabs all stay reachable).
+  const view = useEditor((s) => s.view);
+  useEffect(() => {
+    if (view === "wall") setTab("assets");
+  }, [view]);
   const [fxQuery, setFxQuery] = useState("");
   const [trQuery, setTrQuery] = useState("");
   // Categories collapse by default once there are enough of them to scroll — searching bypasses this.

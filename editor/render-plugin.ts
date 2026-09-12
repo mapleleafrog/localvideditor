@@ -106,7 +106,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const composition = await selectComposition({ serveUrl, id: "Timeline", inputProps });
     await fs.mkdir(OUT_DIR, { recursive: true });
     const ext = transparent ? "mov" : "mp4";
-    const tag = overlaysOnly ? "overlays" : transparent ? "alpha" : "video";
+    const tag = overlaysOnly ? "overlays" : options.wallOnly ? (transparent ? "wall-prores" : "wall") : transparent ? "alpha" : "video";
     const fileName = `timeline-${tag}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
     const kind = transparent ? "transparent ProRes" : "H.264";

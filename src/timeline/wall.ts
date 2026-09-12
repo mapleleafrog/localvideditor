@@ -41,9 +41,14 @@ export interface WallItemLike {
   depth?: number;
   frame?: string;
   fontSize?: number;
+  /** Scene timing refs (scene ids). Unset / unknown = always on the wall. */
+  appearIn?: string;
+  appearDelaySeconds?: number;
+  leaveAfter?: string;
 }
 
 export interface WallSceneLike {
+  id?: string;
   x?: number;
   y?: number;
   zoom?: number;
@@ -173,6 +178,11 @@ const lineEms = (seg: string) => {
   return u;
 };
 
+/** Polaroid margins as fractions of the OUTER width: sides/top and the fat bottom margin.
+ *  The ONE source for wall-paper.ts (chrome), itemBox (geometry) and check:wall (group 13).
+ *  A real Polaroid 600 is 5.7 % / 25.7 %; 6 / 24 keeps that proportion with a caption still legible. */
+export const POLAROID = { side: 0.06, bottom: 0.24 } as const;
+
 export const itemBox = (it: WallItemLike): Box => {
   const w = Math.max(1, finite(it.width, 560));
   if ((it.type ?? "image") === "text") {
@@ -192,9 +202,9 @@ export const itemBox = (it: WallItemLike): Box => {
   }
   const inner = w / itemAspect(it);
   switch (it.frame ?? "none") {
-    // polaroid: 5% sides/top, 18% bottom  |  matte: 9% all round
+    // polaroid: POLAROID.side sides/top, POLAROID.bottom bottom  |  matte: 9% all round
     case "polaroid":
-      return { w, h: 0.9 * inner + 0.23 * w };
+      return { w, h: (1 - 2 * POLAROID.side) * inner + (POLAROID.side + POLAROID.bottom) * w };
     case "matte":
       return { w, h: 0.82 * inner + 0.18 * w };
     // `taped` tape overhangs visually but is not part of the hit box; `torn` deckles inward.
@@ -461,6 +471,55 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
  *  remains the mount window; `calculateTimelineMetadata` is not involved. */
 export const wallFitFrames = (wall: WallLike | undefined, fps: number, W: number, H: number) =>
   Math.max(1, scheduleWall(wall, fps, W, H).total);
+
+// ---------------------------------------------------------------------------------------------
+// Per-object scene timing ("appears in scene N" / "leaves after scene M").
+//
+// Objects are on the wall for the whole clip by default. An item that names a scene by `id` is
+// hidden until the camera ARRIVES at that scene (`sceneFrames[i]`, plus an optional stagger) and,
+// when it also names a `leaveAfter` scene, hidden again once that scene's hold ENDS
+// (`sceneEnds[j]`). Both refs resolve by id so a reorder never re-targets an object; an unknown id
+// is treated as unset (never as "hidden forever").
+// ---------------------------------------------------------------------------------------------
+
+/** Index of the scene with this id, or -1 when unset / unknown. */
+export const sceneIndexById = (wall: WallLike | undefined, id: string | undefined): number => {
+  if (!id) return -1;
+  const scenes = wall?.scenes ?? [];
+  for (let i = 0; i < scenes.length; i++) if (scenes[i].id === id) return i;
+  return -1;
+};
+
+export interface ItemWindow {
+  /** Inclusive first visible clip-local frame. */
+  from: number;
+  /** Exclusive last visible frame; Infinity when the object never leaves. */
+  to: number;
+}
+
+/** The clip-local frame window an item is visible in, or null = always visible (no scene refs).
+ *  `from` is clamped to `to`, so a reversed pair (leave before appear, or a stagger past the
+ *  leave frame) degrades to an EMPTY window rather than a negative one. */
+export const itemWindow = (sched: WallSchedule, wall: WallLike | undefined, it: WallItemLike): ItemWindow | null => {
+  const i = sceneIndexById(wall, it.appearIn);
+  const j = sceneIndexById(wall, it.leaveAfter);
+  if (i < 0 && j < 0) return null;
+  const delay = Math.max(0, Math.round(Math.max(0, finite(it.appearDelaySeconds, 0)) * sched.fps));
+  const to = j >= 0 ? finite(sched.sceneEnds[j], 0) : Infinity;
+  const from = Math.min(i >= 0 ? finite(sched.sceneFrames[i], 0) + delay : 0, to);
+  return { from, to };
+};
+
+/** Editor hint predicate (no schedule needed): is the item visible while the camera holds on
+ *  scene `j`? Ignores the stagger — agrees with `itemWindow` at `sceneFrames[j]` when delay is 0. */
+export const itemVisibleInScene = (wall: WallLike | undefined, it: WallItemLike, j: number): boolean => {
+  const a = sceneIndexById(wall, it.appearIn);
+  const l = sceneIndexById(wall, it.leaveAfter);
+  if (a >= 0 && j < a) return false;
+  if (l >= 0 && j > l) return false;
+  if (a >= 0 && l >= 0 && l < a) return false;
+  return true;
+};
 
 /** Index of the segment covering `frame`; frames past `total` park on the last segment. */
 export const segIndexAt = (sched: WallSchedule, frame: number) => {

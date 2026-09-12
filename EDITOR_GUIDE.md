@@ -61,9 +61,13 @@ arrange + annotate your shots in Storyboard, then switch to Edit to layer effect
 ## Wall mode
 
 Toggle **Edit | Storyboard | Wall** in the top bar (the button reads **+ Create a wall clip** until the
-project has one). A **wall clip** (`clip.type: "wall"`) is a free-growing collage wall: photos, props and
-hand-font text pinned anywhere on unbounded paper, walked by a **keyframed camera**. Nothing on the wall
-animates by default — the movement *is* the camera, timed in seconds (holds + glides), not beats.
+project has one), or press **＋ New wall** to start a *separate* project that is only a wall (its own
+`projects/<name>.json` + media folder — compose the wall on its own, render it with **Wall only**, and cut it into
+the wedding timeline later). A **wall clip** (`clip.type: "wall"`) is a free-growing collage wall: photos, props and
+hand-font text pinned anywhere on unbounded paper, walked by a **keyframed camera**. Everything on the wall is
+there for the whole clip by default — the movement *is* the camera, timed in seconds (holds + glides), not beats.
+Think PowerPoint + Morph: each scene is a slide, the glide between them is the morph, and any object can be told
+to **appear in** a scene with an entrance (and **leave after** one with an exit).
 
 **The viewport is the renderer.** The centre panel mounts a real `<Player component={Timeline}>` on a derived
 project whose wall carries one synthetic scene at your authoring camera — so the pixels under the drag handles
@@ -73,22 +77,34 @@ centred rectangle and every zoom-dependent look (paper fibre, shadow lift) is id
 
 | Panel | What it is |
 |---|---|
-| Left rail | The usual **Library**. In Wall mode an **Assets** tile click adds a *wall item* at the frame centre. |
-| Centre | Nav bar (**⤢ Fit all** · **⤡ Fit selection** · **1:1** · hand · roll slider · overscan · **▶ Live** · wall-clip picker · **+ Photos…** · live camera readout), the Player, the gesture/handle overlay, and the always-on **minimap** (items by depth, numbered scene frusta, the real glide paths). |
-| Right rail | **Wall inspector** — the selected item (position, width, rotation, opacity, **depth**, frame treatment, caption, filter, flip, text/font, stacked effects, paint order) plus the wall globals (paper, fibre, finish, breathing, intro/outro, viewfinder, hand font, fit padding). |
-| Footer | **Scenes strip** — the authoring loop below. |
+| Left rail | The usual **Library**, opened on **Assets** (a tile click adds a *wall item* at the frame centre; the Effects tab still stacks motions on the selected item). |
+| Centre | Nav bar (**⤢ Fit all** · **⤡ Fit selection** · hand · overscan · **⟳ Motion** · **▶ Live** · wall-clip picker · **+ Photos…** · live camera readout), the Player, the gesture/handle overlay, and the always-on **minimap** (items by depth, numbered scene frusta, the real glide paths). Roll / 1:1 live under **Wall settings** (Alt-drag and `1` still work). |
+| Right rail | **Wall inspector** — **Scene N** (when a card is selected: hold + glide-in **seconds**, easing, arc, speed chip, re-frame / play / duplicate / delete), then for the selected item **Photo** (source, width, rotation, opacity, frame, caption, filter), **Appear** (appears in scene · delay · entrance · leaves after scene · exit), **Effects** (stacked motions — they run from the appear frame), **Advanced** (aspect, position, depth, mirror, pixelated, paint order), and **Wall settings** (camera globals, paper, fibre, finish, viewfinder, hand font). |
+| Footer | **Scenes strip** — a slide sorter: one card per scene (thumb · name · `hold 2.4s · glide 2.6s` · speed dot · `+N` objects appearing). **Click a card to select it** and jump the camera; drag to reorder. |
 
 **The loop.** ① Pan/zoom/roll until the recorded frame holds what you want. ② Drop photos (OS drag, **+ Photos…**,
 or an Assets tile) and arrange them — drag, corner-scale, rotate, `Shift`-marquee for a group, align/distribute.
 ③ **⊕ Set as scene** (or `Enter`) appends a camera keyframe with a glide duration a motion designer would sign
 off. ④ Pan to the next area and repeat. ⑤ **⟲ Fit clip duration** makes the clip exactly as long as the schedule.
 
-Each scene card carries a minimap thumb, its hold and glide seconds, easing, arc, and a **colour-banded px/frame
-speed chip** — hover it for *"1.5 s over 1010 screen px — 35 px/frame. Suggested 1.76 s."*, click to apply.
-**⌖** jumps the camera to the scene, **⟳** updates its pose from the viewport *keeping the timing*, **▸** plays
-that scene in Live mode, **⧉** duplicates, **×** deletes, and cards reorder by drag or ◀ ▶.
+Click a scene card and the inspector's **Scene N** section shows its **Hold** and **Glide in** in seconds, the
+easing, the arc, and a **colour-banded px/frame speed chip** — *"● 35 px/f → 1.8s"*, click to apply the suggested
+glide. **⟳ Re-frame** updates the pose from the viewport *keeping the timing*, **▸ Play** plays that scene in Live
+mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). `PgUp`/`PgDn` step scenes.
+
+**Appear (PowerPoint-style object timing).** Select a photo or prop → **Appear**. *Appears in scene* hides it until
+the camera arrives at that scene, then plays the **Entrance** (fade / slide / zoom / pop / rotate / spin / blur /
+flash / wipe / iris / typewriter, in seconds, with an easing) — add a *Delay* to stagger a cluster. *Leaves after
+scene* hides it once that scene's hold ends, with an **Exit**. Stacked **Effects** (springPop, bounceIn,
+monogramBlurReveal…) also start when the object appears, so the whole motion library doubles as an entrance
+library. Unset = always on the wall (the reference-video look). While a scene card is selected, objects that are
+not on the wall during it show a hatched outline in the viewport.
 
 **Camera navigation is not undoable** (pan/zoom/roll is transient); item edits and scene keyframes are.
+
+**Rendering a wall.** The render picker has **Wall only · MP4** and **Wall only · ProRes 4444 (master)** — just
+the wall clip, with any overlays/audio that overlap it shifted onto it. The paper is opaque, so the ProRes variant
+is a quality master rather than an alpha export.
 
 Outside the Wall view a wall clip shows up as: a `🧱 Wall · N items · M scenes` timeline block (double-click to
 open, drop photos on it to add items, right-click for **Edit wall… / Fit duration to scenes / Fit camera to all

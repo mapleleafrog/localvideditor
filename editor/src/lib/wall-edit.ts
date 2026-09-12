@@ -188,10 +188,62 @@ export const firstWallClip = (p: Project): number => (p.clips ?? []).findIndex((
 // Scenes.
 // ---------------------------------------------------------------------------------------------
 
+/** Stable scene id for item `appearIn` / `leaveAfter` refs. Unique per wall is all that matters
+ *  (a pasted wall clip keeps its ids; two walls never share a namespace). */
+// Editor-only (never runs inside a render), so true randomness is the right call here.
+// eslint-disable-next-line @remotion/deterministic-randomness
+export const newSceneId = (): string => `sc_${Math.floor(Math.random() * 2 ** 40).toString(36)}`;
+
+/** Backfill ids on legacy scenes (projects saved before scene ids existed). Returns the SAME
+ *  object when nothing needs an id, so reference-compared consumers (undo, autosave) see no change. */
+export const withSceneIds = (wall: Wall): Wall => {
+  const scenes = wall.scenes ?? [];
+  if (scenes.every((sc) => typeof sc.id === "string" && sc.id.length > 0)) return wall;
+  const seen = new Set<string>();
+  return {
+    ...wall,
+    scenes: scenes.map((sc) => {
+      let id = typeof sc.id === "string" && sc.id.length > 0 && !seen.has(sc.id) ? sc.id : newSceneId();
+      while (seen.has(id)) id = newSceneId();
+      seen.add(id);
+      return id === sc.id ? sc : { ...sc, id };
+    }),
+  };
+};
+
+/** A fresh, unique id for a scene being ADDED to `wall` (duplicating a scene must never copy its id —
+ *  two scenes with one id would make every `appearIn` ref ambiguous). */
+export const uniqueSceneId = (wall: Wall, want?: string): string => {
+  const taken = new Set((wall.scenes ?? []).map((sc) => sc.id).filter((v): v is string => typeof v === "string"));
+  let id = want && !taken.has(want) ? want : newSceneId();
+  while (taken.has(id)) id = newSceneId();
+  return id;
+};
+
+/** Items pointing at a deleted scene fall back to "always on the wall". */
+export const clearSceneRefs = (items: WallItem[], id: string | undefined): WallItem[] => {
+  if (!id) return items;
+  let changed = false;
+  const out = items.map((it) => {
+    if (it.appearIn !== id && it.leaveAfter !== id) return it;
+    changed = true;
+    const next = { ...it };
+    if (next.appearIn === id) delete next.appearIn;
+    if (next.leaveAfter === id) delete next.leaveAfter;
+    return next;
+  });
+  return changed ? out : items;
+};
+
+/** `[{ id, label }]` for the Appear selects — labelled by index + name so unnamed scenes still read. */
+export const sceneOptions = (wall: Wall): { id: string; label: string }[] =>
+  (wall.scenes ?? []).flatMap((sc, i) => (sc.id ? [{ id: sc.id, label: `${i + 1}${sc.name ? ` · ${sc.name}` : ""}` }] : []));
+
 /** Camera -> scene keyframe. `wallCam` is already in scene space, so "Set as scene" is a COPY, not
  *  a conversion: a hold segment returns the pose bit-exact (design §0.4). */
 export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene => ({
   ...DEFAULT_SCENE,
+  id: newSceneId(),
   x: cam.x,
   y: cam.y,
   zoom: cam.zoom,
@@ -321,6 +373,43 @@ export const newWallClip = (fps: number, W: number, H: number, wall: Wall = DEFA
   volume: 1,
   wall: cloneWall(wall),
 });
+
+/** A project that is ONLY a wall: one wall clip, no overlays, no audio, no background. What
+ *  "+ New wall" starts from — the wall is authored and rendered on its own, and composited into the
+ *  wedding timeline later (or never). Canvas size/fps/bpm come from `base`. */
+export const newWallProject = (base: Project): Project => ({
+  ...base,
+  background: { ...(base.background ?? {}), type: "none" } as Project["background"],
+  durationInFrames: 0,
+  clips: [newWallClip(base.fps, base.width, base.height)],
+  overlays: [],
+  audio: [],
+});
+
+/** The project the "Wall only" render modes send: just the wall clip at index `ci`, with overlays
+ *  and audio SHIFTED so anything that overlapped the wall in the full timeline still lands on it
+ *  (a title over the wall stays over the wall; one that ended before it is dropped). The render
+ *  endpoint adds only a filename tag — this is the whole derivation. */
+export const wallOnlyProject = (p: Project, ci: number): Project | null => {
+  const clip = p.clips?.[ci];
+  if (!clip || clip.type !== "wall") return null;
+  const start = clipStarts(p)[ci] ?? 0;
+  const len = clip.durationInFrames;
+  const overlays = (p.overlays ?? []).flatMap((o) => {
+    const from = o.from - start;
+    const dur = o.durationInFrames;
+    if (from + dur <= 0 || from >= len) return [];
+    return [{ ...o, from }];
+  });
+  const audio = (p.audio ?? []).flatMap((a) => {
+    const from = (a.from ?? 0) - start;
+    // A track that starts before the wall is trimmed (trimBefore is in frames of the source).
+    if (from < 0) return [{ ...a, from: 0, trimBefore: (a.trimBefore ?? 0) - from }];
+    if (from >= len) return [];
+    return [{ ...a, from }];
+  });
+  return { ...p, durationInFrames: len, clips: [{ ...clip, transitionToNext: "none" }], overlays, audio };
+};
 
 // ---------------------------------------------------------------------------------------------
 // The authoring loupe (design §0.4).

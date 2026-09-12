@@ -23,6 +23,8 @@ const TRANSITION_IDS = readyTransitions().map((t) => t.id);
 // z.enum needs a non-empty tuple type; the registry always has entries.
 const enumOf = (vals: string[]) => z.enum(vals as [string, ...string[]]);
 const easingPick = z.enum(["linear", "easeIn", "easeOut", "easeInOut", "easeOutIn"]);
+/** Element-scoped enter/exit kinds (src/effects/io.ts) — shared by overlays and wall items. */
+const ioKindPick = z.enum(["none", "fade", "slideLeft", "slideRight", "slideUp", "slideDown", "zoom", "pop", "rotateIn", "spin", "blurIn", "flash", "wipe", "iris", "typewriter"]);
 // Per-effect settings, index-aligned with `overlay.motions`.
 const motionParamSchema = z.object({
   loop: z.boolean().optional(),
@@ -80,6 +82,21 @@ const wallItemSchema = z.object({
   flipY: z.boolean().optional(),
   /** Editor-only name in the item list; the render ignores it. */
   label: z.string().optional(),
+  // --- Scene timing (PowerPoint-style "appears in scene N"). ALL OPTIONAL: unset = the object is
+  // simply on the wall for the whole clip (the reference-video model). Seconds, like the scenes.
+  /** Scene `id` the object appears in — hidden before the camera ARRIVES there. Unknown = unset. */
+  appearIn: z.string().optional(),
+  /** Stagger after arrival, seconds. */
+  appearDelaySeconds: z.number().min(0).optional(),
+  /** Element-scoped entrance played from the appear frame (0.5 s unless `enterSeconds`). */
+  enter: ioKindPick.optional(),
+  enterSeconds: z.number().min(0).optional(),
+  enterEasing: easingPick.optional(),
+  /** Scene `id` the object leaves after — hidden once that scene's hold ENDS. */
+  leaveAfter: z.string().optional(),
+  exit: ioKindPick.optional(),
+  exitSeconds: z.number().min(0).optional(),
+  exitEasing: easingPick.optional(),
   // text only
   fontSize: z.number().positive().default(96), // wall units
   fontFamily: enumOf([...FONT_IDS]).optional(),
@@ -88,6 +105,9 @@ const wallItemSchema = z.object({
 });
 
 const wallSceneSchema = z.object({
+  /** Stable reference for item `appearIn` / `leaveAfter` (survives reorder). The editor writes
+   *  `sc_<base36>`; legacy scenes without one are backfilled on load (store.ts#migrate). */
+  id: z.string().optional(),
   name: z.string().default(""),
   x: z.number().default(0),
   y: z.number().default(0),
@@ -179,12 +199,8 @@ const overlaySchema = z.object({
   windowInFrames: z.number().int().positive().default(30),
   /** Enter / exit transition for this layer (element-scoped: fade / slide / zoom / pop / rotate /
    *  spin / blur / flash / wipe / iris / typewriter — in & out). */
-  enter: z
-    .enum(["none", "fade", "slideLeft", "slideRight", "slideUp", "slideDown", "zoom", "pop", "rotateIn", "spin", "blurIn", "flash", "wipe", "iris", "typewriter"])
-    .default("none"),
-  exit: z
-    .enum(["none", "fade", "slideLeft", "slideRight", "slideUp", "slideDown", "zoom", "pop", "rotateIn", "spin", "blurIn", "flash", "wipe", "iris", "typewriter"])
-    .default("none"),
+  enter: ioKindPick.default("none"),
+  exit: ioKindPick.default("none"),
   enterDurationInFrames: z.number().int().nonnegative().default(15),
   exitDurationInFrames: z.number().int().nonnegative().default(15),
   /** Easing curves for the enter / exit ramps. */

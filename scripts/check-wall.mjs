@@ -107,7 +107,9 @@ const randItem = () => ({
   depth: rr(0.2, 3),
   frame: pick(FRAMES),
 });
+let sceneSeq = 0;
 const randScene = () => ({
+  id: `sc_${(sceneSeq++).toString(36)}`,
   x: rr(-2500, 2500),
   y: rr(-1400, 1400),
   zoom: rr(0.15, 3),
@@ -117,9 +119,22 @@ const randScene = () => ({
   easing: pick(["smooth", "sine", "cubic", "settle"]),
   arc: pick([0, 0, 0.6, -0.4, 1, -1]),
 });
-const randWall = (nItems, nScenes) => ({
-  items: Array.from({ length: nItems }, randItem),
-  scenes: Array.from({ length: nScenes }, randScene),
+// Scene refs on items: unset, a valid id, or a stale id — the renderer must treat stale == unset.
+const withRefs = (items, scenes) =>
+  items.map((it) => {
+    const ref = () => {
+      const r = rnd();
+      if (r < 0.5 || !scenes.length) return undefined;
+      if (r < 0.9) return pick(scenes).id;
+      return "sc_unknown";
+    };
+    return { ...it, appearIn: ref(), leaveAfter: ref(), appearDelaySeconds: pick([undefined, 0, 0.2, 0.5, 3]) };
+  });
+const randWall = (nItems, nScenes) => {
+  const scenes = Array.from({ length: nScenes }, randScene);
+  return {
+  items: withRefs(Array.from({ length: nItems }, randItem), scenes),
+  scenes,
   intro: rnd() < 0.7,
   introHoldSeconds: rr(0, 1.5),
   outro: rnd() < 0.7,
@@ -127,7 +142,8 @@ const randWall = (nItems, nScenes) => ({
   outroHoldSeconds: rr(0, 2),
   fitPadding: pick([0, 0.06, 0.12, 0.3]),
   breathing: 0,
-});
+  };
+};
 
 const W = 1920;
 const H = 1080;
@@ -676,10 +692,10 @@ startGroup(13, "wall-paper: deckle shape, window/box reconstruction, filter iden
         const fc = frameCss(it, paper, box, 12345);
         ok(Number.isFinite(box.h) && box.h > 0, `${frame}: box height is finite and positive`);
         if (frame === "polaroid" || frame === "matte") {
-          const pad = (frame === "polaroid" ? 0.05 : 0.09) * w;
+          const pad = (frame === "polaroid" ? W_.POLAROID.side : 0.09) * w;
           const winW = w - 2 * pad;
           const winH = fc.window.height;
-          near(winH + pad + (frame === "polaroid" ? 0.18 * w : pad), box.h, 1e-9,
+          near(winH + pad + (frame === "polaroid" ? W_.POLAROID.bottom * w : pad), box.h, 1e-9,
             `${frame}: window height + margins must reconstruct itemBox().h`);
           near(winW / winH, aspect, 1e-9, `${frame}: the window preserves the source aspect`);
           ok(fc.caption !== null, `${frame}: has a caption margin`);
@@ -792,8 +808,67 @@ startGroup(14, "itemBox text height honours hard line breaks");
 }
 
 // =============================================================================================
+startGroup(15, "per-object scene windows: itemWindow / itemVisibleInScene / sceneIndexById");
+{
+  const { itemWindow, itemVisibleInScene, sceneIndexById } = W_;
+  for (let c = 0; c < 600; c++) {
+    const wall = randWall(Math.floor(rr(1, 9)), Math.floor(rr(0, 7)));
+    const fps = pick([24, 25, 30, 60]);
+    const sched = scheduleWall(wall, fps, W, H);
+    ok(sceneIndexById(wall, undefined) === -1 && sceneIndexById(wall, "") === -1 && sceneIndexById(wall, "sc_unknown") === -1,
+      "unset / empty / unknown ids resolve to -1");
+    wall.scenes.forEach((s, i) => ok(sceneIndexById(wall, s.id) === i, "a scene id resolves to its own index"));
+    for (const it of wall.items) {
+      const i = sceneIndexById(wall, it.appearIn);
+      const j = sceneIndexById(wall, it.leaveAfter);
+      const win = itemWindow(sched, wall, it);
+      if (i < 0 && j < 0) {
+        ok(win === null, "no (valid) refs -> always visible (null window)");
+        for (let k = 0; k < wall.scenes.length; k++) ok(itemVisibleInScene(wall, it, k) === true, "no refs -> visible in every scene");
+        continue;
+      }
+      ok(win !== null && Number.isFinite(win.from) && win.from >= 0, "a referenced item has a finite non-negative from");
+      ok(win.from <= win.to, `from (${win.from}) must never exceed to (${win.to})`);
+      const delay = Math.round(Math.max(0, it.appearDelaySeconds ?? 0) * fps);
+      if (i >= 0) {
+        ok(win.from === Math.min(sched.sceneFrames[i] + delay, win.to), "from = arrival frame + stagger (clamped to `to`)");
+        if (j < 0) ok(win.to === Infinity, "appear-only -> never leaves");
+      } else {
+        ok(win.from === 0, "leave-only -> visible from frame 0");
+      }
+      if (j >= 0) ok(win.to === sched.sceneEnds[j], "to = the frame the leave scene's hold ends");
+      // itemVisibleInScene agrees with the window at each scene's arrival frame when there is no stagger.
+      if (!delay) {
+        for (let k = 0; k < wall.scenes.length; k++) {
+          const f = sched.sceneFrames[k];
+          const holds = sched.sceneEnds[k] > f; // a via scene (hold 0) has no frame to test
+          if (!holds) continue;
+          const inWin = f >= win.from && f < win.to;
+          ok(itemVisibleInScene(wall, it, k) === inWin, `itemVisibleInScene(${k}) agrees with itemWindow at the arrival frame`);
+        }
+      }
+      // Deterministic.
+      const again = itemWindow(sched, wall, it);
+      ok(again.from === win.from && again.to === win.to, "itemWindow is deterministic");
+    }
+  }
+  // Reversed refs (leave before appear) degrade to an EMPTY window, never a negative one.
+  {
+    const wall = { items: [], scenes: [{ id: "a", x: 0, y: 0, zoom: 1, holdSeconds: 1, glideSeconds: 1 }, { id: "b", x: 100, y: 0, zoom: 1, holdSeconds: 1, glideSeconds: 1 }] };
+    const sched = scheduleWall(wall, 30, W, H);
+    const win = itemWindow(sched, wall, { appearIn: "b", leaveAfter: "a" });
+    ok(win.from === win.to && win.to === sched.sceneEnds[0], "reversed refs -> empty window at the leave frame");
+    ok(itemVisibleInScene(wall, { appearIn: "b", leaveAfter: "a" }, 0) === false && itemVisibleInScene(wall, { appearIn: "b", leaveAfter: "a" }, 1) === false,
+      "reversed refs -> visible in no scene");
+    const late = itemWindow(sched, wall, { appearIn: "a", leaveAfter: "a", appearDelaySeconds: 99 });
+    ok(late.from === late.to, "a stagger past the leave frame clamps to an empty window");
+    ok(itemWindow(sched, wall, { appearIn: "a", appearDelaySeconds: NaN }).from === sched.sceneFrames[0], "a non-finite stagger reads as 0");
+  }
+}
+
+// =============================================================================================
 if (failures) {
   console.error(`\ncheck:wall FAILED — ${failures} of ${checks} assertions`);
   process.exit(1);
 }
-console.log(`check:wall OK — ${checks} assertions across 14 invariant groups`);
+console.log(`check:wall OK — ${checks} assertions across 15 invariant groups`);

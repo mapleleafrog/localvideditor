@@ -18,6 +18,7 @@ import { AbsoluteFill, Img, OffthreadVideo, staticFile, useCurrentFrame, useVide
 import { Gif } from "@remotion/gif";
 import type { CSSProperties } from "react";
 import { getMotion, stackMotions } from "../effects";
+import { combineIo } from "../effects/io";
 import { beatKick, clamp } from "../effects/helpers";
 import type { Wall, WallItem } from "./schema";
 import { resolveHandFontFamily } from "./fonts";
@@ -29,7 +30,9 @@ import {
   layerTransform,
   scheduleWall,
   visibleAt,
+  itemWindow,
   type Cam,
+  type ItemWindow,
   type WallSeg,
 } from "./wall";
 import {
@@ -115,6 +118,8 @@ interface ItemViewProps {
   tAbs: number;
   beat: number;
   zIndex: number;
+  /** Clip-local visible window from wall.ts#itemWindow; null = on the wall for the whole clip. */
+  win: ItemWindow | null;
 }
 
 const WallItemView: React.FC<ItemViewProps> = ({
@@ -129,10 +134,33 @@ const WallItemView: React.FC<ItemViewProps> = ({
   tAbs,
   beat,
   zIndex,
+  win,
 }) => {
   const box = itemBox(it);
   const depth = itemDepth(it);
   const isText = (it.type ?? "image") === "text";
+
+  // Scene timing. An object that names an `appearIn` scene is hidden until the camera arrives
+  // there and its motions / entrance run on a LOCAL clock from that frame (so springPop on a prop
+  // pops when the prop appears, not at clip frame 0). Always-on items have fLocal === frame and
+  // an identity `io`, so nothing below changes for them.
+  const inWindow = !win || (frame >= win.from && frame < win.to);
+  const fLocal = frame - (win?.from ?? 0);
+  const secs = (v: number | undefined, dflt: number) => Math.max(0, finite(v, dflt));
+  const io = combineIo({
+    enter: it.enter ?? "none",
+    exit: it.exit ?? "none",
+    f: fLocal,
+    durationInFrames: win && Number.isFinite(win.to) ? win.to - win.from : undefined,
+    enterFrames: Math.round(secs(it.enterSeconds, 0.5) * fps),
+    exitFrames: Math.round(secs(it.exitSeconds, 0.5) * fps),
+    enterEasing: it.enterEasing,
+    exitEasing: it.exitEasing,
+    // Slides travel 20 % of the ITEM (not the frame); direction is wall-space, so under a rolled
+    // camera "left" is the wall's left.
+    w: box.w,
+    h: box.h,
+  });
 
   // Item motions go through the SAME stacker overlays use (effects/stack.ts), so the two can never
   // drift. `t` is ABSOLUTE, so a swayLoop on a wall item is on the same clock as everything else.
@@ -148,7 +176,7 @@ const WallItemView: React.FC<ItemViewProps> = ({
     it.motions ?? [],
     it.motionParams,
     { frame, fps, t: tAbs, beat, z: 0, params: {} },
-    frame,
+    fLocal,
     Math.max(1, finite(it.windowInFrames, 90)),
     false,
     1,
@@ -175,7 +203,7 @@ const WallItemView: React.FC<ItemViewProps> = ({
     // real for paint and for <Img>/<Gif>; it is NOT a cut in video extraction work. Gating the
     // video branch on `visible` would fix that, but it contradicts §3.8's stated rule and is not
     // exercised by the demo (no video items), so it is documented rather than done.
-    ...(visible ? {} : { visibility: "hidden" }),
+    ...(visible && inWindow ? {} : { visibility: "hidden" }),
   };
 
   // .wl-anchor — CENTRING BY NEGATIVE MARGIN. With transform-origin 50% 50% the element's centre
@@ -196,9 +224,21 @@ const WallItemView: React.FC<ItemViewProps> = ({
     height: box.h,
     marginLeft: -box.w / 2,
     marginTop: -box.h / 2,
-    transform: `rotate(${deg(finite(it.rotation, 0))}deg) scale(${num(1 / depth)})`,
+    // Enter/exit terms are PREPENDED: `rotate(item) scale(1/depth)` must stay rightmost or the
+    // parallax cancel and the item rotation get re-interpreted. They live on the anchor (not the
+    // card — `torn` owns the card's clip-path — and not .wl-fx, whose sibling shadow would then
+    // wipe/blur out of step with the print).
+    transform:
+      `${io.tx || io.ty ? `translate(${num(io.tx)}px, ${num(io.ty)}px) ` : ""}` +
+      `${io.scale !== 1 ? `scale(${num(io.scale)}) ` : ""}` +
+      `${io.rotate ? `rotate(${deg(io.rotate)}deg) ` : ""}` +
+      `rotate(${deg(finite(it.rotation, 0))}deg) scale(${num(1 / depth)})`,
     transformOrigin: "50% 50%",
-    opacity: finite(it.opacity, 1) * Number(motionOpacity ?? 1),
+    opacity: finite(it.opacity, 1) * Number(motionOpacity ?? 1) * io.opacity,
+    ...(io.blur || io.brightness !== 1
+      ? { filter: `${io.blur ? `blur(${num(io.blur)}px) ` : ""}${io.brightness !== 1 ? `brightness(${num(io.brightness)})` : ""}`.trim() }
+      : {}),
+    ...(io.clip ? { clipPath: io.clip } : {}),
   };
 
   // .wl-fx — the motion's own wrapper, NEVER the camera chain (squashStretch / pendulum /
@@ -324,6 +364,7 @@ const WallItemView: React.FC<ItemViewProps> = ({
               {/* `faded` lifts blacks — filter() can only crush them. Contained by the window's
                   overflow:hidden + isolation:isolate. */}
               {wash ? <div className="wl-wash" style={wash} /> : null}
+              {fc.rim ? <div className="wl-rim" style={fc.rim} /> : null}
             </div>
             {fc.caption && it.caption ? (
               <div className="wl-caption" style={{ ...fc.caption, fontFamily: resolveHandFontFamily(handFont) }}>
@@ -590,6 +631,7 @@ export const WallClip: React.FC<WallClipProps> = ({ wall, absStart, clipDuration
           tAbs={tAbs}
           beat={beat}
           zIndex={10 + i}
+          win={itemWindow(sched, wall, it)}
         />
       ))}
       {finish > 0 ? (

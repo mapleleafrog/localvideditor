@@ -3,7 +3,7 @@ import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave, migrate } from "
 import type { Project } from "../../../src/timeline/schema";
 import { renderVideo, saveProjectFile, deleteProject } from "../lib/api";
 import { ensureProjectName, safeName } from "../lib/names";
-import { firstWallClip, newWallClip } from "../lib/wall-edit";
+import { firstWallClip, newWallClip, newWallProject, wallOnlyProject } from "../lib/wall-edit";
 
 type RenderState =
   | { phase: "idle" }
@@ -21,7 +21,10 @@ export const Topbar: React.FC = () => {
   const toggleShortcuts = useEditor((s) => s.toggleShortcuts);
   const wallIndex = firstWallClip(project);
   const [render, setRender] = useState<RenderState>({ phase: "idle" });
-  const [mode, setMode] = useState<"mp4" | "alpha" | "overlays">("mp4");
+  type Mode = "mp4" | "alpha" | "overlays" | "wall" | "wall-prores";
+  const [mode, setMode] = useState<Mode>("mp4");
+  const wallOnly = mode === "wall" || mode === "wall-prores";
+  const isMov = mode !== "mp4" && mode !== "wall";
   const [note, setNote] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState(projectName);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -45,9 +48,32 @@ export const Topbar: React.FC = () => {
 
   const onRender = async () => {
     setRender({ phase: "running", message: "Starting…", progress: 0 });
-    const options = { transparent: mode !== "mp4", overlaysOnly: mode === "overlays", concurrency, gl, crf };
+    // "Wall only": the project is reduced CLIENT-SIDE to the wall clip (overlays/audio shifted to
+    // it) — the paper is opaque, so the ProRes variant is a quality master, not an alpha export.
+    let toRender = project;
+    if (wallOnly) {
+      const st = useEditor.getState();
+      const ci = st.wallClip != null && st.project.clips?.[st.wallClip]?.type === "wall" ? st.wallClip : firstWallClip(st.project);
+      const reduced = ci >= 0 ? wallOnlyProject(st.project, ci) : null;
+      if (!reduced) {
+        setRender({ phase: "error", message: "No wall clip in this project" });
+        flash("No wall clip to render — add one with the Wall button");
+        return;
+      }
+      toRender = reduced;
+    }
+    const options = {
+      transparent: mode === "alpha" || mode === "overlays",
+      overlaysOnly: mode === "overlays",
+      wallOnly,
+      // ProRes 4444 master for the wall: high quality, no alpha (the paper is opaque).
+      ...(mode === "wall-prores" ? { transparent: true } : {}),
+      concurrency,
+      gl,
+      crf,
+    };
     try {
-      await renderVideo(project, options, (msg) => {
+      await renderVideo(toRender, options, (msg) => {
         if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
         else if (msg.type === "progress")
           setRender({ phase: "running", message: "Rendering…", progress: msg.progress });
@@ -126,6 +152,25 @@ export const Topbar: React.FC = () => {
     flash("Added a wall clip — drop photos from the Assets tab");
   };
 
+  /** Start a project that is ONLY a wall (own JSON + media folder) — the wall is authored on its
+   *  own and composited into the wedding timeline later. Goes through `migrate` like every other
+   *  whole-project replacement so scene ids are guaranteed. */
+  const onNewWall = () => {
+    const st = useEditor.getState();
+    const dirty = useTemporal.getState().pastStates.length > 0;
+    if (dirty && !window.confirm("Start a new wall project? The current project stays saved only if you saved it (💾 Save)."))
+      return;
+    const name = window.prompt("Name for the new wall project (used for projects/<name>.json and public/media/<name>/):", "wall");
+    if (name == null) return;
+    clearAutosave();
+    st.setProject(migrate(newWallProject(st.project)));
+    st.setProjectName(safeName(name));
+    st.setWallClip(0);
+    st.select({ kind: "clip", index: 0 });
+    st.setView("wall");
+    flash("New wall project — drop photos from the Assets tab, then ⊕ Set as scene");
+  };
+
   const onReset = () => {
     if (!window.confirm("Discard the current project and reload the sample?")) return;
     clearAutosave();
@@ -147,6 +192,9 @@ export const Topbar: React.FC = () => {
           title={wallIndex >= 0 ? "Edit the collage wall + camera scenes" : "Create a wall clip and start arranging"}
         >
           {wallIndex >= 0 ? "Wall" : "+ Create a wall clip"}
+        </button>
+        <button onClick={onNewWall} title="Start a separate project that is only a wall (its own JSON + media folder)">
+          ＋ New wall
         </button>
       </span>
 
@@ -191,13 +239,15 @@ export const Topbar: React.FC = () => {
       <select
         className="render-mode"
         value={mode}
-        onChange={(e) => setMode(e.target.value as "mp4" | "alpha" | "overlays")}
+        onChange={(e) => setMode(e.target.value as Mode)}
         disabled={render.phase === "running"}
-        title="Export format — ProRes carries an alpha channel for compositing in DaVinci"
+        title="Export format — ProRes carries an alpha channel for compositing in DaVinci. Wall only = just the wall clip (overlays over it kept); its paper is opaque, so the ProRes variant is a quality master, not an alpha export."
       >
         <option value="mp4">Full video · MP4</option>
         <option value="alpha">Full video · ProRes (alpha)</option>
         <option value="overlays">Overlays only · ProRes (alpha)</option>
+        <option value="wall">Wall only · MP4</option>
+        <option value="wall-prores">Wall only · ProRes 4444 (master)</option>
       </select>
       <span className="render-settings-wrap">
         <button onClick={() => setShowSettings((s) => !s)} title="Render settings" className={showSettings ? "on" : ""}>⚙</button>
@@ -227,7 +277,7 @@ export const Topbar: React.FC = () => {
         )}
       </span>
       <button className="primary" onClick={onRender} disabled={render.phase === "running"}>
-        {render.phase === "running" ? "Rendering…" : mode === "mp4" ? "⏺ Render MP4" : "⏺ Render .mov"}
+        {render.phase === "running" ? "Rendering…" : isMov ? "⏺ Render .mov" : "⏺ Render MP4"}
       </button>
     </header>
   );

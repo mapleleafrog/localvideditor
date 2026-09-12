@@ -23,7 +23,7 @@
 import React, { useRef, useState } from "react";
 import { useEditor } from "../store";
 import type { Wall, WallItem } from "../../../src/timeline/schema";
-import { itemBox, normAngle } from "../../../src/timeline/wall";
+import { itemBox, itemVisibleInScene, normAngle, sceneIndexById } from "../../../src/timeline/wall";
 import {
   itemScreenBoxPx,
   panBy,
@@ -95,6 +95,10 @@ export const WallOverlay: React.FC<Props> = ({ ci, wall, cam, vp, boxW, boxH, on
   const [marquee, setMarquee] = useState<{ l: number; t: number; w: number; h: number } | null>(null);
 
   const items = wall.items ?? [];
+  // The selected scene card (footer strip): items that are NOT on the wall during that scene draw
+  // a dashed "hidden here" outline. Editor chrome only — the Player pixels are the render's.
+  const wallScene = useEditor((s) => s.wallScene);
+  const sceneIdx = sceneIndexById(wall, wallScene ?? undefined);
   const primary = selection?.kind === "wallItem" && selection.clip === ci ? selection.index : -1;
   // wallSel is the multi-selection; a bare primary counts as a selection of one.
   const sel = wallSel.length ? wallSel.filter((i) => i >= 0 && i < items.length) : primary >= 0 ? [primary] : [];
@@ -489,7 +493,12 @@ export const WallOverlay: React.FC<Props> = ({ ci, wall, cam, vp, boxW, boxH, on
         return (
           <div
             key={i}
-            className={"wo-hit" + (selSet.has(i) ? " on" : "") + (i === primary ? " primary" : "")}
+            className={
+              "wo-hit" +
+              (selSet.has(i) ? " on" : "") +
+              (i === primary ? " primary" : "") +
+              (sceneIdx >= 0 && !itemVisibleInScene(wall, it, sceneIdx) ? " hidden-in-scene" : "")
+            }
             style={{
               left: b.cx - b.w / 2,
               top: b.cy - b.h / 2,

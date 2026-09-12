@@ -53,7 +53,7 @@ export const Slider: React.FC<{
 /** Collapsible group — cuts down the constant scrolling on layers with lots of props/effects.
  *  State is a controlled <details> (not a bare `open` prop) so re-renders while editing a field
  *  don't fight the user's manual expand/collapse. */
-export const Section: React.FC<{ title: string; defaultOpen?: boolean; badge?: number; children: React.ReactNode }> = ({
+export const Section: React.FC<{ title: string; defaultOpen?: boolean; badge?: number | string; children: React.ReactNode }> = ({
   title,
   defaultOpen = true,
   badge,

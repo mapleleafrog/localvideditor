@@ -107,7 +107,15 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "the morning 3"
+            "label": "the morning 3",
+            "appearIn": "sc_demo1",
+            "appearDelaySeconds": 0,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut",
+            "leaveAfter": "sc_demo2",
+            "exit": "fade",
+            "exitSeconds": 0.6
           },
           {
             "type": "image",
@@ -199,7 +207,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "the vows 4"
+            "label": "the vows 4",
+            "appearIn": "sc_demo3",
+            "appearDelaySeconds": 0.15,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "image",
@@ -498,7 +511,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "after dark 1"
+            "label": "after dark 1",
+            "appearIn": "sc_demo6",
+            "appearDelaySeconds": 0.3,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "image",
@@ -590,7 +608,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "the walk home 3"
+            "label": "the walk home 3",
+            "appearIn": "sc_demo5",
+            "appearDelaySeconds": 0,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "image",
@@ -613,7 +636,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "prop butterfly"
+            "label": "prop butterfly",
+            "appearIn": "sc_demo1",
+            "appearDelaySeconds": 0.15,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "image",
@@ -636,7 +664,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "prop ticket"
+            "label": "prop ticket",
+            "appearIn": "sc_demo5",
+            "appearDelaySeconds": 0.3,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "image",
@@ -659,7 +692,12 @@
             "fontSize": 96,
             "color": "#3a3226",
             "align": "center",
-            "label": "prop pressed flower"
+            "label": "prop pressed flower",
+            "appearIn": "sc_demo6",
+            "appearDelaySeconds": 0,
+            "enter": "pop",
+            "enterSeconds": 0.5,
+            "enterEasing": "easeOut"
           },
           {
             "type": "text",
@@ -765,7 +803,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo1"
           },
           {
             "name": "the vows",
@@ -776,7 +815,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo2"
           },
           {
             "name": "portraits",
@@ -787,7 +827,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo3"
           },
           {
             "name": "the table",
@@ -798,7 +839,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo4"
           },
           {
             "name": "the walk home",
@@ -809,7 +851,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0.3
+            "arc": 0.3,
+            "id": "sc_demo5"
           },
           {
             "name": "after dark",
@@ -820,7 +863,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo6"
           },
           {
             "name": "the sea",
@@ -831,7 +875,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": -0.2
+            "arc": -0.2,
+            "id": "sc_demo7"
           },
           {
             "name": "kyoto",
@@ -842,7 +887,8 @@
             "holdSeconds": 2.4,
             "glideSeconds": 2.6,
             "easing": "smooth",
-            "arc": 0
+            "arc": 0,
+            "id": "sc_demo8"
           }
         ]
       }

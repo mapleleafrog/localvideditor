@@ -16,7 +16,7 @@ import { loadFont as loadNotoSerifJP } from "@remotion/google-fonts/NotoSerifJP"
 import { loadFont as loadZenMaruGothic } from "@remotion/google-fonts/ZenMaruGothic";
 import { loadFont as loadShipporiMincho } from "@remotion/google-fonts/ShipporiMincho";
 import { loadFont as loadNotoSansJP } from "@remotion/google-fonts/NotoSansJP";
-// Hand faces for wall captions / wall text items (see Wall.tsx, wall.handFont).
+// Hand faces for wall captions / wall text items (see WallClip.tsx, wall.handFont).
 import { loadFont as loadCaveat } from "@remotion/google-fonts/Caveat";
 import { loadFont as loadYomogi } from "@remotion/google-fonts/Yomogi";
 import { loadFont as loadZenKurenaido } from "@remotion/google-fonts/ZenKurenaido";

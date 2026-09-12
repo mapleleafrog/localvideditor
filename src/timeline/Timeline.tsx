@@ -17,7 +17,7 @@ import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
 import { resolveFontFamily } from "./fonts";
-import { WallClip } from "./Wall";
+import { WallClip } from "./WallClip"; // NOT "./Wall": on a case-insensitive FS (Windows) that resolves to wall.ts
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 

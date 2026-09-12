@@ -4,7 +4,7 @@
 // per-effect `loop` (progress sawtooth) / `easing` (progress curve) / `strength` (magnitude), each
 // falling back to the layer-level value, then scaleStrength(getMotion(id)(ctx)) and composeStyles.
 //
-// It exists so OVERLAYS (Layer.tsx) and WALL ITEMS (Wall.tsx) provably compose identically instead
+// It exists so OVERLAYS (Layer.tsx) and WALL ITEMS (WallClip.tsx) provably compose identically instead
 // of drifting apart. Argument order and every `??` fallback are exactly as they were inline — a
 // transposed fallback here would silently alter every existing render.
 //

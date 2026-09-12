@@ -105,7 +105,7 @@ export const IDENTITY_CAM: Cam = { x: 0, y: 0, zoom: 1, rot: 0 };
  *
  * So harden ONCE, at the single boundary every component already funnels through (`wallOf`).
  * Memoised by input reference in a WeakMap, which matters for more than speed: `authoringProject`
- * spreads the hardened wall, and `Wall.tsx` memoises on `wall.items` — a fresh array per call would
+ * spreads the hardened wall, and `WallClip.tsx` memoises on `wall.items` — a fresh array per call would
  * defeat both. Patching still goes through `rawWall` (see `withWall`), so hardening never writes
  * defaults back into the project JSON; only fields the user actually touches are persisted.
  */

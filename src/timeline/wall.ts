@@ -2,7 +2,7 @@
 //
 // No React, no DOM, no frame reads, no Math.random, no Date, and NO 1920/1080 default anywhere:
 // `W` and `H` are always parameters (a vertical project must work). This module is the single
-// authority shared by the renderer (Wall.tsx), the editor (gestures, Fit buttons, minimap,
+// authority shared by the renderer (WallClip.tsx), the editor (gestures, Fit buttons, minimap,
 // scene strip) and `npm run check:wall`, so there is exactly one implementation of the geometry.
 //
 // The schema is imported with `import type` ONLY — check-wall.mjs bundles this file with esbuild
@@ -95,7 +95,7 @@ const mix = (a: number, b: number, t: number) => (1 - t) * a + t * b;
 const smooth = (t: number) => t * t * (3 - 2 * t);
 /** `?? default` is not enough: zod defaults never run on the `<Player inputProps>` path and the
  *  editor's number fields yield NaN for an emptied input, so every numeric read goes through this.
- *  Exported because Wall.tsx must harden the SAME fields — otherwise an item's geometry would be
+ *  Exported because WallClip.tsx must harden the SAME fields — otherwise an item's geometry would be
  *  computed at (0,0) while its DOM emitted `left: NaNpx`, i.e. the two would disagree instead of
  *  both degrading. */
 export const finite = (v: unknown, fallback: number) =>
@@ -180,7 +180,7 @@ export const itemBox = (it: WallItemLike): Box => {
     // (flex-centred, overflow visible), so the selection box and the rendered box agree by
     // construction and there is no measuring path to go stale.
     //
-    // Wall.tsx renders the block with `white-space: pre-wrap`, so an explicit "\n" FORCES a break.
+    // WallClip.tsx renders the block with `white-space: pre-wrap`, so an explicit "\n" FORCES a break.
     // Costing the whole string in ONE ceil() ignored that (a 5-line poem measured as one line, and
     // every text item in the demo project carries a "\n"), so hard lines are split first and each
     // wraps on its own. Deviation from design §1's single-ceil formula, in service of the F-9

@@ -230,7 +230,7 @@ export const tornPolygon = (seed: number) => {
 };
 
 export interface FrameCss {
-  /** `.wl-card` — the physical print. Carries the flip transform in Wall.tsx. */
+  /** `.wl-card` — the physical print. Carries the flip transform in WallClip.tsx. */
   card: CSSProperties;
   /** `.wl-window` — the emulsion. Sets overflow:hidden + isolation:isolate so the `faded` wash's
    *  `screen` blend is contained. */
@@ -249,14 +249,14 @@ export interface FrameCss {
   /** Tape strips, children of `.wl-card` (empty for every treatment but `taped`). */
   tapes: CSSProperties[];
   /** Caption block on the margin, or null when this treatment has no margin to write on.
-   *  `fontFamily` is deliberately NOT set here — Wall.tsx resolves the hand font via fonts.ts. */
+   *  `fontFamily` is deliberately NOT set here — WallClip.tsx resolves the hand font via fonts.ts. */
   caption: CSSProperties | null;
 }
 
 /**
  * All of an item's chrome, in WALL units (the camera scales it).
  *
- * TEXT ITEMS NEVER REACH THIS FUNCTION. Wall.tsx returns before calling it for `type: "text"`:
+ * TEXT ITEMS NEVER REACH THIS FUNCTION. WallClip.tsx returns before calling it for `type: "text"`:
  * literal conformance to design §5.7's "treatments forced to none" would draw the `none`
  * treatment's keyline rectangle AND a cast shadow around free-standing handwriting, which is
  * wrong. Consequence for the editor (slice 4/5): `frame` and `caption` are live, defaulted schema
@@ -494,7 +494,7 @@ export const fadedWashStyle = (id: string | undefined, strength = 1): CSSPropert
 // ---------------------------------------------------------------------------------------------
 // Finish — lens layers, OUTSIDE the camera, so they cannot swim or crawl by construction.
 // Everything is multiplied by `finish`, so 0 gives a clean ungraded wall for compositing in
-// DaVinci and 1 is the full look. (Grain is the 5th layer and lives in Wall.tsx: it is the one
+// DaVinci and 1 is the full look. (Grain is the 5th layer and lives in WallClip.tsx: it is the one
 // honest registry reuse, getMotion("grainLoop") with only `opacity` overridden.)
 // ---------------------------------------------------------------------------------------------
 

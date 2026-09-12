@@ -37,7 +37,7 @@ const bgMotionPick = enumOf(["none", ...BG_IDS]);
 // A clip of type "wall" pins photos, props and hand-font text anywhere on an UNBOUNDED wall
 // (negative coordinates included) and walks a camera across it through an ordered list of scenes
 // (camera keyframes, in SECONDS — the beat grid is deliberately not involved).
-// Pure maths: wall.ts (schedule / camera / fit-all / boxes). Look: wall-paper.ts. Render: Wall.tsx.
+// Pure maths: wall.ts (schedule / camera / fit-all / boxes). Look: wall-paper.ts. Render: WallClip.tsx.
 const wallItemSchema = z.object({
   type: z.enum(["image", "text"]).default("image"),
   /** public/ or public/media/ ref. .gif -> <Gif>, .webm/.mp4/.mov -> <OffthreadVideo>, else <Img>. */

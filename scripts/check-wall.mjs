@@ -740,7 +740,7 @@ startGroup(13, "wall-paper: deckle shape, window/box reconstruction, filter iden
 // =============================================================================================
 startGroup(14, "itemBox text height honours hard line breaks");
 {
-  // Wall.tsx renders the text block with `white-space: pre-wrap`, so a "\n" FORCES a break. Costing
+  // WallClip.tsx renders the text block with `white-space: pre-wrap`, so a "\n" FORCES a break. Costing
   // the whole string in one ceil() measured a 5-line poem as ONE line — and every text item in the
   // demo project carries a "\n". The box is authoritative (fit-all, the frustum cull, the DOM block
   // height and the editor's handles all read it), so it must agree with what pre-wrap renders.

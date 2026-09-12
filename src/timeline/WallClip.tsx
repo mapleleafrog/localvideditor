@@ -57,10 +57,13 @@ const VIDEO_RE = /\.(webm|mp4|mov)$/i;
  *  extraction so the alpha survives (without it Remotion extracts JPEG and alpha becomes black). */
 const ALPHA_RE = /\.(webm|mov)$/i;
 
-/** <Gif> rasterises into a canvas at the given backing size and the camera then scales it, so a
- *  1x backing looks soft on any tight scene. 2x supersampling, capped at 2048 for bounded memory. */
-const GIF_SS = 2;
-const gifPx = (v: number) => Math.min(2048, Math.max(1, Math.round(v * GIF_SS)));
+// <Gif> is rendered at its NATIVE pixel size (no width/height props) and stretched to the window by
+// CSS. Two reasons. (1) @remotion/gif 4.0.472 clears only the GIF's intrinsic area before painting
+// the next frame, so a canvas larger than the GIF keeps whatever the previous frame drew outside
+// that area — a 2-frame bobbing sprite drawn into a supersampled backing shows BOTH frames
+// ("ghosting"). At native size the clear covers the whole canvas. (2) A GIF has no more detail than
+// its own pixels, so a larger backing never sharpened anything anyway; CSS scaling is what a
+// browser <img> does. `pixelated` keeps sprites crisp, otherwise the scale is bilinear.
 
 /** Empty-src placeholder. NEVER <Img src=""> — its delayRender handle rejects on load failure and
  *  hard-fails the whole render. */
@@ -296,14 +299,13 @@ const WallItemView: React.FC<ItemViewProps> = ({
                 // mounted once per clip and acquires its delayRender handle exactly once.
                 <Gif
                   src={resolveSrc(src)}
-                  fit="cover"
+                  fit="fill"
                   loopBehavior="loop"
-                  width={gifPx(box.w)}
-                  height={gifPx(box.h)}
                   playbackRate={Math.max(0.01, finite(it.playbackRate, 1))}
                   style={{
                     width: "100%",
                     height: "100%",
+                    display: "block",
                     ...(filter ? { filter } : {}),
                     ...(it.pixelated ? { imageRendering: "pixelated" as const } : {}),
                   }}

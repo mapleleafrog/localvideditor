@@ -193,6 +193,16 @@ export const dualShadow = (lift: number, ink: string, k = 1) => {
   );
 };
 
+/** The same two shadows as `dualShadow`, as a `filter` so they follow the ALPHA of a transparent
+ *  prop (a sticker, a cut-out GIF) instead of its bounding box. Used by the `none` treatment. */
+export const dualDropShadow = (lift: number, ink: string, k = 1) => {
+  const L = clamp(lift);
+  return (
+    `drop-shadow(0 ${(1.5 + 3.5 * L).toFixed(1)}px ${(2 + 5 * L).toFixed(1)}px rgba(${ink},${((0.28 - 0.12 * L) * k).toFixed(3)}))` +
+    ` drop-shadow(0 ${(6 + 22 * L).toFixed(1)}px ${(10 + 24 * L).toFixed(1)}px rgba(${ink},${((0.12 + 0.12 * L) * k).toFixed(3)}))`
+  );
+};
+
 export type FrameId = "none" | "polaroid" | "matte" | "taped" | "torn";
 
 export const LIFT: Record<FrameId, number> = { none: 0.1, polaroid: 0.22, matte: 0.16, taped: 0.06, torn: 0.14 };
@@ -434,18 +444,18 @@ export const frameCss = (it: WallItemLike, paper: PaperPreset, box: Box, seed: n
     };
   }
 
+  // `none` = a PROP: a sticker, a cut-out GIF, a torn scrap the user made themselves. No card, no
+  // keyline, and the shadow is a drop-shadow FILTER so it follows the alpha, not the bounding box —
+  // a rectangular box-shadow drew a visible square around every transparent prop.
   return {
-    card: { position: "absolute", inset: 0, borderRadius: CARD_RADIUS },
+    card: { position: "absolute", inset: 0, filter: dualDropShadow(lift, ink, k) },
     window: {
       position: "absolute",
       inset: 0,
       overflow: "hidden",
       isolation: "isolate",
-      borderRadius: CARD_RADIUS,
-      // A keyline so a white-ish photo still has an edge, without a 1 px hard rim.
-      boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06)",
     },
-    shadow: baseShadow,
+    shadow: { display: "none" },
     tapes: [],
     caption: null,
   };

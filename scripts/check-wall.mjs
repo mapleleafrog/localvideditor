@@ -697,6 +697,12 @@ startGroup(13, "wall-paper: deckle shape, window/box reconstruction, filter iden
           ok(!fc.shadow.clipPath, "torn: the OUTER (blurred) shadow must NOT carry the clip");
           ok(/blur/.test(String(fc.shadow.filter)), "torn: the OUTER shadow carries the blur");
           ok(!fc.shadowInner.filter, "torn: the INNER (clipped) shadow must NOT carry the blur");
+        } else if (frame === "none") {
+          // A prop: no card, no keyline, and the shadow follows the ALPHA (drop-shadow filter on the
+          // card), never the bounding box — a box-shadow drew a square around transparent stickers.
+          ok(fc.shadow.display === "none", "none: no box-shadow plate at all");
+          ok(/drop-shadow\(/.test(String(fc.card.filter)) && (String(fc.card.filter).match(/drop-shadow\(/g) || []).length === 2, "none: two drop-shadows on the card");
+          ok(!fc.card.background && !fc.window.boxShadow, "none: no card background and no keyline");
         } else {
           ok(fc.shadowInner === undefined, `${frame}: leaves shadowInner undefined (unchanged path)`);
           ok(/rgba\(/.test(String(fc.shadow.boxShadow)), `${frame}: uses the dual box-shadow`);

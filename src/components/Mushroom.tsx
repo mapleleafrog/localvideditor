@@ -47,7 +47,9 @@ export const Mushroom: React.FC<MushroomProps> = ({
       style={{ left, top }}
     >
       {isGif ? (
-        <Gif src={staticFile(src)} width={size} height={size} fit="contain" style={{ imageRendering: "pixelated" }} />
+        // Native size + CSS scaling: @remotion/gif clears only the GIF's intrinsic area between
+        // frames, so a canvas larger than the sprite kept the previous frame's pixels (ghosting).
+        <Gif src={staticFile(src)} fit="contain" style={{ width: size, height: size, imageRendering: "pixelated" }} />
       ) : (
         <Img src={staticFile(src)} className="pixelated" style={{ width: size, height: "auto", display: "block" }} />
       )}

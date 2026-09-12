@@ -230,7 +230,15 @@ export interface NewItemOpts {
   label?: string;
 }
 
-/** A dropped/imported asset as a wall item. `frame: "polaroid"` for images is the house default. */
+/** Photos become polaroids by default; PROPS do not. A GIF, an alpha PNG/WebP sticker or a video
+ *  clip dropped on the wall is almost never meant to sit inside a white print border, and a
+ *  polaroid frame also hides that a GIF is animated (the arrange viewport is a still). Scans are
+ *  overwhelmingly JPEG, so the extension is a good enough tell — one click in the inspector fixes
+ *  the exceptions either way. */
+export const defaultFrameFor = (src: string): WallItem["frame"] =>
+  /\.(gif|png|webp|webm|mp4|mov|m4v|svg)$/i.test(src) ? "none" : "polaroid";
+
+/** A dropped/imported asset as a wall item. Frame defaults per `defaultFrameFor`. */
 export const newWallItemFromAsset = (src: string, o: NewItemOpts): WallItem => newWallItem({
   type: "image",
   src,
@@ -238,7 +246,7 @@ export const newWallItemFromAsset = (src: string, o: NewItemOpts): WallItem => n
   y: Math.round(o.y),
   width: Math.max(1, Math.round(o.width ?? DEFAULT_WALL_ITEM.width)),
   ...(o.aspect && Number.isFinite(o.aspect) && o.aspect > 0 ? { aspect: o.aspect } : {}),
-  frame: o.frame ?? "polaroid",
+  frame: o.frame ?? defaultFrameFor(src),
   seed: o.seed ?? newSeed(),
   ...(o.label ? { label: o.label } : {}),
 });

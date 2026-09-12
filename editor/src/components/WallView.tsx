@@ -208,7 +208,13 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   // overlay end, AUDIO end). The audio term is measured in the browser (the JSON does not carry a
   // track's length), so Live has to read it too or a song-length project stops short here while the
   // Edit preview and the MP4 run on.
-  const duration = live ? computeDuration(project, audioEnd) : 1;
+  // Arranging shows the authoring camera as a STILL by default (one frame, nothing moves, cheap
+  // while dragging). "Motion" loops 3 s of that same still camera so animated GIFs, video items
+  // and stacked item effects can be seen moving while you place them — the camera itself does not
+  // move (the derived project has one scene and no breathing), so it is still a framing tool.
+  const [motion, setMotion] = useState(true);
+  const ARRANGE_LOOP_FRAMES = Math.max(1, Math.round(3 * fps));
+  const duration = live ? computeDuration(project, audioEnd) : motion ? ARRANGE_LOOP_FRAMES : 1;
 
   const flash = (m: string) => {
     setNote(m);
@@ -358,6 +364,15 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
             </button>
           ))}
         </span>
+        {!live && (
+          <button
+            className={motion ? "on" : ""}
+            onClick={() => setMotion(!motion)}
+            title="Loop the still camera so GIFs, video items and stacked effects animate while you arrange (turn off if dragging feels heavy)"
+          >
+            ⟳ Motion
+          </button>
+        )}
         <button
           className={live ? "on" : ""}
           onClick={() => setLive(!live)}
@@ -429,6 +444,8 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
             style={{ width: "100%", height: "100%" }}
             clickToPlay={false}
             controls={live}
+            autoPlay={!live && motion}
+            loop={!live && motion}
           />
           {!live && fit.w > 0 && (
             <WallOverlay

@@ -4,7 +4,26 @@ import type { Project, Clip, Overlay, AudioTrack, Wall, WallItem, WallScene } fr
 import type { Cam } from "../../src/timeline/wall";
 import sampleProject from "../../projects/sample.json";
 import { clipStarts } from "./lib/timeline-utils";
-import { IDENTITY_CAM, duplicatedItem, insertAt, mapAt, moveAt, removeAt, withWall } from "./lib/wall-edit";
+import { IDENTITY_CAM, duplicatedItem, fitDurationPatch, insertAt, mapAt, moveAt, removeAt, withWall } from "./lib/wall-edit";
+
+const AUTOFIT_KEY = "soranji.wall.autofit";
+const readAutoFit = (): boolean => {
+  try {
+    return localStorage.getItem(AUTOFIT_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+/** Auto-fit: after a SCHEDULE edit (scene added/changed/removed, intro/outro toggled), size the wall
+ *  clip to exactly what the camera needs — inside the SAME store update, so it lands in the same
+ *  undo step as the edit that caused it and never fights the timeline's resize handle (which is a
+ *  different action). Off = the manual "⟲ Fit clip duration" buttons only. */
+const withFit = (project: Project, ci: number, auto: boolean): Project => {
+  if (!auto) return project;
+  const p = fitDurationPatch(project, ci);
+  if (!p || project.clips[ci]?.durationInFrames === p.durationInFrames) return project;
+  return { ...project, clips: project.clips.map((c, k) => (k === ci ? { ...c, ...p } : c)) };
+};
 
 /** A wall item is addressed by BOTH its clip and its index — the wall lives inside one clip, so a
  *  bare index would be ambiguous the moment a project has two wall clips. */
@@ -127,6 +146,10 @@ export interface EditorState {
   wallLive: boolean;
   /** Sticky hand (pan) tool — `H`. */
   wallHand: boolean;
+  /** Keep the wall clip's duration equal to its camera schedule after every schedule edit
+   *  (persisted preference, default on). */
+  wallAutoFit: boolean;
+  setWallAutoFit: (v: boolean) => void;
   /** Which wall clip the view has already framed. Lives HERE and not in a component ref because the
    *  Wall view unmounts on every trip to Edit/Storyboard: a per-mount ref would re-frame scene 1 and
    *  throw away the framing being composed, with no undo (camera nav is deliberately not undoable). */
@@ -266,6 +289,7 @@ export const useEditor = create<EditorState>()(
       wallOverscan: 1.6,
       wallLive: false,
       wallHand: false,
+      wallAutoFit: readAutoFit(),
       wallFramed: null,
       seekRequest: null,
 
@@ -319,7 +343,7 @@ export const useEditor = create<EditorState>()(
       patchWall: (ci, patch) =>
         set((s) => {
           const project = withWall(s.project, ci, (w) => ({ ...w, ...patch }));
-          return project ? { project } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       addWallItem: (ci, item) =>
@@ -394,7 +418,7 @@ export const useEditor = create<EditorState>()(
             const scenes = w.scenes ?? [];
             return { ...w, scenes: at == null ? [...scenes, scene] : insertAt(scenes, at, scene) };
           });
-          return project ? { project } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       patchWallScene: (ci, i, patch) =>
@@ -402,19 +426,19 @@ export const useEditor = create<EditorState>()(
           const project = withWall(s.project, ci, (w) =>
             i >= 0 && i < (w.scenes ?? []).length ? { ...w, scenes: mapAt(w.scenes ?? [], i, (sc) => ({ ...sc, ...patch })) } : w,
           );
-          return project ? { project } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       removeWallScene: (ci, i) =>
         set((s) => {
           const project = withWall(s.project, ci, (w) => ({ ...w, scenes: removeAt(w.scenes ?? [], i) }));
-          return project ? { project } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       reorderWallScene: (ci, from, to) =>
         set((s) => {
           const project = withWall(s.project, ci, (w) => ({ ...w, scenes: moveAt(w.scenes ?? [], from, to) }));
-          return project ? { project } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       removeSelected: () =>
@@ -676,6 +700,15 @@ export const useEditor = create<EditorState>()(
       setWallOverscan: (wallOverscan) => set({ wallOverscan }),
       setWallLive: (wallLive) => set({ wallLive }),
       setWallHand: (wallHand) => set({ wallHand }),
+      setWallAutoFit: (v) => {
+        try {
+          localStorage.setItem(AUTOFIT_KEY, v ? "1" : "0");
+        } catch {
+          /* private mode etc. — the in-memory flag still works for this session */
+        }
+        // Turning it ON fits the open wall clip right away, so the toggle has a visible effect.
+        set((s) => ({ wallAutoFit: v, project: v && s.wallClip != null ? withFit(s.project, s.wallClip, true) : s.project }));
+      },
       requestSeek: (frame, opts) =>
         set({ seekRequest: { frame: Math.max(0, Math.round(frame)), play: !!opts?.play, until: opts?.until, n: ++seekN } }),
 

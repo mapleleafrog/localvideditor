@@ -42,6 +42,8 @@ export const WallScenes: React.FC = () => {
   const reorderWallScene = useEditor((s) => s.reorderWallScene);
   const patchWall = useEditor((s) => s.patchWall);
   const patchClip = useEditor((s) => s.patchClip);
+  const autoFit = useEditor((s) => s.wallAutoFit);
+  const setAutoFit = useEditor((s) => s.setWallAutoFit);
   const requestSeek = useEditor((s) => s.requestSeek);
   const flash = useEditor((s) => s.flash);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -102,6 +104,9 @@ export const WallScenes: React.FC = () => {
         >
           ⟲ Fit clip duration
         </button>
+        <label className="wsc-check" title="Keep the clip exactly as long as the camera schedule — refits after every scene edit (same undo step). Dragging the block on the timeline still overrides it until the next scene edit.">
+          <input type="checkbox" checked={autoFit} onChange={(e) => setAutoFit(e.target.checked)} /> auto-fit
+        </label>
         <span className="view-toggle">
           <button className={!live ? "on" : ""} onClick={() => setLive(false)}>
             Arrange

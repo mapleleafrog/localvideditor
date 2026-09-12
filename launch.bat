@@ -15,6 +15,7 @@ echo.
 echo   [1]  Soranji Studio  - drag-and-drop EDITOR   (the main app; also editor.bat)
 echo   [2]  Retro Portal    - quick effect preview   (index.html, no npm)
 echo   [3]  Remotion Studio - effect galleries / dev (npm run dev)
+echo   [4]  Wall mode       - collage wall + camera   (wall.bat: pulls the branch, opens the editor)
 echo.
 echo   (Render your video from the editor's Render button. Dev/maintenance
 echo    commands - sample renders, gen:portal, credits - are still available
@@ -28,6 +29,7 @@ set /p "choice=Choose an option: "
 if /i "%choice%"=="1" goto editor
 if /i "%choice%"=="2" goto portal
 if /i "%choice%"=="3" goto studio
+if /i "%choice%"=="4" goto wall
 if /i "%choice%"=="Q" goto end
 echo.
 echo   "%choice%" is not a valid option.
@@ -51,6 +53,10 @@ echo.
 echo Starting Remotion Studio (effect galleries + props/JSON)...
 echo Press Ctrl+C to stop, then it returns here.
 call npm run dev
+goto menu
+
+:wall
+call "%~dp0wall.bat"
 goto menu
 
 :end

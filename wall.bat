@@ -1,14 +1,13 @@
 @echo off
 REM ============================================================
 REM  Wall mode quick start — double-click to try the collage wall.
-REM   1. switches to the Wall-mode branch (if not already on it)
+REM   1. pulls the latest of the branch you are on (Wall mode is on master)
 REM   2. installs npm deps on first run
 REM   3. starts Soranji Studio and opens it in your browser
 REM  Then in the app: Import projects\wall-demo.json -> click "Wall".
 REM ============================================================
 setlocal
 cd /d "%~dp0"
-set "BRANCH=claude/photo-montage-transitions-nhbk5x"
 
 echo.
 echo   ============================================================
@@ -16,16 +15,10 @@ echo     SORANJI-VFX  ::  WALL MODE
 echo   ============================================================
 echo.
 
-REM --- 1. branch -------------------------------------------------
+REM --- 1. latest code (stays on the current branch) ---------------
 for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set "CUR=%%b"
-if /i not "%CUR%"=="%BRANCH%" (
-  echo   Current branch: %CUR%
-  echo   Switching to %BRANCH% ...
-  git fetch origin %BRANCH% || goto fail
-  git checkout %BRANCH% || goto dirty
-)
-echo   Pulling latest %BRANCH% ...
-git pull --ff-only origin %BRANCH%
+echo   Branch: %CUR% - pulling latest ...
+git pull --ff-only
 if errorlevel 1 echo   (pull skipped - local changes or no network; continuing with what is here)
 
 REM --- 2. deps ---------------------------------------------------
@@ -47,12 +40,6 @@ echo.
 start "" cmd /c "timeout /t 6 >nul & start "" http://localhost:5173"
 call npm run editor
 goto end
-
-:dirty
-echo.
-echo   Could not switch branches - you probably have uncommitted changes.
-echo   Commit or stash them ^(git stash^) and run this again.
-goto fail
 
 :fail
 echo.

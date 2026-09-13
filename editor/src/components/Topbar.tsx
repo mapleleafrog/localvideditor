@@ -7,7 +7,7 @@ import { firstWallClip, newWallClip, newWallProject, wallOnlyProject, withFps } 
 
 type RenderState =
   | { phase: "idle" }
-  | { phase: "running"; message: string; progress: number }
+  | { phase: "running"; message: string; progress: number; detail?: string }
   | { phase: "done"; fileName: string }
   | { phase: "error"; message: string };
 
@@ -97,16 +97,20 @@ export const Topbar: React.FC = () => {
         toRender,
         options,
         (msg) => {
-          if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
+          // `detail` = the latest browser console error forwarded by the plugin; kept across
+          // status/progress updates so a failed photo/font load stays visible.
+          if (msg.type === "status") setRender((r) => ({ phase: "running", message: msg.message, progress: 0, detail: r.phase === "running" ? r.detail : undefined }));
           else if (msg.type === "progress")
-            setRender({
+            setRender((r) => ({
               phase: "running",
               message:
                 msg.total != null
                   ? `${msg.stage === "encoding" ? "Encoding" : "Rendering"} ${msg.rendered ?? 0}/${msg.total} frames${msg.encoded ? ` · ${msg.encoded} encoded` : ""}`
                   : "Rendering…",
               progress: msg.progress,
-            });
+              detail: r.phase === "running" ? r.detail : undefined,
+            }));
+          else if (msg.type === "log") setRender((r) => (r.phase === "running" ? { ...r, detail: msg.message } : r));
           else if (msg.type === "done") setRender({ phase: "done", fileName: msg.fileName });
           else if (msg.type === "error") setRender({ phase: "error", message: msg.message });
         },
@@ -268,13 +272,22 @@ export const Topbar: React.FC = () => {
             <span className="render-fill" style={{ width: `${Math.round(render.progress * 100)}%` }} />
           </span>
           {render.message} {render.progress > 0 ? `${Math.round(render.progress * 100)}%` : ""}
+          {render.detail && (
+            <span className="render-err" title={render.detail}>
+              ⚠ {render.detail.length > 90 ? render.detail.slice(0, 90) + "…" : render.detail}
+            </span>
+          )}
           <button className="stop" onClick={onCancelRender} title="Stop this render (the partial file is discarded)">
             ✕ Cancel
           </button>
         </span>
       )}
       {render.phase === "done" && <span className="render-ok">✓ out/{render.fileName}</span>}
-      {render.phase === "error" && <span className="render-err" title={render.message}>✕ render failed</span>}
+      {render.phase === "error" && (
+        <span className="render-err" title={render.message}>
+          ✕ {render.message.length > 140 ? render.message.slice(0, 140) + "…" : render.message}
+        </span>
+      )}
       {note && <span className="muted">{note}</span>}
 
       <select

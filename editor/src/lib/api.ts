@@ -4,6 +4,8 @@ export type RenderMsg =
   | { type: "status"; message: string; durationInFrames?: number }
   | { type: "progress"; progress: number; rendered?: number; encoded?: number; total?: number; stage?: string }
   | { type: "done"; file: string; fileName: string }
+  /** A browser console error forwarded from a render tab (also written to out/<render>.log). */
+  | { type: "log"; message: string }
   | { type: "error"; message: string };
 
 export interface RenderOptions {

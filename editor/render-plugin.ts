@@ -89,6 +89,12 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
   const { makeCancelSignal } = await import("@remotion/renderer");
   const { cancelSignal, cancel } = makeCancelSignal();
   let cancelled = false;
+  // Render log (out/<render>.log): settings, every browser console line, timings, the error.
+  let logPath = "";
+  const logLines: string[] = [];
+  const log = (line: string) => logLines.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
+  const flushLog = () => (logPath ? fs.writeFile(logPath, logLines.join("\n") + "\n").catch(() => {}) : Promise.resolve());
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
   req.on("close", () => {
     if (!res.writableEnded) {
       cancelled = true;
@@ -114,11 +120,15 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const quality = options.quality === "draft" || options.quality === "preview" ? options.quality : "full";
     const draft = quality !== "full";
     send({ type: "status", message: "Preparing browser…" });
-    await ensureBrowser();
+    // REMOTION_BROWSER_EXECUTABLE (optional) = use this Chrome/Chromium instead of Remotion's
+    // managed download — for machines that cannot fetch it (or CI). Unset = Remotion's own.
+    const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || undefined;
+    const browserOpt = browserExecutable ? { browserExecutable } : {};
+    if (!browserExecutable) await ensureBrowser();
     send({ type: "status", message: "Bundling composition…" });
     const serveUrl = await getBundle();
     send({ type: "status", message: "Resolving composition…" });
-    const composition = await selectComposition({ serveUrl, id: "Timeline", inputProps });
+    const composition = await selectComposition({ serveUrl, id: "Timeline", inputProps, ...browserOpt });
     await fs.mkdir(OUT_DIR, { recursive: true });
     const ext = transparent ? "mov" : "mp4";
     const tag = overlaysOnly ? "overlays" : options.wallOnly ? (transparent ? "wall-prores" : "wall") : transparent ? "alpha" : "video";
@@ -147,17 +157,60 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       message: `Rendering ${composition.durationInFrames} frames @ ${composition.fps} fps (${kind}${quality === "full" ? "" : `, ${quality}`}) · ${concurrency} tabs · ${useGpu ? gl.toUpperCase() : "default GL"}${transparent ? "" : ` · x264 ${x264Preset}`}…`,
       durationInFrames: composition.durationInFrames,
     });
+    // Diagnostics: everything the render tabs log (image/font load failures, GPU/ANGLE trouble,
+    // delayRender timeouts) goes to out/<render>.log next to the output, browser ERRORS are also
+    // streamed to the editor, and a heartbeat keeps the status moving until the first frame lands
+    // — a render that "sits there" is otherwise indistinguishable from one that is still loading.
+    logPath = outputLocation.replace(/\.(mp4|mov)$/, ".log");
+    logLines.push(
+      `render started ${new Date().toISOString()}`,
+      `output ${outputLocation}`,
+      `settings quality=${quality} concurrency=${concurrency} scale=${scale} gl=${useGpu ? gl : "default"} crf=${crf} x264=${x264Preset} transparent=${transparent}`,
+      `composition ${composition.width}x${composition.height} @ ${composition.fps} fps · ${composition.durationInFrames} frames`,
+      `node ${process.version} · ${cpus().length} cpus · ${process.platform}`,
+    );
+    const logName = logPath.split(/[\\/]/).pop();
+    const t0 = Date.now();
+    let firstFrameAt: number | null = null;
+    heartbeat = setInterval(() => {
+      if (firstFrameAt != null || res.writableEnded) return;
+      const s = Math.round((Date.now() - t0) / 1000);
+      const hint =
+        s >= 45
+          ? ` Still nothing after ${s}s — open out/${logName} and the wall.bat window for errors; try ⚙ GPU backend → SwiftShader, or fewer tabs.`
+          : ` (${s}s — every tab loads every photo before its first frame)`;
+      send({ type: "status", message: `Waiting for the first frame…${hint}` });
+      void flushLog();
+    }, 5000);
     await renderMedia({
       composition,
       serveUrl,
       outputLocation,
       inputProps,
       concurrency,
+      // A big wall legitimately needs more than Remotion's 30 s default to load every photo in
+      // every tab before its first frame; a genuine hang still fails, with the reason logged.
+      timeoutInMilliseconds: 120_000,
+      ...browserOpt,
       // GPU-accelerated rendering (ANGLE by default) — big win for filter-heavy comps; switch to
       // SwiftShader (CPU) or "default" if a GPU backend ever fails to launch.
       ...(useGpu ? { chromiumOptions: { gl: gl as "angle" | "swiftshader" } } : {}),
-      onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) =>
-        send({ type: "progress", progress, rendered: renderedFrames, encoded: encodedFrames, total: composition.durationInFrames, stage: stitchStage }),
+      onStart: ({ frameCount, resolvedConcurrency, parallelEncoding }) => {
+        log(`onStart frames=${frameCount} tabs=${resolvedConcurrency} parallelEncoding=${parallelEncoding}`);
+        send({ type: "status", message: `${resolvedConcurrency} tabs open — loading the composition (${frameCount} frames)…` });
+      },
+      onBrowserLog: (l) => {
+        const where = l.stackTrace?.[0];
+        log(`[browser:${l.type}] ${l.text}${where ? ` @ ${where.url ?? ""}:${where.lineNumber ?? ""}` : ""}`);
+        if (l.type === "error") send({ type: "log", message: l.text.slice(0, 240) });
+      },
+      onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) => {
+        if (firstFrameAt == null && renderedFrames > 0) {
+          firstFrameAt = Date.now();
+          log(`first frame after ${((firstFrameAt - t0) / 1000).toFixed(1)}s`);
+        }
+        send({ type: "progress", progress, rendered: renderedFrames, encoded: encodedFrames, total: composition.durationInFrames, stage: stitchStage });
+      },
       cancelSignal,
       ...(scale !== 1 ? { scale } : {}),
       ...(transparent
@@ -165,11 +218,18 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
         : // H.264: max-quality frame capture (jpegQuality 100) + configurable CRF, software x264.
           { codec: "h264" as const, jpegQuality: quality === "preview" ? 60 : draft ? 80 : 100, crf: quality === "preview" ? Math.max(crf, 30) : draft ? Math.max(crf, 26) : crf, x264Preset }),
     });
+    log(`done in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    log(`ERROR ${message}`);
+    console.error("[render] failed:", message);
     if (cancelled) return; // the client is gone; nothing to report to
-    send({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    send({ type: "error", message: `${err instanceof Error ? err.message : String(err)}${logPath ? ` — details in out/${logPath.split(/[\\/]/).pop()}` : ""}` });
   } finally {
+    if (heartbeat) clearInterval(heartbeat);
+    if (cancelled) log("cancelled by the editor");
+    await flushLog();
     res.end();
   }
 }

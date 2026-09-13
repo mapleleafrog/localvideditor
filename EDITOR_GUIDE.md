@@ -244,6 +244,17 @@ the NLE — Remotion makes the elements, DaVinci makes the cut.
 The composition is bundled once per dev session and reused; restart `npm run editor` after changing
 composition/effect code to pick it up.
 
+**When a render "sits there".** Before the first frame, every tab has to load every photo of the
+composition (a 24-photo 4K wall in 8 tabs is a lot of decoding), so the status now shows a live
+**"Waiting for the first frame… Ns"** heartbeat instead of a frozen line. After 45 s it points you at
+the two places to look: **`out/<render name>.log`** (written next to the output: the settings, every
+line the render tabs logged — a photo or font that failed to load, a GPU/ANGLE problem, a timed-out
+`delayRender` — and the final error), and the **`wall.bat` window** (the dev server's own output).
+Browser errors are also shown inline as a ⚠ next to the status while it runs, and a failed render now
+shows its message in the bar. Two things to try if it never moves: ⚙ Render settings → **GPU backend
+→ SwiftShader** (an ANGLE/GPU-driver hang looks exactly like this), and **fewer tabs** (Concurrency
+2–4 — at 4K each tab decodes every photo, and a machine that runs out of RAM crawls without an error).
+
 **Render speed — what actually helps.** A render is Chrome painting every frame in parallel tabs, then
 x264 encoding them; there is nothing to pre-cache beyond the bundle (every frame is unique). In order of
 impact: (1) **resolution** — 4K is 4× the pixels of 1080p and roughly 3–4× the time; render 1080p unless

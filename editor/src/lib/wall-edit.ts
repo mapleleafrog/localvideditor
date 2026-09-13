@@ -79,9 +79,9 @@ export const DEFAULT_WALL: Wall = {
   fibre: 1,
   finish: 1,
   breathing: 0.55,
-  intro: true,
+  intro: false,
   introHoldSeconds: 0.8,
-  outro: true,
+  outro: false,
   outroSeconds: 2.4,
   outroHoldSeconds: 1.5,
   viewfinder: false,
@@ -412,6 +412,14 @@ export const wallOnlyProject = (p: Project, ci: number): Project | null => {
     return [{ ...a, from }];
   });
   return { ...p, durationInFrames: len, clips: [{ ...clip, transitionToNext: "none" }], overlays, audio };
+};
+
+/** What the Wall view's ▶ Live plays: JUST the wall — the wall clip alone, no other clips, no
+ *  overlays; audio kept (shifted) so timing against the song still reads. The Edit view is where
+ *  the full composite is previewed. Null when `ci` is not a wall clip. */
+export const liveWallProject = (p: Project, ci: number): Project | null => {
+  const r = wallOnlyProject(p, ci);
+  return r ? { ...r, overlays: [] } : null;
 };
 
 // ---------------------------------------------------------------------------------------------

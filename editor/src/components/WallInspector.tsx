@@ -23,7 +23,6 @@ import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 import { TRANSITION_KINDS, type TransitionKind } from "../../../src/effects/io";
 import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
 import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { clipStarts } from "../lib/timeline-utils";
 import { camFromScene, hasJapanese, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
 import { EffectStack, Field, Section, Slider } from "./fields";
@@ -212,7 +211,6 @@ export const WallInspector: React.FC = () => {
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sum = useMemo(() => wallSummary(wall, fps, W, H), [wall, fps, W, H]);
   const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
-  const starts = useMemo(() => clipStarts(project), [project]);
   if (!isWall || wallClip == null) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
@@ -283,10 +281,10 @@ export const WallInspector: React.FC = () => {
     const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
     const appearing = items.filter((it) => it.appearIn === scene.id).length;
     const leaving = items.filter((it) => it.leaveAfter === scene.id).length;
-    const absStart = starts[ci] ?? 0;
+    // Live shows JUST the wall (liveWallProject), so the clip starts at Player frame 0.
     const playScene = () => {
       setLive(true);
-      requestSeek(absStart + (sched.sceneFrames[si] ?? 0), { play: true, until: absStart + (sched.sceneEnds[si] ?? sched.total) });
+      requestSeek(sched.sceneFrames[si] ?? 0, { play: true, until: sched.sceneEnds[si] ?? sched.total });
     };
     return (
       <Section title={`Scene ${si + 1} of ${scenes.length}`} defaultOpen>

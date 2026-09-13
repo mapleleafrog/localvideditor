@@ -24,17 +24,7 @@ import { clipStarts, computeDuration } from "../lib/timeline-utils";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize } from "../lib/image";
-import {
-  authoringProject,
-  camFromScene,
-  fitAll,
-  importWidth,
-  isWallClip,
-  newSeed,
-  newWallItemFromAsset,
-  spiralOffset,
-  wallOf,
-} from "../lib/wall-edit";
+import { authoringProject, camFromScene, fitAll, importWidth, isWallClip, liveWallProject, newSeed, newWallItemFromAsset, spiralOffset, wallOf } from "../lib/wall-edit";
 import { wallViewport, zoomAtCursor, panBy, screenPtToWall, ZOOM_MAX, ZOOM_MIN } from "../lib/wall-coords";
 import { WallOverlay } from "./WallOverlay";
 import { WallMiniMap } from "./WallMiniMap";
@@ -79,7 +69,7 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   const fps = project.fps ?? 30;
   // Measured only in Live mode — while arranging, the derived project has no audio at all, so
   // there is nothing to size against and no reason to fetch the song.
-  const audioTracks = useMemo(() => (live ? (project.audio ?? []) : []), [live, project.audio]);
+  const audioTracks = useMemo(() => (live ? (liveProj.audio ?? []) : []), [live, liveProj.audio]);
   const audioEnd = useAudioEnd(audioTracks, fps);
   // Live plays the real take at the real size; overscan is an arranging aid only.
   const k = live ? 1 : overscan;
@@ -93,6 +83,13 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   // authoring a stale clip (the EffectBrowser pattern).
   const clip = wallClip != null ? project.clips?.[wallClip] : undefined;
   const valid = !!clip && clip.type === "wall" && wallClip != null;
+  // ▶ Live plays JUST the wall (liveWallProject: the wall clip alone, audio shifted onto it) —
+  // never the surrounding footage or the project's overlays. The clip therefore starts at frame 0
+  // of the Player, which is what the strip's / inspector's seeks assume.
+  const liveProj = useMemo(
+    () => (valid && wallClip != null ? (liveWallProject(project, wallClip) ?? project) : project),
+    [valid, project, wallClip],
+  );
   const wallClips = project.clips.map((c, i) => ({ c, i })).filter(({ c }) => c.type === "wall");
 
   // Adopt a wall clip when the view opens on none (or on one that has gone away).
@@ -203,7 +200,7 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
     () => (valid && wallClip != null ? authoringProject(project, wallClip, wallCam) : project),
     [valid, project, wallClip, wallCam],
   );
-  const inputProps = live ? project : derived;
+  const inputProps = live ? liveProj : derived;
   // Live plays the REAL take, so it must be sized the way the render is: max(clips - transitions,
   // overlay end, AUDIO end). The audio term is measured in the browser (the JSON does not carry a
   // track's length), so Live has to read it too or a song-length project stops short here while the
@@ -214,7 +211,7 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   // move (the derived project has one scene and no breathing), so it is still a framing tool.
   const [motion, setMotion] = useState(true);
   const ARRANGE_LOOP_FRAMES = Math.max(1, Math.round(3 * fps));
-  const duration = live ? computeDuration(project, audioEnd) : motion ? ARRANGE_LOOP_FRAMES : 1;
+  const duration = live ? computeDuration(liveProj, audioEnd) : motion ? ARRANGE_LOOP_FRAMES : 1;
 
   const flash = (m: string) => {
     setNote(m);

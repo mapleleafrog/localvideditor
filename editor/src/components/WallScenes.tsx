@@ -16,7 +16,6 @@
 import React, { useMemo, useState } from "react";
 import { useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { clipStarts } from "../lib/timeline-utils";
 import { appendedScene, camFromScene, fitDurationPatch, scheduleWall, speedClass, wallFitFor, wallOf } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
 import { CommitNum } from "./WallInspector";
@@ -53,7 +52,6 @@ export const WallScenes: React.FC = () => {
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
   const fit = useMemo(() => (isWall ? wallFitFor(project, wallClip) : null), [isWall, project, wallClip]);
-  const starts = useMemo(() => clipStarts(project), [project]);
   if (!isWall || wallClip == null || !clip) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
@@ -78,11 +76,11 @@ export const WallScenes: React.FC = () => {
     setWallCam(camFromScene(s));
   };
 
-  /** Play the whole schedule (intro → every scene → outro) in Live mode, from the clip's start. */
+  /** Play the whole schedule in Live mode. Live shows JUST the wall (liveWallProject), so the clip
+   *  starts at Player frame 0 and the schedule's own frames are the seek targets. */
   const previewAll = () => {
-    const absStart = starts[ci] ?? 0;
     setLive(true);
-    requestSeek(absStart, { play: true, until: absStart + sched.total });
+    requestSeek(0, { play: true, until: sched.total });
   };
 
   const onDrop = (to: number) => {

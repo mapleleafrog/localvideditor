@@ -93,6 +93,12 @@ easing, the arc, and a **colour-banded px/frame speed chip** — *"● 35 px/f �
 glide. **⟳ Re-frame** updates the pose from the viewport *keeping the timing*, **▸ Play** plays that scene in Live
 mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). `PgUp`/`PgDn` step scenes.
 
+**Seamless flow.** Tick **flow** in the strip toolbar and the camera never stops: each hold drifts at a steady pace
+(hover amount = how fast) and every glide is re-shaped to depart at the previous hold's drift speed and land at the
+next one's — fast in the middle, decelerating straight into the slow drift, no stop at either end. It overrides the
+glide easings (a still hold still meets its glide at zero). This is the "fast arrive, slow glide across, fast leave"
+profile; off is the classic stop-and-go.
+
 **The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased
 drift across the hold (**creep toward the next scene** — the default on new scenes, it anticipates the glide — or push
 in / pull out / drift left·right·up·down, + amount), (2) the **glide** between scenes (the arrow box on the strip; 1 s by default, `smooth` easing ramps up and

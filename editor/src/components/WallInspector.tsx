@@ -386,6 +386,12 @@ export const WallInspector: React.FC = () => {
             )}
           </div>
         </Field>
+        {wall.flow && (
+          <span className="muted wi-lint">
+            Flow is on (strip toolbar): this glide departs at the previous hold's drift speed and lands at this
+            scene's, so the easing below is not used. Hover amount sets the drift speed.
+          </span>
+        )}
         <Field label="Easing (of the glide in)">
           <select
             value={scene.easing}

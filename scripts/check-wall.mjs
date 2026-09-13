@@ -144,6 +144,7 @@ const randWall = (nItems, nScenes) => {
   outroHoldSeconds: rr(0, 2),
   fitPadding: pick([0, 0.06, 0.12, 0.3]),
   breathing: 0,
+  flow: rnd() < 0.4,
   };
 };
 
@@ -337,6 +338,66 @@ startGroup(3, "bit-exact holds");
     const tw2 = scheduleWall({ ...tw, outro: true, outroSeconds: 1, outroHoldSeconds: 0.5 }, 30, W, H);
     const h1b = tw2.segs.find((g) => g.kind === "hold" && g.scene === 1);
     ok(Math.hypot(h1b.b.x - h1b.a.x, h1b.b.y - h1b.a.y) > 0 || h1b.b.zoom !== h1b.a.zoom, "with an outro the last scene creeps toward the whole-wall pose");
+  }
+  // FLOW: holds drift linearly and the glide on either side CARRIES that velocity — the speed
+  // one frame before the junction equals the speed one frame after it (no stop), while a still
+  // hold still meets its glide at zero.
+  {
+    const { hermiteFlow } = W_;
+    ok(hermiteFlow(0, 0.3, 0.7) === 0 && Math.abs(hermiteFlow(1, 0.3, 0.7) - 1) < 1e-12, "hermiteFlow hits 0 and 1 exactly");
+    for (const [A, B] of [[0, 0], [0.3, 0.7], [1, 1], [0.05, 0]]) {
+      const hh = 1e-5;
+      near((hermiteFlow(hh, A, B) - hermiteFlow(0, A, B)) / hh, A, 1e-3, `hermiteFlow'(0) = a (${A})`);
+      near((hermiteFlow(1, A, B) - hermiteFlow(1 - hh, A, B)) / hh, B, 1e-3, `hermiteFlow'(1) = b (${B})`);
+      let prev = 0;
+      for (let i = 1; i <= 1000; i++) {
+        const v = hermiteFlow(i / 1000, A, B);
+        ok(v >= prev - 1e-12, `hermiteFlow is monotonic (a=${A}, b=${B})`);
+        prev = v;
+      }
+    }
+    for (let i = 0; i <= 100; i++) near(hermiteFlow(i / 100, 0, 0), EASE.smooth(i / 100), 1e-12, "hermiteFlow(·,0,0) IS smooth");
+    const fw = {
+      items: wall.items,
+      scenes: [
+        { x: 0, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0, hover: "toward", hoverAmount: 1 },
+        { x: 3000, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0, hover: "toward", hoverAmount: 1 },
+        { x: 6000, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0 },
+      ],
+      intro: false,
+      outro: false,
+      flow: true,
+    };
+    const fs = scheduleWall(fw, 30, W, H);
+    const h0 = fs.segs[0];
+    const g1 = fs.segs[1];
+    const h1 = fs.segs[2];
+    const g2 = fs.segs[3];
+    const h2 = fs.segs[4];
+    ok(h0.kind === "hold" && h0.linear === true && g1.kind === "glide" && g1.va > 0 && g1.vb > 0, "flow: holds are linear, the glide between two drifting holds has both slopes");
+    // Junction velocity = the POSITION derivative at the boundary (0.1-frame differences, so the
+    // Hermite's own ramp and the lift's zoom dip — both ~0 at the endpoints — do not pollute it).
+    const posSpeed = (seg, f0, f1) => {
+      const P0 = poseInSeg(seg, f0, W);
+      const P1 = poseInSeg(seg, f1, W);
+      return Math.hypot(P1.x - P0.x, P1.y - P0.y) / Math.abs(f1 - f0);
+    };
+    const vHold = Math.hypot(h0.b.x - h0.a.x, h0.b.y - h0.a.y) / (h0.to - h0.from);
+    ok(vHold > 0, "flow: a drifting hold has speed");
+    near(posSpeed(h0, h0.to - 0.1, h0.to), vHold, 1e-9, "flow: a linear hold drifts at a constant speed right up to its end");
+    near(posSpeed(g1, g1.from, g1.from + 0.1), vHold, 0.03 * vHold, "flow: the glide departs at the hold's drift speed (no stop)");
+    const vNext = Math.hypot(h1.b.x - h1.a.x, h1.b.y - h1.a.y) / (h1.to - h1.from);
+    near(posSpeed(g1, g1.to - 0.1, g1.to), vNext, 0.03 * vNext, "flow: the glide lands at the next hold's drift speed");
+    near(posSpeed(h1, h1.from, h1.from + 0.1), vNext, 1e-9, "flow: the next hold picks up at exactly that speed");
+    ok(segSpeed(g1, (g1.from + g1.to) / 2, W, H) > 3 * vHold, "flow: the middle of the glide is much faster than the drift");
+    ok(h2.kind === "hold" && h2.a.x === h2.b.x, "flow: the last scene (nowhere to creep, no outro) is still");
+    ok(g2.vb === 0, "flow: a glide into a still hold lands at zero");
+    // Position continuity across every junction survives the linear holds.
+    for (let f = 1; f < fs.total; f++) {
+      const p0 = cameraAt(fs, f - 1, 0, { W, H, breathing: 0 }).cam;
+      const p1 = cameraAt(fs, f, 0, { W, H, breathing: 0 }).cam;
+      ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 200, `flow: no jump at frame ${f}`);
+    }
   }
   const still = sceneHoverCam({ ...wall.scenes[0], hover: "none" });
   ok(still.zoom === wall.scenes[0].zoom && still.x === wall.scenes[0].x, "hover none is the identity");

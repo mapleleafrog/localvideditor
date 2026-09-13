@@ -181,6 +181,12 @@ export const WallScenes: React.FC = () => {
           </button>
         </span>
         <span className="sep" />
+        <label
+          className="wsc-check"
+          title="Seamless flow: the camera never stops — each hold drifts at a steady pace and the glides depart and land AT that pace (fast in the middle, decelerating straight into the slow drift). Overrides the glide easings."
+        >
+          <input type="checkbox" checked={!!wall.flow} onChange={(e) => patchWall(ci, { flow: e.target.checked || undefined })} /> flow
+        </label>
         <label className="wsc-check">
           <input type="checkbox" checked={wall.intro} onChange={(e) => patchWall(ci, { intro: e.target.checked })} /> intro
         </label>

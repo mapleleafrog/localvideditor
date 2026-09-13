@@ -64,6 +64,7 @@ export interface WallSceneLike {
 export interface WallLike {
   items?: WallItemLike[];
   scenes?: WallSceneLike[];
+  flow?: boolean;
   intro?: boolean;
   introHoldSeconds?: number;
   outro?: boolean;
@@ -391,7 +392,24 @@ export interface WallSeg {
   scene: number;
   /** True when this segment is on or toward the whole-wall fit pose. */
   whole: boolean;
+  /** FLOW mode — hold: drift at a steady (linear) pace instead of the eased drift. */
+  linear?: boolean;
+  /** FLOW mode — glide: endpoint slopes of the progress curve (dp/dt at t=0 / t=1, in
+   *  progress-per-normalised-time), matched to the adjacent holds' drift speed so the junctions
+   *  carry velocity instead of stopping. Both 0 == the `smooth` curve exactly. */
+  va?: number;
+  vb?: number;
 }
+
+/** Quintic Hermite progress curve: p(0)=0, p(1)=1, p'(0)=a, p'(1)=b, p''(0)=p''(1)=0. With
+ *  a = b = 0 it IS `EASE.smooth`; a = b = 1 is linear. Clamp a, b to [0, 1] — larger endpoint
+ *  slopes than the average would make the curve non-monotonic. */
+export const hermiteFlow = (t: number, a: number, b: number): number => {
+  const p = clamp(t);
+  const A = clamp(a, 0, 1);
+  const B = clamp(b, 0, 1);
+  return A * p + (10 - 6 * A - 4 * B) * p ** 3 + (-15 + 8 * A + 7 * B) * p ** 4 + (6 - 3 * A - 3 * B) * p ** 5;
+};
 
 export interface WallSchedule {
   segs: WallSeg[];
@@ -484,16 +502,38 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
   const wholeSeg = (kind: "hold" | "glide", a: Cam, b: Cam, scene: number, easing: EaseId = DEFAULT_EASE) =>
     ({ kind, a, b, easing, arc: 0, scene, whole: true }) as const;
 
+  const flow = !!w.flow;
   if (scenes.length) {
     const poses = scenes.map(sceneCam);
     // Where each scene's hold ENDS (its hover drift) — the pose the NEXT glide departs from. A via
     // scene (hold 0) has no hold segment, so nothing drifts and the glide leaves the authored pose.
     const nextOf = (i: number): Cam | undefined => (i + 1 < poses.length ? poses[i + 1] : (w.outro ?? true) ? whole : undefined);
     const ends = scenes.map((s, i) => (holdLen(s.holdSeconds ?? 1.8) > 0 ? sceneHoverCam(s, nextOf(i)) : poses[i]));
+    // FLOW: the drift speed of each hold (wall units / frame), projected onto a glide's direction
+    // of travel, becomes that glide's endpoint slope. `va` = leaving the previous hold, `vb` =
+    // arriving into the next one. A still hold contributes 0 — the glide then eases as usual.
+    const holdFrames = scenes.map((s) => holdLen(s.holdSeconds ?? 1.8));
+    const driftSpeedAlong = (i: number, dirX: number, dirY: number): number => {
+      if (i < 0 || i >= scenes.length || holdFrames[i] <= 0) return 0;
+      const vx = (ends[i].x - poses[i].x) / holdFrames[i];
+      const vy = (ends[i].y - poses[i].y) / holdFrames[i];
+      return Math.max(0, vx * dirX + vy * dirY);
+    };
+    const flowSlopes = (from: Cam, to: Cam, frames: number, prevScene: number, nextScene: number) => {
+      if (!flow || frames <= 0) return {};
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const L = Math.hypot(dx, dy);
+      if (L < 1e-6) return { va: 0, vb: 0 };
+      const ux = dx / L;
+      const uy = dy / L;
+      // slope in progress-per-normalised-time = (wall units / frame) * frames / L
+      return { va: clamp((driftSpeedAlong(prevScene, ux, uy) * frames) / L, 0, 1), vb: clamp((driftSpeedAlong(nextScene, ux, uy) * frames) / L, 0, 1) };
+    };
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
       push(
-        { kind: "glide", a: whole, b: poses[0], easing: easeIdOf(scenes[0].easing), arc: clamp(finite(scenes[0].arc, 0), -1, 1), scene: 0, whole: true },
+        { kind: "glide", a: whole, b: poses[0], easing: easeIdOf(scenes[0].easing), arc: clamp(finite(scenes[0].arc, 0), -1, 1), scene: 0, whole: true, ...flowSlopes(whole, poses[0], glideLen(scenes[0].glideSeconds ?? 1.5), -1, 0) },
         glideLen(scenes[0].glideSeconds ?? 1.5),
       );
     }
@@ -501,17 +541,17 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       const s = scenes[i];
       if (i > 0) {
         push(
-          { kind: "glide", a: ends[i - 1], b: poses[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false },
+          { kind: "glide", a: ends[i - 1], b: poses[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false, ...flowSlopes(ends[i - 1], poses[i], glideLen(s.glideSeconds ?? 1.5), i - 1, i) },
           glideLen(s.glideSeconds ?? 1.5),
         );
       }
       sceneFrames[i] = cur;
       // A hold drifts from the authored pose to its hover pose (b === a when there is no hover).
-      push({ kind: "hold", a: poses[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false }, holdLen(s.holdSeconds ?? 1.8));
+      push({ kind: "hold", a: poses[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false, ...(flow ? { linear: true } : {}) }, holdLen(s.holdSeconds ?? 1.8));
       sceneEnds[i] = cur;
     }
     if (w.outro ?? true) {
-      push(wholeSeg("glide", ends[ends.length - 1], whole, -1), glideLen(w.outroSeconds ?? 2.4));
+      push({ ...wholeSeg("glide", ends[ends.length - 1], whole, -1), ...flowSlopes(ends[ends.length - 1], whole, glideLen(w.outroSeconds ?? 2.4), scenes.length - 1, -1) }, glideLen(w.outroSeconds ?? 2.4));
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.outroHoldSeconds ?? 1.5));
     }
   }
@@ -617,12 +657,14 @@ export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
   if (seg.kind === "hold") {
     if (a.x === b.x && a.y === b.y && a.zoom === b.zoom && a.rot === b.rot) return { x: a.x, y: a.y, zoom: a.zoom, rot: a.rot };
     const len = seg.to - seg.from;
-    const p = EASE.smooth(len <= 0 ? 1 : clamp((frame - seg.from) / len));
+    const raw = len <= 0 ? 1 : clamp((frame - seg.from) / len);
+    // FLOW holds drift at a steady pace so the glides on either side can carry that velocity.
+    const p = seg.linear ? raw : EASE.smooth(raw);
     return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p, zoom: a.zoom + (b.zoom - a.zoom) * p, rot: a.rot + shortAngle(a.rot, b.rot) * p };
   }
   const len = seg.to - seg.from;
   const p = len <= 0 ? 1 : clamp((frame - seg.from) / len);
-  const ep = ease(seg.easing, p);
+  const ep = seg.va != null || seg.vb != null ? hermiteFlow(p, seg.va ?? 0, seg.vb ?? 0) : ease(seg.easing, p);
 
   // (a) position + arc — quadratic Bezier; arc 0 collapses ALGEBRAICALLY to lerp.
   const Dx = b.x - a.x;

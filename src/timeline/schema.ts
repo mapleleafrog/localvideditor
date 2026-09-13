@@ -155,6 +155,12 @@ export const wallSchema = z.object({
    *  per-scene values. */
   defaultHoldSeconds: z.number().min(0).optional(),
   defaultGlideSeconds: z.number().min(0).optional(),
+  /** SEAMLESS FLOW: the camera never stops. A hovering hold drifts at a STEADY pace (linear, not
+   *  eased) and each glide is re-shaped so it departs at the previous hold's drift speed and lands
+   *  at the next hold's drift speed — fast in the middle, decelerating straight into the slow
+   *  drift with no stop between. Overrides the per-scene easing on glides (a quintic Hermite that
+   *  equals `smooth` when the adjacent holds are still). Off = the classic stop-and-go. */
+  flow: z.boolean().optional(),
   timecodeOffsetInFrames: z.number().int().nonnegative().default(0),
 });
 

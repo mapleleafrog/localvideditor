@@ -459,6 +459,11 @@ export const authoringProject = (p: Project, ci: number, cam: Cam): Project => {
         ...c,
         transitionToNext: "none",
         motion: "none",
+        // The loupe's Player runs its own clock (a 1-frame still, or the 3 s "⟳ Motion" loop) —
+        // never the clip's real length. A fresh wall's clip is 30f, so with the real duration the
+        // loop's frames 30..89 fell off the clip track and the PROJECT BACKGROUND (the sample's
+        // synth grid) showed through the viewport. Unbounded here; Live uses the real project.
+        durationInFrames: 1_000_000,
         wall: {
           ...wallOf(c),
           breathing: 0,

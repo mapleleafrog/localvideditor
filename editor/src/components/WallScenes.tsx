@@ -87,6 +87,16 @@ export const WallScenes: React.FC = () => {
   /** Back to Arrange (the editor): the Player drops the live take and shows the authoring camera. */
   const stopPreview = () => setLive(false);
 
+  /** ⟳ Re-frame: overwrite the SELECTED scene's framing (x / y / zoom / rotation) with the current
+   *  viewport camera, keeping its hold, glide, hover and easing. The pair with ⊕ Set as scene:
+   *  set once, then tweak the framing as often as you like. */
+  const selIdx = scenes.findIndex((s) => s.id != null && s.id === wallScene);
+  const reframe = () => {
+    if (selIdx < 0) return;
+    patchWallScene(ci, selIdx, { x: wallCam.x, y: wallCam.y, zoom: wallCam.zoom, rotation: wallCam.rot });
+    flash(`Scene ${selIdx + 1} re-framed from the viewport`);
+  };
+
   const onDrop = (to: number) => {
     if (dragIndex !== null && dragIndex !== to) reorderWallScene(ci, dragIndex, to);
     setDragIndex(null);
@@ -97,8 +107,15 @@ export const WallScenes: React.FC = () => {
   return (
     <div className="tl wall-scenes">
       <div className="tl-toolbar">
-        <button className="primary" onClick={setAsScene} title="Append the current framing as a scene (Enter)">
+        <button className="primary" onClick={setAsScene} title="Append the current framing as a NEW scene (Enter)">
           ⊕ Set as scene
+        </button>
+        <button
+          onClick={reframe}
+          disabled={selIdx < 0}
+          title={selIdx < 0 ? "Select a scene card first" : `Update scene ${selIdx + 1}'s framing from the viewport — timing kept (Shift+Enter)`}
+        >
+          ⟳ Re-frame {selIdx >= 0 ? selIdx + 1 : ""}
         </button>
         {live ? (
           <button className="stop" onClick={stopPreview} title="Stop the preview and go back to arranging (Esc)">

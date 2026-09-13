@@ -60,6 +60,7 @@ const GROUPS: Group[] = [
       { keys: ["[", "]"], label: "Send backward / bring forward" },
       { keys: ["←↑→↓"], label: "Nudge 1 wall unit (Shift = 10)" },
       { keys: ["Enter"], label: "Set as scene (and select it)" },
+      { keys: ["Shift", "Enter"], label: "Re-frame the selected scene from the viewport (timing kept)" },
       { keys: ["PgUp", "PgDn"], label: "Previous / next scene (select + jump the camera)" },
       { keys: ["Esc"], label: "Stop the Live preview (back to Arrange)" },
       { keys: ["Alt"], label: "Hold to disable snapping" },

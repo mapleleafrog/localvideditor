@@ -249,8 +249,16 @@ export const App: React.FC = () => {
           case "Enter":
             e.preventDefault();
             if (ci != null && clip?.type === "wall") {
-              st.addWallScene(ci, appendedScene(wall, st.wallCam));
-              st.flash(`Scene ${(wall.scenes ?? []).length + 1} set`);
+              // Shift+Enter re-frames the SELECTED scene from the viewport (timing kept); Enter
+              // appends a new one.
+              const sel = (wall.scenes ?? []).findIndex((sc) => sc.id != null && sc.id === st.wallScene);
+              if (e.shiftKey && sel >= 0) {
+                st.patchWallScene(ci, sel, { x: st.wallCam.x, y: st.wallCam.y, zoom: st.wallCam.zoom, rotation: st.wallCam.rot });
+                st.flash(`Scene ${sel + 1} re-framed from the viewport`);
+              } else {
+                st.addWallScene(ci, appendedScene(wall, st.wallCam));
+                st.flash(`Scene ${(wall.scenes ?? []).length + 1} set`);
+              }
             }
             break;
           case "Delete":

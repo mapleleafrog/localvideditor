@@ -167,6 +167,20 @@ export const WallScenes: React.FC = () => {
             suffix="s"
             onCommit={(n) => patchWall(ci, { defaultGlideSeconds: n })}
           />
+          <span className="muted">land</span>
+          <CommitNum
+            value={Math.round((wall.flowLand ?? 0.35) * 100)}
+            min={0}
+            max={60}
+            step={5}
+            suffix="%"
+            disabled={!wall.flow}
+            title={
+              (wall.flow ? "" : "Needs flow ON. ") +
+              "Landing: the share of EVERY glide spent slowing from travel pace into the next scene's drift, BEFORE the scene point. Higher = the camera settles earlier (the dwell reads longer, the move shorter); 0 = only meets the drift speed on the last frame. Wall-wide; the scene cycle length (hold + glide) is unchanged."
+            }
+            onCommit={(n) => patchWall(ci, { flowLand: Math.max(0, Math.min(0.6, n / 100)) })}
+          />
           <button
             disabled={!scenes.length}
             onClick={() => {
@@ -187,19 +201,6 @@ export const WallScenes: React.FC = () => {
         >
           <input type="checkbox" checked={!!wall.flow} onChange={(e) => patchWall(ci, { flow: e.target.checked || undefined })} /> flow
         </label>
-        {wall.flow ? (
-          <span className="wsc-defaults" title="Landing: how much of each glide is spent coasting at the arrival drift speed BEFORE the scene point — the fast part ends early and the camera eases the rest of the way in slowly. 0 = only meets the drift speed at the last frame.">
-            <span className="muted">land</span>
-            <CommitNum
-              value={Math.round((wall.flowLand ?? 0.35) * 100)}
-              min={0}
-              max={60}
-              step={5}
-              suffix="%"
-              onCommit={(n) => patchWall(ci, { flowLand: Math.max(0, Math.min(0.6, n / 100)) })}
-            />
-          </span>
-        ) : null}
         <label className="wsc-check">
           <input type="checkbox" checked={wall.intro} onChange={(e) => patchWall(ci, { intro: e.target.checked })} /> intro
         </label>

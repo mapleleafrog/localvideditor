@@ -95,11 +95,14 @@ mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to
 
 **Seamless flow.** Tick **flow** in the strip toolbar and the camera never stops: each hold drifts at a steady pace
 (hover amount = how fast) and every glide is re-shaped to depart at the previous hold's drift speed and land at the
-next one's — fast in the middle, decelerating straight into the slow drift, no stop at either end. The **land %** box next to
-it is how much of each glide is spent coasting at the arrival drift speed *before* the scene point (default 35 %): the
-fast part ends early and the camera eases the rest of the way in at the slow pace. Raise it to slow down earlier. It
-overrides the glide easings (a still hold still meets its glide at zero). This is the "fast arrive, slow glide across, fast leave"
-profile; off is the classic stop-and-go.
+next one's — fast in the middle, decelerating straight into the slow drift, no stop at either end. The wall-wide **land %**
+box in the `defaults:` group (greyed until flow is on, default 35 %) is the share of every glide spent slowing from travel
+pace into the next scene's drift *before* the scene point: the fast part ends early and the camera eases the rest of the way
+in slowly. Raise it to settle earlier. **It never changes the scene cycle** (hold + glide stays what you typed) — it only
+moves where the arrival *reads*: at 35 % the camera looks settled about a third of a glide early, so the dwell feels longer
+and the move shorter. If you cut scenes to the beat, either lower land (15–20 % keeps the arrival close to the scene point)
+or treat the *start of the landing* as the beat and keep the cycle the same. It overrides the glide easings (a still hold
+still meets its glide at zero). This is the "fast arrive, slow glide across, fast leave" profile; off is the classic stop-and-go.
 
 **The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased
 drift across the hold (**creep toward the next scene** — the default on new scenes, it anticipates the glide — or push

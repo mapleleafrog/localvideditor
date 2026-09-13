@@ -273,7 +273,7 @@ export const WallInspector: React.FC = () => {
   // --- scene panel maths ---
   const scenePanel = (() => {
     if (!scene || si < 0) return null;
-    const a = si === 0 ? sched.whole : hoverEndCam(scenes[si - 1]);
+    const a = si === 0 ? sched.whole : hoverEndCam(scenes[si - 1], camFromScene(scene));
     const b = camFromScene(scene);
     const glideLive = si === 0 ? wall.intro : true;
     const v = peakVelocity(a, b, scene.glideSeconds, fps);
@@ -302,7 +302,38 @@ export const WallInspector: React.FC = () => {
             <span className="muted">{Math.round(scene.holdSeconds * fps)}f{scene.holdSeconds === 0 ? " · via (no stop)" : ""}</span>
           </div>
         </Field>
-        <Field label={si === 0 ? "Intro glide in (seconds)" : "Glide in from previous scene (seconds)"}>
+        <Field label="Hover during the hold (the camera never quite stops)">
+          <div className="wi-row">
+            <select
+              value={scene.hover ?? "none"}
+              onChange={(e) => {
+                const v = e.target.value as WallScene["hover"];
+                patchWallScene(ci, si, { hover: v === "none" ? undefined : v });
+              }}
+              title="A slow, eased drift across the hold — push-in is the classic. Breathing (Wall settings) is the random handheld tremor on top."
+            >
+              <option value="none">still</option>
+              <option value="toward">creep toward the next scene (anticipates the glide)</option>
+              <option value="pushIn">push in</option>
+              <option value="pullOut">pull out</option>
+              <option value="left">drift left</option>
+              <option value="right">drift right</option>
+              <option value="up">drift up</option>
+              <option value="down">drift down</option>
+            </select>
+          </div>
+          <Slider
+            value={scene.hoverAmount ?? 0.5}
+            min={0}
+            max={1}
+            step={0.05}
+            disabled={!scene.hover || scene.hover === "none"}
+            onChange={(v2) => patchWallScene(ci, si, { hoverAmount: v2 })}
+          />
+          <span className="muted wi-lint">amount 1 = +6 % zoom or 140 px of pan over the hold; 0.5 is the default on new scenes.</span>
+        </Field>
+        <div className="insp-sub wi-subhead">→ Transition into this scene {si > 0 ? `(from scene ${si})` : "(intro)"}</div>
+        <Field label={si === 0 ? "Intro glide in (seconds)" : "Glide duration (seconds)"}>
           <div className="wi-row">
             <CommitNum
               value={scene.glideSeconds}
@@ -325,35 +356,6 @@ export const WallInspector: React.FC = () => {
               <span className="muted">{glideLive ? (dist ? "cut" : "no travel") : "off"}</span>
             )}
           </div>
-        </Field>
-        <Field label="Hover during the hold (the camera never quite stops)">
-          <div className="wi-row">
-            <select
-              value={scene.hover ?? "none"}
-              onChange={(e) => {
-                const v = e.target.value as WallScene["hover"];
-                patchWallScene(ci, si, { hover: v === "none" ? undefined : v });
-              }}
-              title="A slow, eased drift across the hold — push-in is the classic. Breathing (Wall settings) is the random handheld tremor on top."
-            >
-              <option value="none">still</option>
-              <option value="pushIn">push in</option>
-              <option value="pullOut">pull out</option>
-              <option value="left">drift left</option>
-              <option value="right">drift right</option>
-              <option value="up">drift up</option>
-              <option value="down">drift down</option>
-            </select>
-          </div>
-          <Slider
-            value={scene.hoverAmount ?? 0.5}
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={!scene.hover || scene.hover === "none"}
-            onChange={(v2) => patchWallScene(ci, si, { hoverAmount: v2 })}
-          />
-          <span className="muted wi-lint">amount 1 = +6 % zoom or 140 px of pan over the hold; 0.5 is the default on new scenes.</span>
         </Field>
         <Field label="Easing (of the glide in)">
           <select

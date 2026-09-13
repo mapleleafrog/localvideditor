@@ -118,7 +118,7 @@ const randScene = () => ({
   glideSeconds: pick([0, 0.4, 0.8, 1.5, 2.4]),
   easing: pick(["smooth", "sine", "cubic", "settle"]),
   arc: pick([0, 0, 0.6, -0.4, 1, -1]),
-  hover: pick([undefined, "none", "pushIn", "pullOut", "left", "right", "up", "down"]),
+  hover: pick([undefined, "none", "toward", "toward", "pushIn", "pullOut", "left", "right", "up", "down"]),
   hoverAmount: pick([undefined, 0, 0.5, 1]),
 });
 // Scene refs on items: unset, a valid id, or a stale id — the renderer must treat stale == unset.
@@ -301,6 +301,32 @@ startGroup(3, "bit-exact holds");
   });
   near(sceneHoverCam(hov.scenes[0]).zoom, hov.scenes[0].zoom * (1 + HOVER_ZOOM), 1e-12, "pushIn at amount 1 is +HOVER_ZOOM");
   near(sceneHoverCam(hov.scenes[1]).x, hov.scenes[1].x - (HOVER_PAN_PX * 0.5) / hov.scenes[1].zoom, 1e-9, "a pan is HOVER_PAN_PX * amount SCREEN px");
+  // `toward`: a creep along the direction of the NEXT glide, HOVER_PAN_PX * amount screen px,
+  // capped at a third of the hop; zoom-only toward a pure push; identity with nowhere to go.
+  {
+    const a = { ...wall.scenes[0], hover: "toward", hoverAmount: 1 };
+    const nx = { x: a.x + 3000, y: a.y - 4000, zoom: a.zoom, rot: 0 };
+    const e = sceneHoverCam(a, nx);
+    const step = HOVER_PAN_PX / a.zoom;
+    near(Math.hypot(e.x - a.x, e.y - a.y), step, 1e-9, "toward: creeps HOVER_PAN_PX * amount screen px along the hop");
+    near((e.x - a.x) / (e.y - a.y), 3000 / -4000, 1e-9, "toward: exactly along the direction of the next scene");
+    const short = sceneHoverCam(a, { ...nx, x: a.x + 30, y: a.y });
+    near(short.x - a.x, 10, 1e-9, "toward: a short hop creeps at most a third of the way");
+    const zoomOnly = sceneHoverCam(a, { x: a.x, y: a.y, zoom: a.zoom * 2, rot: 0 });
+    near(zoomOnly.zoom, a.zoom * (1 + HOVER_ZOOM), 1e-12, "toward a pure push-in: zoom creeps in");
+    const nowhere = sceneHoverCam(a, undefined);
+    ok(nowhere.x === a.x && nowhere.zoom === a.zoom, "toward with nowhere to go is the identity");
+    // Through the schedule: the last scene's `toward` reads the outro pose when outro is on, else stays.
+    const tw = { items: wall.items, scenes: [{ ...wall.scenes[0], hover: "toward", hoverAmount: 1 }, { ...wall.scenes[1], hover: "toward", hoverAmount: 1 }], intro: false, outro: false };
+    const ts = scheduleWall(tw, 30, W, H);
+    const h0 = ts.segs.find((g) => g.kind === "hold" && g.scene === 0);
+    const h1 = ts.segs.find((g) => g.kind === "hold" && g.scene === 1);
+    ok(Math.hypot(h0.b.x - h0.a.x, h0.b.y - h0.a.y) > 0, "scene 0 creeps toward scene 1");
+    ok(h1.b.x === h1.a.x && h1.b.zoom === h1.a.zoom, "the last scene with no outro stays still");
+    const tw2 = scheduleWall({ ...tw, outro: true, outroSeconds: 1, outroHoldSeconds: 0.5 }, 30, W, H);
+    const h1b = tw2.segs.find((g) => g.kind === "hold" && g.scene === 1);
+    ok(Math.hypot(h1b.b.x - h1b.a.x, h1b.b.y - h1b.a.y) > 0 || h1b.b.zoom !== h1b.a.zoom, "with an outro the last scene creeps toward the whole-wall pose");
+  }
   const still = sceneHoverCam({ ...wall.scenes[0], hover: "none" });
   ok(still.zoom === wall.scenes[0].zoom && still.x === wall.scenes[0].x, "hover none is the identity");
   // Zero velocity at both ends of a hovering hold (it must meet the glides without a shove).

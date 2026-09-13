@@ -251,9 +251,9 @@ export const speedClass = (v: number) => (v <= 18 ? "ok" : v <= 34 ? "mid" : v <
 export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene => ({
   ...DEFAULT_SCENE,
   id: newSceneId(),
-  // The camera never quite stops: a gentle push-in during the hold (set explicitly on NEW scenes
-  // only, so a scene without the field stays a bit-exact still hold — as before).
-  hover: "pushIn",
+  // The camera never quite stops: a slow creep toward wherever the next glide goes (set explicitly
+  // on NEW scenes only, so a scene without the field stays a bit-exact still hold — as before).
+  hover: "toward",
   hoverAmount: 0.5,
   x: cam.x,
   y: cam.y,
@@ -264,8 +264,9 @@ export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene =>
 
 /** Scene keyframe -> camera (hardened the same way the renderer hardens it). */
 export const camFromScene = (s: WallScene): Cam => sceneCam(s);
-/** Where a scene's hold ENDS (after its hover drift) — what the next glide departs from. */
-export const hoverEndCam = (s: WallScene): Cam => sceneHoverCam(s);
+/** Where a scene's hold ENDS (after its hover drift) — what the next glide departs from. `next`
+ *  is the pose the following glide goes to (needed by the `toward` hover). */
+export const hoverEndCam = (s: WallScene, next?: Cam): Cam => sceneHoverCam(s, next);
 
 /** What `⊕ Set as scene` appends: the authoring pose, with a glide duration a motion designer would
  *  sign off (`suggestGlideSeconds` targets a peak px/second, so it is fps-independent). */

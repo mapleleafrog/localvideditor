@@ -413,12 +413,29 @@ export const HOVER_ZOOM = 0.06;
 export const HOVER_PAN_PX = 140;
 
 /** The pose a scene's hold ENDS on: the authored pose drifted by its hover. Identity when the
- *  scene has no hover, so a still hold stays bit-exact and every downstream glide is unchanged. */
-export const sceneHoverCam = (s: WallSceneLike): Cam => {
+ *  scene has no hover, so a still hold stays bit-exact and every downstream glide is unchanged.
+ *  `next` is where the following glide goes (the next scene, or the whole-wall outro pose) —
+ *  only `toward` reads it: a creep along that direction, or along its zoom when there is no
+ *  travel; identity when there is nowhere to go (last scene, no outro). */
+export const sceneHoverCam = (s: WallSceneLike, next?: Cam): Cam => {
   const c = sceneCam(s);
   const k = clamp(finite(s.hoverAmount, 0.5), 0, 1);
   const pan = (HOVER_PAN_PX * k) / c.zoom; // screen px -> wall units at this zoom
   switch (s.hover) {
+    case "toward": {
+      if (!next) return c;
+      const dx = next.x - c.x;
+      const dy = next.y - c.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 1e-6) {
+        // Never overshoot a short hop: creep at most a third of the way there.
+        const step = Math.min(pan, d / 3);
+        return { ...c, x: c.x + (dx / d) * step, y: c.y + (dy / d) * step };
+      }
+      if (next.zoom > c.zoom) return { ...c, zoom: c.zoom * (1 + HOVER_ZOOM * k) };
+      if (next.zoom < c.zoom) return { ...c, zoom: c.zoom / (1 + HOVER_ZOOM * k) };
+      return c;
+    }
     case "pushIn":
       return { ...c, zoom: c.zoom * (1 + HOVER_ZOOM * k) };
     case "pullOut":
@@ -467,7 +484,8 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
     const poses = scenes.map(sceneCam);
     // Where each scene's hold ENDS (its hover drift) — the pose the NEXT glide departs from. A via
     // scene (hold 0) has no hold segment, so nothing drifts and the glide leaves the authored pose.
-    const ends = scenes.map((s, i) => (holdLen(s.holdSeconds ?? 1.8) > 0 ? sceneHoverCam(s) : poses[i]));
+    const nextOf = (i: number): Cam | undefined => (i + 1 < poses.length ? poses[i + 1] : (w.outro ?? true) ? whole : undefined);
+    const ends = scenes.map((s, i) => (holdLen(s.holdSeconds ?? 1.8) > 0 ? sceneHoverCam(s, nextOf(i)) : poses[i]));
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
       push(

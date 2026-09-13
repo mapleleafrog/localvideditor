@@ -20,7 +20,7 @@ import { appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWal
 import { WallMiniMap } from "./WallMiniMap";
 import { CommitNum } from "./WallInspector";
 
-const HOVER_LABEL: Record<string, string> = { pushIn: "push in", pullOut: "pull out", left: "drift ←", right: "drift →", up: "drift ↑", down: "drift ↓" };
+const HOVER_LABEL: Record<string, string> = { toward: "creep → next", pushIn: "push in", pullOut: "pull out", left: "drift ←", right: "drift →", up: "drift ↑", down: "drift ↓" };
 
 export const WallScenes: React.FC = () => {
   const project = useEditor((s) => s.project);
@@ -61,7 +61,7 @@ export const WallScenes: React.FC = () => {
   const scenes = wall.scenes ?? [];
 
   /** The pose a scene glides FROM: the previous scene, or the whole-wall fit pose for scene 0. */
-  const prevCam = (i: number) => (i === 0 ? sched.whole : hoverEndCam(scenes[i - 1]));
+  const prevCam = (i: number) => (i === 0 ? sched.whole : hoverEndCam(scenes[i - 1], camFromScene(scenes[i])));
 
   const setAsScene = () => {
     addWallScene(ci, appendedScene(wall, wallCam));
@@ -186,7 +186,17 @@ export const WallScenes: React.FC = () => {
                     : "No glide into the first scene (intro is off)"
                 }
               >
-                <span className="wsc-arrow-line">{i === 0 ? "intro" : ""}→</span>
+                <button
+                  className="wsc-arrow-line"
+                  title={`Transition into scene ${i + 1}: click to open its settings (seconds, easing, arc) on the right`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    pick(i);
+                    flash(`Transition into scene ${i + 1} — settings on the right`);
+                  }}
+                >
+                  {i === 0 ? "intro" : ""}→
+                </button>
                 <span className="wsc-arrow-box" onClick={stop} onPointerDown={stop}>
                   <CommitNum
                     value={s.glideSeconds}

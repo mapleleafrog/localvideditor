@@ -24,10 +24,9 @@ import { TRANSITION_KINDS, type TransitionKind } from "../../../src/effects/io";
 import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
 import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
 import { clipStarts } from "../lib/timeline-utils";
-import { camFromScene, hasJapanese, sceneOptions, scheduleWall, wallOf, wallSummary } from "../lib/wall-edit";
+import { camFromScene, hasJapanese, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
 import { EffectStack, Field, Section, Slider } from "./fields";
-import { speedClass } from "./WallScenes";
 
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
 

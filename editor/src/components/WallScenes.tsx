@@ -7,18 +7,19 @@
 //      sign off (suggestGlideSeconds targets peak px/SECOND, so it is fps-independent).
 //   4. Pan to the next area, repeat.   5. ⟲ Fit clip duration (or leave auto-fit on).
 //
-// Each card is a scene: thumb + name + "hold 2.4s · glide 2.6s" + the speed dot. CLICKING A CARD
-// SELECTS THE SCENE (by stable id) and jumps the camera to it; its timing, easing, arc, speed chip
-// and actions are edited in the inspector's `Scene` section on the right — one place, in seconds.
-// Drag a card to reorder. Scene refs on items are by id, so reordering never re-targets a prop.
+// Each card is a scene: thumb + name + an inline HOLD box (seconds). Between cards sits an arrow
+// connector with the GLIDE box for the move into the next scene and its speed dot — the two
+// numbers the user actually tunes, typed straight into the strip. CLICKING A CARD SELECTS THE
+// SCENE (by stable id) and jumps the camera to it; easing, arc and the rest live in the
+// inspector's `Scene` section. ▶ Preview all plays the whole schedule in Live mode. Drag a card to
+// reorder. Scene refs on items are by id, so reordering never re-targets a prop.
 import React, { useMemo, useState } from "react";
 import { useEditor } from "../store";
-import { peakVelocity } from "../../../src/timeline/wall";
-import { appendedScene, camFromScene, fitDurationPatch, scheduleWall, wallFitFor, wallOf } from "../lib/wall-edit";
+import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
+import { clipStarts } from "../lib/timeline-utils";
+import { appendedScene, camFromScene, fitDurationPatch, scheduleWall, speedClass, wallFitFor, wallOf } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
-
-/** How a glide reads at 30 fps (design §3.6) — the bands the chip is coloured by. */
-export const speedClass = (v: number) => (v <= 18 ? "ok" : v <= 34 ? "mid" : v <= 55 ? "hot" : "bad");
+import { CommitNum } from "./WallInspector";
 
 export const WallScenes: React.FC = () => {
   const project = useEditor((s) => s.project);
@@ -31,7 +32,9 @@ export const WallScenes: React.FC = () => {
   const live = useEditor((s) => s.wallLive);
   const setLive = useEditor((s) => s.setWallLive);
   const addWallScene = useEditor((s) => s.addWallScene);
+  const patchWallScene = useEditor((s) => s.patchWallScene);
   const reorderWallScene = useEditor((s) => s.reorderWallScene);
+  const requestSeek = useEditor((s) => s.requestSeek);
   const patchWall = useEditor((s) => s.patchWall);
   const patchClip = useEditor((s) => s.patchClip);
   const autoFit = useEditor((s) => s.wallAutoFit);
@@ -50,6 +53,7 @@ export const WallScenes: React.FC = () => {
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
   const fit = useMemo(() => (isWall ? wallFitFor(project, wallClip) : null), [isWall, project, wallClip]);
+  const starts = useMemo(() => clipStarts(project), [project]);
   if (!isWall || wallClip == null || !clip) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
@@ -74,6 +78,13 @@ export const WallScenes: React.FC = () => {
     setWallCam(camFromScene(s));
   };
 
+  /** Play the whole schedule (intro → every scene → outro) in Live mode, from the clip's start. */
+  const previewAll = () => {
+    const absStart = starts[ci] ?? 0;
+    setLive(true);
+    requestSeek(absStart, { play: true, until: absStart + sched.total });
+  };
+
   const onDrop = (to: number) => {
     if (dragIndex !== null && dragIndex !== to) reorderWallScene(ci, dragIndex, to);
     setDragIndex(null);
@@ -86,6 +97,9 @@ export const WallScenes: React.FC = () => {
       <div className="tl-toolbar">
         <button className="primary" onClick={setAsScene} title="Append the current framing as a scene (Enter)">
           ⊕ Set as scene
+        </button>
+        <button onClick={previewAll} disabled={!scenes.length} title="Play every scene in order (Live mode) — how they string together">
+          ▶ Preview all
         </button>
         <button
           // The SAME patch the Inspector, the Storyboard card and the clip context menu apply — it
@@ -134,7 +148,7 @@ export const WallScenes: React.FC = () => {
             {secs(Math.max(0, (sched.sceneEnds[scenes.length - 1] ?? sched.total) - (sched.sceneFrames[0] ?? 0)) / fps)}s · outro{" "}
             {secs(Math.max(0, sched.total - (sched.sceneEnds[scenes.length - 1] ?? sched.total)) / fps)}s
           </div>
-          <span className="muted wsc-hint">Click a scene to edit its seconds on the right. Drag to reorder.</span>
+          <span className="muted wsc-hint">Type hold / glide seconds right on the strip. Click a card for more. Drag to reorder.</span>
         </div>
 
         {scenes.length === 0 && (
@@ -146,48 +160,88 @@ export const WallScenes: React.FC = () => {
           const b = camFromScene(s);
           const glideLive = i === 0 ? wall.intro : true;
           const v = peakVelocity(a, b, s.glideSeconds, fps);
+          const suggested = suggestGlideSeconds(a, b);
           const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
           const via = s.holdSeconds === 0;
           const on = !!s.id && s.id === wallScene;
           const startsAt = secs((sched.sceneFrames[i] ?? 0) / fps);
           const appearing = (wall.items ?? []).filter((it) => it.appearIn === s.id).length;
+          const stop = (e: React.SyntheticEvent) => e.stopPropagation();
           return (
-            <div
-              key={s.id ?? i}
-              className={"wsc-card" + (via ? " via" : "") + (on ? " on" : "") + (dragIndex === i ? " dragging" : "")}
-              draggable
-              onDragStart={() => setDragIndex(i)}
-              onDragEnd={() => setDragIndex(null)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(i)}
-              onClick={() => pick(i)}
-              title={`Scene ${i + 1} — starts at ${startsAt}s. Click to select and jump the camera.`}
-            >
-              <div className="wsc-card-head">
-                <span className="wsc-idx">{i + 1}</span>
-                <span className="wsc-name-ro">{s.name || `x ${Math.round(s.x)} y ${Math.round(s.y)}`}</span>
-              </div>
-              {!via && (
-                <div className="wsc-mini">
-                  <WallMiniMap wall={wall} W={W} H={H} fps={fps} width={148} height={84} highlight={i} onJump={undefined} />
-                </div>
-              )}
-              <div className="wsc-meta muted">
-                {via ? "via" : `hold ${secs(s.holdSeconds)}s`}
-                {glideLive && s.glideSeconds > 0 ? ` · glide ${secs(s.glideSeconds)}s` : glideLive ? " · cut" : ""}
-                {appearing ? ` · +${appearing}` : ""}
-              </div>
-              <div className="wsc-meta muted">
-                @ {startsAt}s
+            <React.Fragment key={s.id ?? i}>
+              {/* Connector: the glide INTO this scene (for scene 0 the intro glide, when intro is on). */}
+              <div
+                className={"wsc-arrow" + (glideLive ? "" : " off")}
+                title={
+                  glideLive
+                    ? `Glide into scene ${i + 1}${dist ? ` — ${dist} screen px, ${v.toFixed(0)} px/frame peak. Suggested ${suggested.toFixed(2)}s (click the dot to apply).` : ""}`
+                    : "No glide into the first scene (intro is off)"
+                }
+              >
+                <span className="wsc-arrow-line">{i === 0 ? "intro" : ""}→</span>
+                <span className="wsc-arrow-box" onClick={stop} onPointerDown={stop}>
+                  <CommitNum
+                    value={s.glideSeconds}
+                    min={0}
+                    step={0.1}
+                    suffix="s"
+                    disabled={!glideLive}
+                    onCommit={(n) => patchWallScene(ci, i, { glideSeconds: n })}
+                  />
+                </span>
                 {glideLive && s.glideSeconds > 0 && dist > 0 ? (
-                  <span className={"wsc-dot " + speedClass(v)} title={`${v.toFixed(0)} px/frame peak`}>
-                    ●
-                  </span>
-                ) : null}
+                  <button
+                    className={"wsc-dot-btn " + speedClass(v)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      patchWallScene(ci, i, { glideSeconds: Math.round(suggested * 100) / 100 });
+                    }}
+                    title={`${v.toFixed(0)} px/frame — click to use the suggested ${suggested.toFixed(2)}s`}
+                  >
+                    ● {v.toFixed(0)}
+                  </button>
+                ) : (
+                  <span className="muted wsc-dot-btn flat">{glideLive ? (dist ? "cut" : "still") : "off"}</span>
+                )}
               </div>
-            </div>
+
+              <div
+                className={"wsc-card" + (via ? " via" : "") + (on ? " on" : "") + (dragIndex === i ? " dragging" : "")}
+                draggable
+                onDragStart={() => setDragIndex(i)}
+                onDragEnd={() => setDragIndex(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDrop(i)}
+                onClick={() => pick(i)}
+                title={`Scene ${i + 1} — starts at ${startsAt}s. Click to select and jump the camera.`}
+              >
+                <div className="wsc-card-head">
+                  <span className="wsc-idx">{i + 1}</span>
+                  <span className="wsc-name-ro">{s.name || `x ${Math.round(s.x)} y ${Math.round(s.y)}`}</span>
+                </div>
+                {!via && (
+                  <div className="wsc-mini">
+                    <WallMiniMap wall={wall} W={W} H={H} fps={fps} width={148} height={84} highlight={i} onJump={undefined} />
+                  </div>
+                )}
+                <div className="wsc-meta" onClick={stop} onPointerDown={stop}>
+                  <span className="muted">hold</span>
+                  <CommitNum value={s.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => patchWallScene(ci, i, { holdSeconds: n })} />
+                  {via ? <span className="muted">via</span> : null}
+                </div>
+                <div className="wsc-meta muted">
+                  @ {startsAt}s{appearing ? ` · +${appearing} appear` : ""}
+                </div>
+              </div>
+            </React.Fragment>
           );
         })}
+        {scenes.length > 0 && wall.outro ? (
+          <div className="wsc-arrow" title="Outro: glide back out to the whole wall (Wall settings)">
+            <span className="wsc-arrow-line">→ outro</span>
+            <span className="muted">{secs(wall.outroSeconds)}s</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

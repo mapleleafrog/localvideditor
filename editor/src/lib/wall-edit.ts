@@ -241,6 +241,9 @@ export const sceneOptions = (wall: Wall): { id: string; label: string }[] =>
 
 /** Camera -> scene keyframe. `wallCam` is already in scene space, so "Set as scene" is a COPY, not
  *  a conversion: a hold segment returns the pose bit-exact (design §0.4). */
+/** How a glide reads at 30 fps (design §3.6) — the bands the speed chip / dot are coloured by. */
+export const speedClass = (v: number) => (v <= 18 ? "ok" : v <= 34 ? "mid" : v <= 55 ? "hot" : "bad");
+
 export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene => ({
   ...DEFAULT_SCENE,
   id: newSceneId(),

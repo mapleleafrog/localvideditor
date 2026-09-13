@@ -95,7 +95,12 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
   const log = (line: string) => logLines.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
   const flushLog = () => (logPath ? fs.writeFile(logPath, logLines.join("\n") + "\n").catch(() => {}) : Promise.resolve());
   let heartbeat: ReturnType<typeof setInterval> | null = null;
-  req.on("close", () => {
+  // A REAL client disconnect = the response's connection closing before we ended it. NOT
+  // `req.on("close")`: since Node 16 an IncomingMessage emits "close" as soon as its body has been
+  // fully read — i.e. right after readJsonBody() below — which cancelled every render the instant
+  // it started (renderMedia() got cancelled → swallowed as "client gone" → the editor sat on its
+  // last status line forever, the "stuck at Rendering N frames…" symptom).
+  res.on("close", () => {
     if (!res.writableEnded) {
       cancelled = true;
       cancel();

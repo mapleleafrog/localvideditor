@@ -52,6 +52,16 @@ export async function renderVideo(
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+  let terminal = false; // saw done / error — otherwise the server ended the stream mid-render
+  const emit = (t: string) => {
+    try {
+      const m = JSON.parse(t) as RenderMsg;
+      if (m.type === "done" || m.type === "error") terminal = true;
+      onMsg(m);
+    } catch {
+      /* ignore partial */
+    }
+  };
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -60,14 +70,13 @@ export async function renderVideo(
     buf = lines.pop() ?? "";
     for (const line of lines) {
       const t = line.trim();
-      if (!t) continue;
-      try {
-        onMsg(JSON.parse(t) as RenderMsg);
-      } catch {
-        /* ignore partial */
-      }
+      if (t) emit(t);
     }
   }
+  if (buf.trim()) emit(buf.trim());
+  // A stream that ends without a result is a failure, never "still running": the dev server
+  // died, restarted, or dropped the render. Show it instead of a frozen status line.
+  if (!terminal) onMsg({ type: "error", message: "The render server ended the stream without a result — check the wall.bat window and out/<render>.log, then try again." });
 }
 
 export async function saveProjectFile(name: string, project: Project): Promise<{ ok: boolean; file?: string; message?: string }> {

@@ -25,6 +25,9 @@ import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
 import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
 import { camFromScene, hasJapanese, hoverEndCam, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
+import { uploadMedia } from "../lib/api";
+import { ensureProjectName } from "../lib/names";
+import { clipStarts } from "../lib/timeline-utils";
 import { EffectStack, Field, Section, Slider } from "./fields";
 
 const srcUrl = (ref: string) => (/^https?:\/\//.test(ref) ? ref : staticFile(ref));
@@ -193,6 +196,10 @@ export const WallInspector: React.FC = () => {
   const requestSeek = useEditor((s) => s.requestSeek);
   const patchWall = useEditor((s) => s.patchWall);
   const patchWallItem = useEditor((s) => s.patchWallItem);
+  const addAudio = useEditor((s) => s.addAudio);
+  const patchAudio = useEditor((s) => s.patchAudio);
+  const removeAudio = useEditor((s) => s.removeAudio);
+  const audioRef = useRef<HTMLInputElement>(null);
   const reorderWallItem = useEditor((s) => s.reorderWallItem);
   const removeWallItem = useEditor((s) => s.removeWallItem);
   const duplicateWallItem = useEditor((s) => s.duplicateWallItem);
@@ -218,6 +225,7 @@ export const WallInspector: React.FC = () => {
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sum = useMemo(() => wallSummary(wall, fps, W, H), [wall, fps, W, H]);
   const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
+  const starts = useMemo(() => clipStarts(project), [project]);
   if (!isWall || wallClip == null) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
@@ -704,6 +712,51 @@ export const WallInspector: React.FC = () => {
           them. <span className="kbd">⇧</span>-drag for a marquee.
         </div>
       )}
+
+      <Section title="Soundtrack" defaultOpen={false} badge={(project.audio ?? []).filter((a) => (a.from ?? 0) === (starts[ci] ?? 0)).length || undefined}>
+        {/* Tracks aligned to THIS wall's start (the Audio tab lists every track in the project). A
+            track added here starts exactly when the wall does, so Wall-only render and ▶ Live play
+            it from its first beat. */}
+        {(project.audio ?? []).map((a, i) =>
+          (a.from ?? 0) === (starts[ci] ?? 0) ? (
+            <Field key={i} label={a.src.split("/").pop() ?? a.src}>
+              <div className="wi-row">
+                <Slider value={a.volume ?? 1} min={0} max={1} step={0.05} onChange={(v) => patchAudio(i, { volume: v })} />
+                <button className="del" title="Remove this track" onClick={() => removeAudio(i)}>
+                  ×
+                </button>
+              </div>
+            </Field>
+          ) : null,
+        )}
+        <Field label="Add a song (starts with the wall)">
+          <button onClick={() => audioRef.current?.click()}>🎵 Add soundtrack…</button>
+          <input
+            ref={audioRef}
+            type="file"
+            accept="audio/*"
+            hidden
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              const proj = ensureProjectName();
+              if (!proj) return flash("Name the project first to import audio.");
+              const r = await uploadMedia(f, proj);
+              if (!r.ok || !r.ref) return flash(`Import failed: ${r.message ?? "unknown error"}`);
+              // Re-read the store after the await: the wall may have moved on the clip track.
+              const st = useEditor.getState();
+              const from = clipStarts(st.project)[ci] ?? 0;
+              st.addAudio({ src: r.ref, volume: 1, from, trimBefore: 0, trimAfter: 0, loop: false });
+              flash(`Added ${f.name} — starts with the wall`);
+            }}
+          />
+          <span className="muted wi-lint">
+            Plays in ▶ Live and in Wall-only renders. Trim / offset / BPM live in the Library's Audio tab. Tracks
+            starting elsewhere in the timeline are listed there, not here.
+          </span>
+        </Field>
+      </Section>
 
       <Section title="Wall settings" defaultOpen={false}>
         <Field label="Viewport roll (not saved)">

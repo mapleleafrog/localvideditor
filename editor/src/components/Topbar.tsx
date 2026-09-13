@@ -25,6 +25,14 @@ export const Topbar: React.FC = () => {
   const [mode, setMode] = useState<Mode>("mp4");
   const wallOnly = mode === "wall" || mode === "wall-prores";
   const isMov = mode !== "mp4" && mode !== "wall";
+  const [draft, setDraft] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  // Opening the Wall view flips a still-default picker to "Wall only" — the thing the Wall view
+  // previews. (Only from the plain default, so a deliberate choice is never overridden.)
+  useEffect(() => {
+    if (view === "wall" && mode === "mp4") setMode("wall");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   const [note, setNote] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState(projectName);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -71,19 +79,32 @@ export const Topbar: React.FC = () => {
       concurrency,
       gl,
       crf,
+      draft,
     };
+    const ac = new AbortController();
+    abortRef.current = ac;
     try {
-      await renderVideo(toRender, options, (msg) => {
-        if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
-        else if (msg.type === "progress")
-          setRender({ phase: "running", message: "Rendering…", progress: msg.progress });
-        else if (msg.type === "done") setRender({ phase: "done", fileName: msg.fileName });
-        else if (msg.type === "error") setRender({ phase: "error", message: msg.message });
-      });
+      await renderVideo(
+        toRender,
+        options,
+        (msg) => {
+          if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
+          else if (msg.type === "progress") setRender({ phase: "running", message: "Rendering…", progress: msg.progress });
+          else if (msg.type === "done") setRender({ phase: "done", fileName: msg.fileName });
+          else if (msg.type === "error") setRender({ phase: "error", message: msg.message });
+        },
+        ac.signal,
+      );
     } catch (e) {
-      setRender({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+      if (ac.signal.aborted) {
+        setRender({ phase: "idle" });
+        flash("Render cancelled");
+      } else setRender({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      abortRef.current = null;
     }
   };
+  const onCancelRender = () => abortRef.current?.abort();
 
   const onSave = async () => {
     const name = ensureProjectName(); // uses the name field, or prompts if still unset
@@ -230,6 +251,9 @@ export const Topbar: React.FC = () => {
             <span className="render-fill" style={{ width: `${Math.round(render.progress * 100)}%` }} />
           </span>
           {render.message} {render.progress > 0 ? `${Math.round(render.progress * 100)}%` : ""}
+          <button className="stop" onClick={onCancelRender} title="Stop this render (the partial file is discarded)">
+            ✕ Cancel
+          </button>
         </span>
       )}
       {render.phase === "done" && <span className="render-ok">✓ out/{render.fileName}</span>}
@@ -249,6 +273,9 @@ export const Topbar: React.FC = () => {
         <option value="wall">Wall only · MP4</option>
         <option value="wall-prores">Wall only · ProRes 4444 (master)</option>
       </select>
+      <label className="render-draft" title="Quick look: half resolution and lighter compression — several times faster. File name gets -draft.">
+        <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} disabled={render.phase === "running"} /> draft
+      </label>
       <span className="render-settings-wrap">
         <button onClick={() => setShowSettings((s) => !s)} title="Render settings" className={showSettings ? "on" : ""}>⚙</button>
         {showSettings && (
@@ -277,7 +304,7 @@ export const Topbar: React.FC = () => {
         )}
       </span>
       <button className="primary" onClick={onRender} disabled={render.phase === "running"}>
-        {render.phase === "running" ? "Rendering…" : isMov ? "⏺ Render .mov" : "⏺ Render MP4"}
+        {render.phase === "running" ? "Rendering…" : `⏺ Render ${isMov ? ".mov" : "MP4"}${draft ? " draft" : ""}`}
       </button>
     </header>
   );

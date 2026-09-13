@@ -97,7 +97,19 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     if (transparent) inputProps = { ...inputProps, background: { ...(project.background ?? {}), type: "none" } };
     if (overlaysOnly) inputProps = { ...inputProps, clips: [] };
 
-    const { selectComposition, renderMedia, ensureBrowser } = await import("@remotion/renderer");
+    const { selectComposition, renderMedia, ensureBrowser, makeCancelSignal } = await import("@remotion/renderer");
+    // ✕ Cancel in the editor aborts the fetch; the closed request cancels the render (the browser
+    // tabs are torn down and the partial file is discarded by Remotion).
+    const { cancelSignal, cancel } = makeCancelSignal();
+    let cancelled = false;
+    req.on("close", () => {
+      if (!res.writableEnded) {
+        cancelled = true;
+        cancel();
+      }
+    });
+    // Draft: half resolution, lighter compression — a quick look, not a master.
+    const draft = !!options.draft;
     send({ type: "status", message: "Preparing browser…" });
     await ensureBrowser();
     send({ type: "status", message: "Bundling composition…" });
@@ -107,7 +119,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     await fs.mkdir(OUT_DIR, { recursive: true });
     const ext = transparent ? "mov" : "mp4";
     const tag = overlaysOnly ? "overlays" : options.wallOnly ? (transparent ? "wall-prores" : "wall") : transparent ? "alpha" : "video";
-    const fileName = `timeline-${tag}-${stamp()}.${ext}`;
+    const fileName = `timeline-${tag}${draft ? "-draft" : ""}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
     const kind = transparent ? "transparent ProRes" : "H.264";
     // Render-machine controls (overridable from the editor's Render settings).
@@ -117,7 +129,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const crf = Number(options.crf) >= 1 ? Math.max(1, Math.min(51, Math.round(Number(options.crf)))) : 16; // lower = higher quality
     send({
       type: "status",
-      message: `Rendering ${composition.durationInFrames} frames (${kind}) · ${concurrency} cores · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
+      message: `Rendering ${composition.durationInFrames} frames (${kind}${draft ? ", draft ½ res" : ""}) · ${concurrency} cores · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
       durationInFrames: composition.durationInFrames,
     });
     await renderMedia({
@@ -130,13 +142,16 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       // SwiftShader (CPU) or "default" if a GPU backend ever fails to launch.
       ...(useGpu ? { chromiumOptions: { gl: gl as "angle" | "swiftshader" } } : {}),
       onProgress: ({ progress }) => send({ type: "progress", progress }),
+      cancelSignal,
+      ...(draft ? { scale: 0.5 } : {}),
       ...(transparent
         ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
         : // H.264: max-quality frame capture (jpegQuality 100) + configurable CRF, software x264.
-          { codec: "h264" as const, jpegQuality: 100, crf }),
+          { codec: "h264" as const, jpegQuality: draft ? 80 : 100, crf: draft ? Math.max(crf, 26) : crf }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {
+    if (cancelled) return; // the client is gone; nothing to report to
     send({ type: "error", message: err instanceof Error ? err.message : String(err) });
   } finally {
     res.end();

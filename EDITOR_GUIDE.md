@@ -112,7 +112,9 @@ not on the wall during it show a hatched outline in the viewport.
 
 **Camera navigation is not undoable** (pan/zoom/roll is transient); item edits and scene keyframes are.
 
-**Rendering a wall.** The render picker has **Wall only · MP4** and **Wall only · ProRes 4444 (master)** — just
+**Rendering a wall.** Opening the Wall view switches the render picker to **Wall only** (what the view previews); the
+**draft** checkbox renders at half resolution with lighter compression for a quick look, and **✕ Cancel** stops a
+running render. The render picker has **Wall only · MP4** and **Wall only · ProRes 4444 (master)** — just
 the wall clip, with any overlays/audio that overlap it shifted onto it. The paper is opaque, so the ProRes variant
 is a quality master rather than an alpha export.
 

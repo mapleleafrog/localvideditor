@@ -20,6 +20,8 @@ export interface RenderOptions {
   gl?: string;
   /** H.264 quality (1–51, lower = higher quality). Default 16. */
   crf?: number;
+  /** Quick look: half resolution, lighter compression, "-draft" in the file name. */
+  draft?: boolean;
 }
 
 /** POST the project + render options to the dev-server endpoint and stream NDJSON progress. */
@@ -27,11 +29,14 @@ export async function renderVideo(
   project: Project,
   options: RenderOptions,
   onMsg: (m: RenderMsg) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
+  // Aborting the fetch closes the request; the dev-server plugin cancels the render on close.
   const res = await fetch("/api/render", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, options }),
+    signal,
   });
   if (!res.body) {
     onMsg({ type: "error", message: "No response stream" });

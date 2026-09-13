@@ -98,10 +98,13 @@ mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to
 next one's — fast in the middle, decelerating straight into the slow drift, no stop at either end. The wall-wide **land %**
 box in the `defaults:` group (greyed until flow is on, default 35 %) is the share of every glide spent slowing from travel
 pace into the next scene's drift *before* the scene point: the fast part ends early and the camera eases the rest of the way
-in slowly. Raise it to settle earlier. **It never changes the scene cycle** (hold + glide stays what you typed) — it only
-moves where the arrival *reads*: at 35 % the camera looks settled about a third of a glide early, so the dwell feels longer
-and the move shorter. If you cut scenes to the beat, either lower land (15–20 % keeps the arrival close to the scene point)
-or treat the *start of the landing* as the beat and keep the cycle the same. It overrides the glide easings (a still hold
+in slowly. Raise it to settle earlier (but the same distance in less time makes the fast part *faster*). **Negative land is a
+lead**: the glide lands that share of the hop *short* of the scene point and the hold's slow drift carries the camera the rest
+of the way through it — the fast part covers less distance in the same time, so it is *slower*, and the authored framing is
+passed mid-drift instead of being the start of the drift. Try −20 % to −30 % for a lazier, more continuous feel. **Neither
+sign changes the scene cycle** (hold + glide stays what you typed) — they only move where the arrival *reads*: positive
+settles early (the dwell feels longer), negative arrives late (the scene point comes part-way through the hold). If you cut
+scenes to the beat, keep the cycle and place the beat where the framing lands. Land overrides the glide easings (a still hold
 still meets its glide at zero). This is the "fast arrive, slow glide across, fast leave" profile; off is the classic stop-and-go.
 
 **The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased

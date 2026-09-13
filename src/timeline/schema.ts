@@ -161,10 +161,14 @@ export const wallSchema = z.object({
    *  drift with no stop between. Overrides the per-scene easing on glides (a quintic Hermite that
    *  equals `smooth` when the adjacent holds are still). Off = the classic stop-and-go. */
   flow: z.boolean().optional(),
-  /** FLOW landing: the fraction of each glide (0–0.6) spent COASTING at the arrival drift speed
-   *  before the scene point — the fast part ends early and the camera eases the rest of the way
-   *  in at the slow pace. 0 = the drift speed is only met at the last frame; default 0.35. */
-  flowLand: z.number().min(0).max(0.6).optional(),
+  /** FLOW landing, signed (−0.6 … 0.6, default 0.35).
+   *  Positive = the fraction of each glide's TIME spent decelerating from the approach pace into
+   *  the drift speed before the scene point (the fast part ends early).
+   *  Negative = a LEAD: the glide lands that fraction of the hop SHORT of the scene point and the
+   *  hold's slow drift carries the camera the rest of the way through it — the fast part covers
+   *  less distance in the same time, so it is slower, and the scene point is passed mid-drift.
+   *  0 = the drift speed is only met at the last frame, right on the scene point. */
+  flowLand: z.number().min(-0.6).max(0.6).optional(),
   timecodeOffsetInFrames: z.number().int().nonnegative().default(0),
 });
 

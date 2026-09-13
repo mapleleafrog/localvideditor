@@ -170,16 +170,16 @@ export const WallScenes: React.FC = () => {
           <span className="muted">land</span>
           <CommitNum
             value={Math.round((wall.flowLand ?? 0.35) * 100)}
-            min={0}
+            min={-60}
             max={60}
             step={5}
             suffix="%"
             disabled={!wall.flow}
             title={
               (wall.flow ? "" : "Needs flow ON. ") +
-              "Landing: the share of EVERY glide spent slowing from travel pace into the next scene's drift, BEFORE the scene point. Higher = the camera settles earlier (the dwell reads longer, the move shorter); 0 = only meets the drift speed on the last frame. Wall-wide; the scene cycle length (hold + glide) is unchanged."
+              "Landing, wall-wide. POSITIVE = the share of each glide's time spent slowing into the next scene's drift before the scene point (settles earlier, dwell reads longer). NEGATIVE = a lead: the glide lands that share of the hop SHORT of the scene point and the slow drift carries the camera through it — the fast part covers less distance in the same time, so it is slower, and the scene point is passed mid-drift. 0 = meets the drift speed on the last frame, right on the scene point. The scene cycle (hold + glide) never changes."
             }
-            onCommit={(n) => patchWall(ci, { flowLand: Math.max(0, Math.min(0.6, n / 100)) })}
+            onCommit={(n) => patchWall(ci, { flowLand: Math.max(-0.6, Math.min(0.6, n / 100)) })}
           />
           <button
             disabled={!scenes.length}

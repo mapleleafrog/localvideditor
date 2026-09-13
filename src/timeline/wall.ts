@@ -549,18 +549,36 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
     // Where each scene's hold ENDS (its hover drift) — the pose the NEXT glide departs from. A via
     // scene (hold 0) has no hold segment, so nothing drifts and the glide leaves the authored pose.
     const nextOf = (i: number): Cam | undefined => (i + 1 < poses.length ? poses[i + 1] : (w.outro ?? true) ? whole : undefined);
-    const ends = scenes.map((s, i) => (holdLen(s.holdSeconds ?? 1.8) > 0 ? sceneHoverCam(s, nextOf(i)) : poses[i]));
+    const holdFrames = scenes.map((s) => holdLen(s.holdSeconds ?? 1.8));
+    const ends = scenes.map((s, i) => (holdFrames[i] > 0 ? sceneHoverCam(s, nextOf(i)) : poses[i]));
+    // FLOW landing, signed: positive = a landing DECELERATION over that share of the glide's time
+    // (`coast`, consumed by flowCurve); negative = a LEAD — the glide lands that share of the hop
+    // SHORT of the scene point and the hold's drift carries the camera through it.
+    const land = clamp(finite(w.flowLand, 0.35), -0.6, 0.6);
+    const coast = Math.max(0, land);
+    const lead = flow ? Math.max(0, -land) : 0;
+    // Where each hold STARTS: the authored pose, or (lead) the point `lead` of the way back along
+    // the arriving glide's straight hop. Only a hold that exists AND has a glide arriving into it
+    // can lead; a via scene (hold 0) and an intro-less scene 0 start on the pose.
+    const leadCam = (from: Cam, to: Cam): Cam => {
+      const k = 1 - lead;
+      return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, zoom: from.zoom + (to.zoom - from.zoom) * k, rot: from.rot + shortAngle(from.rot, to.rot) * k };
+    };
+    const starts = poses.map((p, i) => {
+      // A hard cut (glide 0 s) has no glide segment to lead along: it lands on the pose.
+      if (lead <= 0 || holdFrames[i] <= 0 || glideLen(scenes[i].glideSeconds ?? 1.5) <= 0) return p;
+      if (i === 0) return (w.intro ?? true) ? leadCam(whole, p) : p;
+      return leadCam(ends[i - 1], p);
+    });
     // FLOW: the drift speed of each hold (wall units / frame), projected onto a glide's direction
     // of travel, becomes that glide's endpoint slope. `va` = leaving the previous hold, `vb` =
     // arriving into the next one. A still hold contributes 0 — the glide then eases as usual.
-    const holdFrames = scenes.map((s) => holdLen(s.holdSeconds ?? 1.8));
     const driftSpeedAlong = (i: number, dirX: number, dirY: number): number => {
       if (i < 0 || i >= scenes.length || holdFrames[i] <= 0) return 0;
-      const vx = (ends[i].x - poses[i].x) / holdFrames[i];
-      const vy = (ends[i].y - poses[i].y) / holdFrames[i];
+      const vx = (ends[i].x - starts[i].x) / holdFrames[i];
+      const vy = (ends[i].y - starts[i].y) / holdFrames[i];
       return Math.max(0, vx * dirX + vy * dirY);
     };
-    const coast = clamp(finite(w.flowLand, 0.35), 0, 0.6);
     const flowSlopes = (from: Cam, to: Cam, frames: number, prevScene: number, nextScene: number) => {
       if (!flow || frames <= 0) return {};
       const dx = to.x - from.x;
@@ -575,7 +593,7 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
       push(
-        { kind: "glide", a: whole, b: poses[0], easing: easeIdOf(scenes[0].easing), arc: clamp(finite(scenes[0].arc, 0), -1, 1), scene: 0, whole: true, ...flowSlopes(whole, poses[0], glideLen(scenes[0].glideSeconds ?? 1.5), -1, 0) },
+        { kind: "glide", a: whole, b: starts[0], easing: easeIdOf(scenes[0].easing), arc: clamp(finite(scenes[0].arc, 0), -1, 1), scene: 0, whole: true, ...flowSlopes(whole, starts[0], glideLen(scenes[0].glideSeconds ?? 1.5), -1, 0) },
         glideLen(scenes[0].glideSeconds ?? 1.5),
       );
     }
@@ -583,13 +601,14 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       const s = scenes[i];
       if (i > 0) {
         push(
-          { kind: "glide", a: ends[i - 1], b: poses[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false, ...flowSlopes(ends[i - 1], poses[i], glideLen(s.glideSeconds ?? 1.5), i - 1, i) },
+          { kind: "glide", a: ends[i - 1], b: starts[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false, ...flowSlopes(ends[i - 1], starts[i], glideLen(s.glideSeconds ?? 1.5), i - 1, i) },
           glideLen(s.glideSeconds ?? 1.5),
         );
       }
       sceneFrames[i] = cur;
-      // A hold drifts from the authored pose to its hover pose (b === a when there is no hover).
-      push({ kind: "hold", a: poses[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false, ...(flow ? { linear: true } : {}) }, holdLen(s.holdSeconds ?? 1.8));
+      // A hold drifts from the authored pose (or its lead point) to its hover pose (b === a when
+      // there is no hover and no lead).
+      push({ kind: "hold", a: starts[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false, ...(flow ? { linear: true } : {}) }, holdFrames[i]);
       sceneEnds[i] = cur;
     }
     if (w.outro ?? true) {

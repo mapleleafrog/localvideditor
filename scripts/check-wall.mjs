@@ -145,7 +145,7 @@ const randWall = (nItems, nScenes) => {
   fitPadding: pick([0, 0.06, 0.12, 0.3]),
   breathing: 0,
   flow: rnd() < 0.4,
-  flowLand: pick([undefined, 0, 0.35, 0.6]),
+  flowLand: pick([undefined, -0.6, -0.25, 0, 0.35, 0.6]),
   };
 };
 
@@ -423,6 +423,51 @@ startGroup(3, "bit-exact holds");
     for (let i = 0; i <= 100; i++) near(flowCurve(i / 100, 0, 0, 0.35), EASE.smooth(i / 100), 1e-12, "flowCurve with still holds IS smooth");
     ok(h2.kind === "hold" && h2.a.x === h2.b.x, "flow: the last scene (nowhere to creep, no outro) is still");
     ok(g2.vb === 0, "flow: a glide into a still hold lands at zero");
+    // LEAD (negative flowLand): the glide lands `lead` of the hop SHORT of the scene point, the hold
+    // starts there and its drift carries the camera THROUGH the scene point; the shorter hop in the
+    // same time makes the bump slower; the junction still carries velocity; nothing else moves.
+    {
+      const lead = 0.25;
+      const fl = scheduleWall({ ...fw, flowLand: -lead }, 30, W, H);
+      ok(fl.total === fs.total && fl.segs.length === fs.segs.length, "lead: the schedule's length and shape are unchanged");
+      const gL = fl.segs[1];
+      const hL = fl.segs[2];
+      const from = fs.segs[1].a;
+      const pose = { x: 3000, y: 0 };
+      near(gL.b.x, from.x + (pose.x - from.x) * (1 - lead), 1e-9, "lead: the glide lands 25 % of the hop short of the scene point");
+      ok(gL.b.x < fs.segs[1].b.x, "lead: ...which is short of where the plain flow glide lands");
+      ok(hL.a.x === gL.b.x && hL.a.y === gL.b.y && hL.a.zoom === gL.b.zoom, "lead: the hold starts exactly where the glide landed");
+      near(hL.b.x, h1.b.x, 1e-9, "lead: the hold still ENDS on its hover pose, so the next glide is untouched");
+      // The hold is a straight line a -> b; solve for where it crosses the scene point's x and
+      // check that instant is inside the hold and lands on the pose exactly.
+      const tau = (pose.x - hL.a.x) / (hL.b.x - hL.a.x);
+      ok(tau > 0 && tau < 1, "lead: the scene point is crossed INSIDE the hold (mid-drift)");
+      const cross = poseInSeg(hL, hL.from + (hL.to - hL.from) * tau, W);
+      ok(Math.abs(cross.x - pose.x) < 1e-6 && Math.abs(cross.y - pose.y) < 1e-6, "lead: the hold's drift passes through the scene point");
+      const vL = Math.hypot(hL.b.x - hL.a.x, hL.b.y - hL.a.y) / (hL.to - hL.from);
+      ok(vL > vNext, "lead: the hold drifts faster (it has the lead distance to cover too)");
+      near(posSpeed(gL, gL.to - 0.1, gL.to), vL, 0.03 * vL, "lead: the glide lands at the hold's (faster) drift speed");
+      near(posSpeed(hL, hL.from, hL.from + 0.1), vL, 1e-9, "lead: the hold picks up at exactly that speed");
+      let peakPlain = 0;
+      let peakLead = 0;
+      for (let f = g1.from; f <= g1.to; f += 0.5) {
+        peakPlain = Math.max(peakPlain, posSpeed(g1, f, f + 0.1));
+        peakLead = Math.max(peakLead, posSpeed(gL, f, f + 0.1));
+      }
+      ok(peakLead < peakPlain, "lead: the bump's peak speed is lower (less distance in the same time)");
+      ok(fl.segs[0].a.x === fs.segs[0].a.x, "lead: an intro-less scene 0 still starts on its authored pose");
+      const fi = scheduleWall({ ...fw, flowLand: -lead, intro: true, introHoldSeconds: 0.5 }, 30, W, H);
+      const gi = fi.segs[1];
+      near(gi.b.x, fi.whole.x + (0 - fi.whole.x) * (1 - lead), 1e-9, "lead: with an intro, scene 0 leads along the intro glide too");
+      ok(fi.segs[2].a.x === gi.b.x, "lead: ...and its hold starts there");
+      for (let f = 1; f < fl.total; f++) {
+        const p0 = cameraAt(fl, f - 1, 0, { W, H, breathing: 0 }).cam;
+        const p1 = cameraAt(fl, f, 0, { W, H, breathing: 0 }).cam;
+        ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 450, `lead: no jump at frame ${f}`);
+      }
+      const off = scheduleWall({ ...fw, flow: false, flowLand: -lead }, 30, W, H);
+      ok(off.segs[2].a.x === 3000, "lead: ignored when flow is off (the hold starts on the pose)");
+    }
     // Position continuity across every junction survives the linear holds.
     for (let f = 1; f < fs.total; f++) {
       const p0 = cameraAt(fs, f - 1, 0, { W, H, breathing: 0 }).cam;
@@ -749,7 +794,16 @@ startGroup(10, "sceneFrames land inside their own hold, never 0 by fallback");
         ok(f < s.sceneEnds[i], "a scene with a hold has a non-empty [sceneFrames, sceneEnds)");
         const r = cameraAt(s, f, 0, { W, H, breathing: 0 });
         ok(r.seg.scene === i && r.seg.kind === "hold", `frame sceneFrames[${i}] must resolve to scene ${i}'s hold`);
-        ok(r.cam.x === wall.scenes[i].x && r.cam.zoom === wall.scenes[i].zoom, "and to the authored pose");
+        const glideIn = s.segs.find((g) => g.kind === "glide" && g.scene === i);
+        const lead = wall.flow && glideIn ? Math.max(0, -(wall.flowLand ?? 0.35)) : 0;
+        if (lead > 0) {
+          // FLOW lead: the hold starts `lead` of the way back along the arriving glide's hop.
+          const k = 1 - lead;
+          ok(Math.abs(r.cam.x - (glideIn.a.x + (wall.scenes[i].x - glideIn.a.x) * k)) < 1e-6 && Math.abs(r.cam.zoom - (glideIn.a.zoom + (wall.scenes[i].zoom - glideIn.a.zoom) * k)) < 1e-9, "and (lead) to the point short of the authored pose");
+          ok(glideIn.b.x === r.seg.a.x && glideIn.to === f, "and (lead) the glide landed exactly there");
+        } else {
+          ok(r.cam.x === wall.scenes[i].x && r.cam.zoom === wall.scenes[i].zoom, "and to the authored pose");
+        }
       } else {
         // a "via" scene (holdSeconds 0): the arrival instant, not a fallback to 0
         ok(f === s.sceneEnds[i], `via scene ${i}: sceneFrames == sceneEnds (the arrival instant)`);

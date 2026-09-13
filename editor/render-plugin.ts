@@ -130,6 +130,10 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const crf = Number(options.crf) >= 1 ? Math.max(1, Math.min(51, Math.round(Number(options.crf)))) : 16; // lower = higher quality
     send({
       type: "status",
+      message: `Opening ${concurrency} browser tabs at ${Math.round(composition.width * (draft ? 0.5 : 1))}×${Math.round(composition.height * (draft ? 0.5 : 1))} — the first frames take a moment…`,
+    });
+    send({
+      type: "status",
       message: `Rendering ${composition.durationInFrames} frames (${kind}${draft ? ", draft ½ res" : ""}) · ${concurrency} cores · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
       durationInFrames: composition.durationInFrames,
     });
@@ -142,7 +146,8 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       // GPU-accelerated rendering (ANGLE by default) — big win for filter-heavy comps; switch to
       // SwiftShader (CPU) or "default" if a GPU backend ever fails to launch.
       ...(useGpu ? { chromiumOptions: { gl: gl as "angle" | "swiftshader" } } : {}),
-      onProgress: ({ progress }) => send({ type: "progress", progress }),
+      onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) =>
+        send({ type: "progress", progress, rendered: renderedFrames, encoded: encodedFrames, total: composition.durationInFrames, stage: stitchStage }),
       cancelSignal,
       ...(draft ? { scale: 0.5 } : {}),
       ...(transparent

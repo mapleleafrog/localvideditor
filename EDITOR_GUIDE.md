@@ -113,7 +113,8 @@ not on the wall during it show a hatched outline in the viewport.
 **Camera navigation is not undoable** (pan/zoom/roll is transient); item edits and scene keyframes are.
 
 **Soundtrack.** The inspector's **Soundtrack** section (Wall view) has **🎵 Add soundtrack…** — it imports the file
-and adds a track that starts exactly when the wall does, with a volume slider; ▶ Live and Wall-only renders play it.
+and adds a track that starts exactly when the wall does, with a **start song at** offset (seconds into the song) and a
+volume slider; ▶ Live and Wall-only renders play it.
 The Library's Audio tab still edits trim / offset / BPM for every track in the project.
 
 **Rendering a wall.** Opening the Wall view switches the render picker to **Wall only** (what the view previews); the

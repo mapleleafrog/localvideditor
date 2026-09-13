@@ -721,6 +721,18 @@ export const WallInspector: React.FC = () => {
           (a.from ?? 0) === (starts[ci] ?? 0) ? (
             <Field key={i} label={a.src.split("/").pop() ?? a.src}>
               <div className="wi-row">
+                <span className="muted">start song at</span>
+                <CommitNum
+                  value={Math.round(((a.trimBefore ?? 0) / fps) * 10) / 10}
+                  min={0}
+                  step={0.5}
+                  suffix="s"
+                  title="Skip into the song: the wall's first frame plays the song from this many seconds in"
+                  onCommit={(v) => patchAudio(i, { trimBefore: Math.max(0, Math.round(v * fps)) })}
+                />
+              </div>
+              <div className="wi-row">
+                <span className="muted">volume</span>
                 <Slider value={a.volume ?? 1} min={0} max={1} step={0.05} onChange={(v) => patchAudio(i, { volume: v })} />
                 <button className="del" title="Remove this track" onClick={() => removeAudio(i)}>
                   ×

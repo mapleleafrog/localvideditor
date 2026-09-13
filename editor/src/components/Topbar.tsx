@@ -89,7 +89,15 @@ export const Topbar: React.FC = () => {
         options,
         (msg) => {
           if (msg.type === "status") setRender({ phase: "running", message: msg.message, progress: 0 });
-          else if (msg.type === "progress") setRender({ phase: "running", message: "Rendering…", progress: msg.progress });
+          else if (msg.type === "progress")
+            setRender({
+              phase: "running",
+              message:
+                msg.total != null
+                  ? `${msg.stage === "encoding" ? "Encoding" : "Rendering"} ${msg.rendered ?? 0}/${msg.total} frames${msg.encoded ? ` · ${msg.encoded} encoded` : ""}`
+                  : "Rendering…",
+              progress: msg.progress,
+            });
           else if (msg.type === "done") setRender({ phase: "done", fileName: msg.fileName });
           else if (msg.type === "error") setRender({ phase: "error", message: msg.message });
         },

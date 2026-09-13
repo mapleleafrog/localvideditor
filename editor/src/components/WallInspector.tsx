@@ -333,6 +333,20 @@ export const WallInspector: React.FC = () => {
           <span className="muted wi-lint">amount 1 = +6 % zoom or 140 px of pan over the hold; 0.5 is the default on new scenes.</span>
         </Field>
         <div className="insp-sub wi-subhead">→ Transition into this scene {si > 0 ? `(from scene ${si})` : "(intro)"}</div>
+        {!glideLive && (
+          <span className="muted wi-lint">
+            Intro is off, so nothing glides INTO scene 1 — these settings do nothing. The move from scene 1 to scene 2 lives on
+            scene 2: click its card or the arrow before it.
+            {scenes.length > 1 ? (
+              <>
+                {" "}
+                <button className="muted" onClick={() => { setWallScene(scenes[1].id ?? null); setWallCam(camFromScene(scenes[1])); }}>
+                  open scene 2 →
+                </button>
+              </>
+            ) : null}
+          </span>
+        )}
         <Field label={si === 0 ? "Intro glide in (seconds)" : "Glide duration (seconds)"}>
           <div className="wi-row">
             <CommitNum
@@ -360,6 +374,7 @@ export const WallInspector: React.FC = () => {
         <Field label="Easing (of the glide in)">
           <select
             value={scene.easing}
+            disabled={!glideLive}
             title="smooth = zero acceleration at both ends · cubic nearly doubles peak speed · settle overshoots (use at ≥ 1.0 s)"
             onChange={(e) => patchWallScene(ci, si, { easing: e.target.value as WallScene["easing"] })}
           >
@@ -371,7 +386,7 @@ export const WallInspector: React.FC = () => {
           </select>
         </Field>
         <Field label={`Path arc (${scene.arc})`}>
-          <Slider value={scene.arc} min={-1} max={1} step={0.05} onChange={(v2) => patchWallScene(ci, si, { arc: v2 })} />
+          <Slider value={scene.arc} min={-1} max={1} step={0.05} disabled={!glideLive} onChange={(v2) => patchWallScene(ci, si, { arc: v2 })} />
         </Field>
         <Field label="Scene">
           <div className="wi-row">

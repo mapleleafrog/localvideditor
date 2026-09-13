@@ -49,6 +49,8 @@ export interface WallItemLike {
 
 export interface WallSceneLike {
   id?: string;
+  hover?: string;
+  hoverAmount?: number;
   x?: number;
   y?: number;
   zoom?: number;
@@ -405,6 +407,35 @@ export const sceneCam = (s: WallSceneLike): Cam => ({
   rot: finite(s.rotation, 0),
 });
 
+/** Hover (slow drift during a hold) gains at amount 1: +6 % zoom for a push-in, 140 screen px for
+ *  a pan. Small on purpose — a hover is felt, not seen; the glide is the move. */
+export const HOVER_ZOOM = 0.06;
+export const HOVER_PAN_PX = 140;
+
+/** The pose a scene's hold ENDS on: the authored pose drifted by its hover. Identity when the
+ *  scene has no hover, so a still hold stays bit-exact and every downstream glide is unchanged. */
+export const sceneHoverCam = (s: WallSceneLike): Cam => {
+  const c = sceneCam(s);
+  const k = clamp(finite(s.hoverAmount, 0.5), 0, 1);
+  const pan = (HOVER_PAN_PX * k) / c.zoom; // screen px -> wall units at this zoom
+  switch (s.hover) {
+    case "pushIn":
+      return { ...c, zoom: c.zoom * (1 + HOVER_ZOOM * k) };
+    case "pullOut":
+      return { ...c, zoom: c.zoom / (1 + HOVER_ZOOM * k) };
+    case "left":
+      return { ...c, x: c.x - pan };
+    case "right":
+      return { ...c, x: c.x + pan };
+    case "up":
+      return { ...c, y: c.y - pan };
+    case "down":
+      return { ...c, y: c.y + pan };
+    default:
+      return c;
+  }
+};
+
 const easeIdOf = (v: string | undefined): EaseId =>
   v === "sine" || v === "cubic" || v === "settle" ? v : DEFAULT_EASE;
 
@@ -434,6 +465,9 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
 
   if (scenes.length) {
     const poses = scenes.map(sceneCam);
+    // Where each scene's hold ENDS (its hover drift) — the pose the NEXT glide departs from. A via
+    // scene (hold 0) has no hold segment, so nothing drifts and the glide leaves the authored pose.
+    const ends = scenes.map((s, i) => (holdLen(s.holdSeconds ?? 1.8) > 0 ? sceneHoverCam(s) : poses[i]));
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
       push(
@@ -445,16 +479,17 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       const s = scenes[i];
       if (i > 0) {
         push(
-          { kind: "glide", a: poses[i - 1], b: poses[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false },
+          { kind: "glide", a: ends[i - 1], b: poses[i], easing: easeIdOf(s.easing), arc: clamp(finite(s.arc, 0), -1, 1), scene: i, whole: false },
           glideLen(s.glideSeconds ?? 1.5),
         );
       }
       sceneFrames[i] = cur;
-      push({ kind: "hold", a: poses[i], b: poses[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false }, holdLen(s.holdSeconds ?? 1.8));
+      // A hold drifts from the authored pose to its hover pose (b === a when there is no hover).
+      push({ kind: "hold", a: poses[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false }, holdLen(s.holdSeconds ?? 1.8));
       sceneEnds[i] = cur;
     }
     if (w.outro ?? true) {
-      push(wholeSeg("glide", poses[poses.length - 1], whole, -1), glideLen(w.outroSeconds ?? 2.4));
+      push(wholeSeg("glide", ends[ends.length - 1], whole, -1), glideLen(w.outroSeconds ?? 2.4));
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.outroHoldSeconds ?? 1.5));
     }
   }
@@ -551,11 +586,18 @@ export const LIFT_GAIN = 0.035;
  *  The naive sin(pi*p) has slope pi at both ends and pops the zoom velocity at every edge. */
 export const liftShape = (p: number) => Math.pow(Math.sin(Math.PI * Math.pow(clamp(p), 0.85)), 2);
 
-/** The pose of a segment at a (possibly fractional) frame. Holds return their pose BIT-EXACTLY. */
+/** The pose of a segment at a (possibly fractional) frame. A still hold (a === b) returns its pose
+ *  BIT-EXACTLY; a hovering hold drifts a -> b on the `smooth` curve (zero velocity AND
+ *  acceleration at both ends, so it meets the glides on either side without a shove). */
 export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
   const a = seg.a;
   const b = seg.b;
-  if (seg.kind === "hold") return { x: a.x, y: a.y, zoom: a.zoom, rot: a.rot };
+  if (seg.kind === "hold") {
+    if (a.x === b.x && a.y === b.y && a.zoom === b.zoom && a.rot === b.rot) return { x: a.x, y: a.y, zoom: a.zoom, rot: a.rot };
+    const len = seg.to - seg.from;
+    const p = EASE.smooth(len <= 0 ? 1 : clamp((frame - seg.from) / len));
+    return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p, zoom: a.zoom + (b.zoom - a.zoom) * p, rot: a.rot + shortAngle(a.rot, b.rot) * p };
+  }
   const len = seg.to - seg.from;
   const p = len <= 0 ? 1 : clamp((frame - seg.from) / len);
   const ep = ease(seg.easing, p);

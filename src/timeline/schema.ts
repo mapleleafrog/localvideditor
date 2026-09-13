@@ -122,6 +122,13 @@ const wallSceneSchema = z.object({
   /** Path bow. 0 = provably identical to a straight lerp. Sign picks the side of travel
    *  (+ = left of the direction of travel). Deterministic and LOCAL. */
   arc: z.number().min(-1).max(1).default(0),
+  /** HOVER — a deliberate slow drift DURING the hold (the camera never quite stops): a gentle
+   *  push-in / pull-out or a pan, eased with the same zero-velocity-at-both-ends curve as the
+   *  glides, so it lands and departs seamlessly. The next glide starts from the drifted pose.
+   *  Unset = a bit-exact still hold. Distinct from `breathing` (random handheld tremor). */
+  hover: z.enum(["none", "pushIn", "pullOut", "left", "right", "up", "down"]).optional(),
+  /** 0..1 — at 1 a push-in is +6 % zoom and a pan is 140 screen px over the hold. */
+  hoverAmount: z.number().min(0).max(1).optional(),
 });
 
 export const wallSchema = z.object({

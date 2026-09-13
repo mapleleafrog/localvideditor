@@ -16,9 +16,11 @@
 import React, { useMemo, useState } from "react";
 import { useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { appendedScene, camFromScene, fitDurationPatch, scheduleWall, speedClass, wallFitFor, wallOf } from "../lib/wall-edit";
+import { appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWall, speedClass, wallFitFor, wallOf } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
 import { CommitNum } from "./WallInspector";
+
+const HOVER_LABEL: Record<string, string> = { pushIn: "push in", pullOut: "pull out", left: "drift ←", right: "drift →", up: "drift ↑", down: "drift ↓" };
 
 export const WallScenes: React.FC = () => {
   const project = useEditor((s) => s.project);
@@ -59,7 +61,7 @@ export const WallScenes: React.FC = () => {
   const scenes = wall.scenes ?? [];
 
   /** The pose a scene glides FROM: the previous scene, or the whole-wall fit pose for scene 0. */
-  const prevCam = (i: number) => (i === 0 ? sched.whole : camFromScene(scenes[i - 1]));
+  const prevCam = (i: number) => (i === 0 ? sched.whole : hoverEndCam(scenes[i - 1]));
 
   const setAsScene = () => {
     addWallScene(ci, appendedScene(wall, wallCam));
@@ -236,7 +238,8 @@ export const WallScenes: React.FC = () => {
                   {via ? <span className="muted">via</span> : null}
                 </div>
                 <div className="wsc-meta muted">
-                  @ {startsAt}s{appearing ? ` · +${appearing} appear` : ""}
+                  @ {startsAt}s{s.hover && s.hover !== "none" ? ` · ${HOVER_LABEL[s.hover] ?? s.hover}` : ""}
+                  {appearing ? ` · +${appearing} appear` : ""}
                 </div>
               </div>
             </React.Fragment>

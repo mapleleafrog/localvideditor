@@ -92,6 +92,13 @@ easing, the arc, and a **colour-banded px/frame speed chip** — *"● 35 px/f �
 glide. **⟳ Re-frame** updates the pose from the viewport *keeping the timing*, **▸ Play** plays that scene in Live
 mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). `PgUp`/`PgDn` step scenes.
 
+**The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased
+drift across the hold (push in / pull out / drift left·right·up·down + amount; new scenes default to a gentle
+push-in), (2) the **glide** between scenes (the arrow box on the strip; 1 s by default, `smooth` easing ramps up and
+lands with zero velocity and zero acceleration; easing + arc live in the Scene section), and (3) **Breathing** under
+Wall settings — the random handheld tremor on top of everything, shown in Live only. Hover and breathing are separate
+on purpose: hover is a deliberate move you author per scene, breathing is texture.
+
 **Appear (PowerPoint-style object timing).** Select a photo or prop → **Appear**. *Appears in scene* hides it until
 the camera arrives at that scene, then plays the **Entrance** (fade / slide / zoom / pop / rotate / spin / blur /
 flash / wipe / iris / typewriter, in seconds, with an easing) — add a *Delay* to stagger a cluster. *Leaves after

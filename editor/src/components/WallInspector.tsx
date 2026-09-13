@@ -23,7 +23,7 @@ import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 import { TRANSITION_KINDS, type TransitionKind } from "../../../src/effects/io";
 import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
 import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { camFromScene, hasJapanese, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
+import { camFromScene, hasJapanese, hoverEndCam, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
 import { EffectStack, Field, Section, Slider } from "./fields";
 
@@ -273,7 +273,7 @@ export const WallInspector: React.FC = () => {
   // --- scene panel maths ---
   const scenePanel = (() => {
     if (!scene || si < 0) return null;
-    const a = si === 0 ? sched.whole : camFromScene(scenes[si - 1]);
+    const a = si === 0 ? sched.whole : hoverEndCam(scenes[si - 1]);
     const b = camFromScene(scene);
     const glideLive = si === 0 ? wall.intro : true;
     const v = peakVelocity(a, b, scene.glideSeconds, fps);
@@ -326,7 +326,36 @@ export const WallInspector: React.FC = () => {
             )}
           </div>
         </Field>
-        <Field label="Easing">
+        <Field label="Hover during the hold (the camera never quite stops)">
+          <div className="wi-row">
+            <select
+              value={scene.hover ?? "none"}
+              onChange={(e) => {
+                const v = e.target.value as WallScene["hover"];
+                patchWallScene(ci, si, { hover: v === "none" ? undefined : v });
+              }}
+              title="A slow, eased drift across the hold — push-in is the classic. Breathing (Wall settings) is the random handheld tremor on top."
+            >
+              <option value="none">still</option>
+              <option value="pushIn">push in</option>
+              <option value="pullOut">pull out</option>
+              <option value="left">drift left</option>
+              <option value="right">drift right</option>
+              <option value="up">drift up</option>
+              <option value="down">drift down</option>
+            </select>
+          </div>
+          <Slider
+            value={scene.hoverAmount ?? 0.5}
+            min={0}
+            max={1}
+            step={0.05}
+            disabled={!scene.hover || scene.hover === "none"}
+            onChange={(v2) => patchWallScene(ci, si, { hoverAmount: v2 })}
+          />
+          <span className="muted wi-lint">amount 1 = +6 % zoom or 140 px of pan over the hold; 0.5 is the default on new scenes.</span>
+        </Field>
+        <Field label="Easing (of the glide in)">
           <select
             value={scene.easing}
             title="smooth = zero acceleration at both ends · cubic nearly doubles peak speed · settle overshoots (use at ≥ 1.0 s)"

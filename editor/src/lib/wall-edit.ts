@@ -17,6 +17,7 @@ import {
   fitAll,
   itemBox,
   sceneCam,
+  sceneHoverCam,
   scheduleWall,
   suggestGlideSeconds,
   wallFitFrames,
@@ -60,6 +61,9 @@ export const newWallItem = (patch: Partial<WallItem> = {}): WallItem => ({
   ...patch,
 });
 
+/** New scenes glide in over 1 s by default. */
+export const DEFAULT_GLIDE_SECONDS = 1.0;
+
 export const DEFAULT_SCENE: WallScene = {
   name: "",
   x: 0,
@@ -67,7 +71,7 @@ export const DEFAULT_SCENE: WallScene = {
   zoom: 1,
   rotation: 0,
   holdSeconds: 1.8,
-  glideSeconds: 1.5,
+  glideSeconds: DEFAULT_GLIDE_SECONDS,
   easing: "smooth",
   arc: 0,
 };
@@ -247,6 +251,10 @@ export const speedClass = (v: number) => (v <= 18 ? "ok" : v <= 34 ? "mid" : v <
 export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene => ({
   ...DEFAULT_SCENE,
   id: newSceneId(),
+  // The camera never quite stops: a gentle push-in during the hold (set explicitly on NEW scenes
+  // only, so a scene without the field stays a bit-exact still hold — as before).
+  hover: "pushIn",
+  hoverAmount: 0.5,
   x: cam.x,
   y: cam.y,
   zoom: cam.zoom,
@@ -256,13 +264,18 @@ export const sceneFromCam = (cam: Cam, patch?: Partial<WallScene>): WallScene =>
 
 /** Scene keyframe -> camera (hardened the same way the renderer hardens it). */
 export const camFromScene = (s: WallScene): Cam => sceneCam(s);
+/** Where a scene's hold ENDS (after its hover drift) — what the next glide departs from. */
+export const hoverEndCam = (s: WallScene): Cam => sceneHoverCam(s);
 
 /** What `⊕ Set as scene` appends: the authoring pose, with a glide duration a motion designer would
  *  sign off (`suggestGlideSeconds` targets a peak px/second, so it is fps-independent). */
 export const appendedScene = (wall: Wall, cam: Cam): WallScene => {
   const scenes = wall.scenes ?? [];
   const prev = scenes.length ? camFromScene(scenes[scenes.length - 1]) : cam;
-  return sceneFromCam(cam, { glideSeconds: Math.round(suggestGlideSeconds(prev, cam) * 100) / 100 });
+  // A fixed 1 s glide by default (the user's ask); the speed dot on the strip still offers the
+  // velocity-based suggestion for long moves.
+  void prev;
+  return sceneFromCam(cam, { glideSeconds: DEFAULT_GLIDE_SECONDS });
 };
 
 // ---------------------------------------------------------------------------------------------

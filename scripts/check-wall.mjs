@@ -118,6 +118,8 @@ const randScene = () => ({
   glideSeconds: pick([0, 0.4, 0.8, 1.5, 2.4]),
   easing: pick(["smooth", "sine", "cubic", "settle"]),
   arc: pick([0, 0, 0.6, -0.4, 1, -1]),
+  hover: pick([undefined, "none", "pushIn", "pullOut", "left", "right", "up", "down"]),
+  hoverAmount: pick([undefined, 0, 0.5, 1]),
 });
 // Scene refs on items: unset, a valid id, or a stale id — the renderer must treat stale == unset.
 const withRefs = (items, scenes) =>
@@ -269,6 +271,44 @@ startGroup(3, "bit-exact holds");
       ok(r.cam.x === sc.x && r.cam.y === sc.y && r.cam.zoom === sc.zoom && r.cam.rot === sc.rotation, "a scene hold is the authored pose, bit-exact");
     }
   }
+  // --- hover: a hold with a drift STARTS at the authored pose bit-exactly, ENDS on sceneHoverCam,
+  // and the next glide departs from that drifted pose (no jump at the junction).
+  const { sceneHoverCam, HOVER_ZOOM, HOVER_PAN_PX } = W_;
+  const hov = {
+    items: wall.items,
+    scenes: [
+      { ...wall.scenes[0], hover: "pushIn", hoverAmount: 1 },
+      { ...wall.scenes[1], hover: "left", hoverAmount: 0.5 },
+    ],
+    intro: false,
+    outro: true,
+    outroSeconds: 1.5,
+    outroHoldSeconds: 1,
+  };
+  const hs = scheduleWall(hov, 30, W, H);
+  const holds = hs.segs.filter((g) => g.kind === "hold" && g.scene >= 0);
+  ok(holds.length === 2, "both hovering scenes keep their hold segments");
+  holds.forEach((g, k) => {
+    const sc = hov.scenes[k];
+    const p0 = poseInSeg(g, g.from, W);
+    ok(p0.x === sc.x && p0.y === sc.y && p0.zoom === sc.zoom, "a hovering hold starts at the authored pose, bit-exact");
+    const p1 = poseInSeg(g, g.to, W);
+    const e = sceneHoverCam(sc);
+    near(p1.x, e.x, 1e-9, "a hovering hold ends at sceneHoverCam (x)");
+    near(p1.zoom, e.zoom, 1e-9, "a hovering hold ends at sceneHoverCam (zoom)");
+    const next = hs.segs[hs.segs.indexOf(g) + 1];
+    if (next) ok(next.a.x === g.b.x && next.a.zoom === g.b.zoom, "the next glide departs from the drifted pose");
+  });
+  near(sceneHoverCam(hov.scenes[0]).zoom, hov.scenes[0].zoom * (1 + HOVER_ZOOM), 1e-12, "pushIn at amount 1 is +HOVER_ZOOM");
+  near(sceneHoverCam(hov.scenes[1]).x, hov.scenes[1].x - (HOVER_PAN_PX * 0.5) / hov.scenes[1].zoom, 1e-9, "a pan is HOVER_PAN_PX * amount SCREEN px");
+  const still = sceneHoverCam({ ...wall.scenes[0], hover: "none" });
+  ok(still.zoom === wall.scenes[0].zoom && still.x === wall.scenes[0].x, "hover none is the identity");
+  // Zero velocity at both ends of a hovering hold (it must meet the glides without a shove).
+  const g0 = holds[0];
+  const vMid = segSpeed(g0, (g0.from + g0.to) / 2, W, H);
+  ok(vMid > 0, "a hovering hold moves mid-hold");
+  ok(segSpeed(g0, g0.from, W, H) < 0.01 * vMid && segSpeed(g0, g0.to, W, H) < 0.01 * vMid,
+    "a hovering hold departs and lands at < 1 % of its mid-hold speed (zero endpoint velocity)");
 }
 
 // =============================================================================================

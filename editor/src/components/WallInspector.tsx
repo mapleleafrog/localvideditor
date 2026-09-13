@@ -713,13 +713,30 @@ export const WallInspector: React.FC = () => {
         </div>
       )}
 
-      <Section title="Soundtrack" defaultOpen={false} badge={(project.audio ?? []).filter((a) => (a.from ?? 0) === (starts[ci] ?? 0)).length || undefined}>
-        {/* Tracks aligned to THIS wall's start (the Audio tab lists every track in the project). A
-            track added here starts exactly when the wall does, so Wall-only render and ▶ Live play
-            it from its first beat. */}
-        {(project.audio ?? []).map((a, i) =>
-          (a.from ?? 0) === (starts[ci] ?? 0) ? (
+      <Section title="Soundtrack" defaultOpen={false} badge={(project.audio ?? []).length || undefined}>
+        {/* Every track in the project, with where it sits relative to THIS wall. A track that does
+            not start with the wall can be aligned in one click; "start song at" is the offset INTO
+            the song (the Audio tab's "trim in", here in seconds). */}
+        {(project.audio ?? []).map((a, i) => {
+          const wallStart = starts[ci] ?? 0;
+          const off = (a.from ?? 0) - wallStart;
+          const aligned = off === 0;
+          return (
             <Field key={i} label={a.src.split("/").pop() ?? a.src}>
+              <div className="wi-row">
+                {aligned ? (
+                  <span className="muted">▸ starts with the wall</span>
+                ) : (
+                  <>
+                    <span className="wi-warn">
+                      starts {off > 0 ? `${secs(off / fps)}s after` : `${secs(-off / fps)}s before`} the wall
+                    </span>
+                    <button onClick={() => patchAudio(i, { from: wallStart })} title="Move this track so it starts on the wall's first frame">
+                      ⇤ align to wall
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="wi-row">
                 <span className="muted">start song at</span>
                 <CommitNum
@@ -727,9 +744,12 @@ export const WallInspector: React.FC = () => {
                   min={0}
                   step={0.5}
                   suffix="s"
-                  title="Skip into the song: the wall's first frame plays the song from this many seconds in"
+                  title="Offset INTO the song: 30 = the wall's first frame plays the song from 0:30"
                   onCommit={(v) => patchAudio(i, { trimBefore: Math.max(0, Math.round(v * fps)) })}
                 />
+                <span className="muted">
+                  ({Math.floor((a.trimBefore ?? 0) / fps / 60)}:{String(Math.floor(((a.trimBefore ?? 0) / fps) % 60)).padStart(2, "0")} of the song)
+                </span>
               </div>
               <div className="wi-row">
                 <span className="muted">volume</span>
@@ -739,8 +759,8 @@ export const WallInspector: React.FC = () => {
                 </button>
               </div>
             </Field>
-          ) : null,
-        )}
+          );
+        })}
         <Field label="Add a song (starts with the wall)">
           <button onClick={() => audioRef.current?.click()}>🎵 Add soundtrack…</button>
           <input
@@ -764,8 +784,7 @@ export const WallInspector: React.FC = () => {
             }}
           />
           <span className="muted wi-lint">
-            Plays in ▶ Live and in Wall-only renders. Trim / offset / BPM live in the Library's Audio tab. Tracks
-            starting elsewhere in the timeline are listed there, not here.
+            Plays in ▶ Live and in Wall-only renders. BPM and the frame-exact fields live in the Library's Audio tab.
           </span>
         </Field>
       </Section>

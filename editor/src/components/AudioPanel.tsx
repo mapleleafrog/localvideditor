@@ -132,22 +132,33 @@ export const AudioPanel: React.FC = () => {
             <span className="muted">{Math.round((a.volume ?? 1) * 100)}%</span>
           </div>
           <div className="fld">
-            <label>Start (frame)</label>
-            <input
-              type="number"
-              min={0}
-              value={a.from}
-              onChange={(e) => patchAudio(i, { from: Math.max(0, +e.target.value) })}
-            />
+            <label>Starts playing at (timeline frame · seconds)</label>
+            <div className="wi-row">
+              <input type="number" min={0} value={a.from} onChange={(e) => patchAudio(i, { from: Math.max(0, +e.target.value) })} />
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={Math.round(((a.from ?? 0) / fps) * 10) / 10}
+                onChange={(e) => patchAudio(i, { from: Math.max(0, Math.round(+e.target.value * fps)) })}
+              />
+              <span className="muted">s</span>
+            </div>
           </div>
           <div className="fld">
-            <label>Trim in (frames)</label>
-            <input
-              type="number"
-              min={0}
-              value={a.trimBefore ?? 0}
-              onChange={(e) => patchAudio(i, { trimBefore: Math.max(0, +e.target.value) })}
-            />
+            <label>Start the song from (offset into the file · frames · seconds)</label>
+            <div className="wi-row">
+              <input type="number" min={0} value={a.trimBefore ?? 0} onChange={(e) => patchAudio(i, { trimBefore: Math.max(0, +e.target.value) })} />
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                value={Math.round(((a.trimBefore ?? 0) / fps) * 10) / 10}
+                onChange={(e) => patchAudio(i, { trimBefore: Math.max(0, Math.round(+e.target.value * fps)) })}
+              />
+              <span className="muted">s</span>
+            </div>
+            <span className="lib-hint">e.g. 30 = the track opens at 0:30 of the song.</span>
           </div>
           <div className="fld">
             <label>Loop to fill</label>

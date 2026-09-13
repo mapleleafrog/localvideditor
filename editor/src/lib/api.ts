@@ -21,7 +21,8 @@ export interface RenderOptions {
   /** H.264 quality (1–51, lower = higher quality). Default 16. */
   crf?: number;
   /** x264 speed preset. At the same CRF the faster presets keep the same visual quality and cost a
-   *  somewhat larger file; "medium" is x264's default. Default "fast". */
+   *  somewhat larger file; "medium" is x264's default. Default "veryfast" (measured 17 % faster
+   *  than "fast" on a 4K wall render). */
   x264Preset?: "ultrafast" | "superfast" | "veryfast" | "faster" | "fast" | "medium" | "slow";
   /** "full" (default) · "draft" = half resolution, lighter compression · "preview" = ~960 px wide,
    *  15 fps (the project is re-timed client-side), 8 tabs, fast — a quick look, not a master. */

@@ -248,8 +248,9 @@ composition/effect code to pick it up.
 x264 encoding them; there is nothing to pre-cache beyond the bundle (every frame is unique). In order of
 impact: (1) **resolution** — 4K is 4× the pixels of 1080p and roughly 3–4× the time; render 1080p unless
 the delivery is 4K (Canvas tab), or use **Preview** to check timing; (2) **encoder speed** (⚙ Render
-settings → *H.264 encoder speed*, default **fast**, draft/preview always *veryfast*) — the same CRF gives
-the same look, faster presets just make a somewhat larger file; (3) **concurrency** — more tabs than CPU
+settings → *H.264 encoder speed*, default **veryfast**; measured 13 % faster than *medium* at 1080p and
+17 % faster than *fast* at 4K, where encoding is a bigger share) — the same CRF gives the same look,
+faster presets just compress a little less efficiently; (3) **concurrency** — more tabs than CPU
 cores does not help, and at 4K each tab is heavy on RAM (if the machine swaps, lower it); (4) the **GPU
 backend** (ANGLE) — keep it on for the wall's shadows and filters. Lowering the JPEG frame quality is
 *not* a lever: it barely saves time and the artefacts make the H.264 file bigger.

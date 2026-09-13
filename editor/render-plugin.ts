@@ -137,7 +137,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     // efficiently (bigger file). Draft/preview always take the fastest sensible one.
     const PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow"] as const;
     type Preset = (typeof PRESETS)[number];
-    const x264Preset: Preset = draft ? "veryfast" : PRESETS.includes(options.x264Preset) ? (options.x264Preset as Preset) : "fast";
+    const x264Preset: Preset = draft ? "veryfast" : PRESETS.includes(options.x264Preset) ? (options.x264Preset as Preset) : "veryfast";
     send({
       type: "status",
       message: `Opening ${concurrency} browser tabs at ${Math.round(composition.width * scale)}×${Math.round(composition.height * scale)} — the first frames take a moment…`,

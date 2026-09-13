@@ -69,8 +69,6 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   const fps = project.fps ?? 30;
   // Measured only in Live mode — while arranging, the derived project has no audio at all, so
   // there is nothing to size against and no reason to fetch the song.
-  const audioTracks = useMemo(() => (live ? (liveProj.audio ?? []) : []), [live, liveProj.audio]);
-  const audioEnd = useAudioEnd(audioTracks, fps);
   // Live plays the real take at the real size; overscan is an arranging aid only.
   const k = live ? 1 : overscan;
   const fit = useContainFit(wrapRef, compW * k, compH * k);
@@ -90,6 +88,8 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
     () => (valid && wallClip != null ? (liveWallProject(project, wallClip) ?? project) : project),
     [valid, project, wallClip],
   );
+  const audioTracks = useMemo(() => (live ? (liveProj.audio ?? []) : []), [live, liveProj.audio]);
+  const audioEnd = useAudioEnd(audioTracks, fps);
   const wallClips = project.clips.map((c, i) => ({ c, i })).filter(({ c }) => c.type === "wall");
 
   // Adopt a wall clip when the view opens on none (or on one that has gone away).

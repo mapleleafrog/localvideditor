@@ -187,6 +187,19 @@ export const WallScenes: React.FC = () => {
         >
           <input type="checkbox" checked={!!wall.flow} onChange={(e) => patchWall(ci, { flow: e.target.checked || undefined })} /> flow
         </label>
+        {wall.flow ? (
+          <span className="wsc-defaults" title="Landing: how much of each glide is spent coasting at the arrival drift speed BEFORE the scene point — the fast part ends early and the camera eases the rest of the way in slowly. 0 = only meets the drift speed at the last frame.">
+            <span className="muted">land</span>
+            <CommitNum
+              value={Math.round((wall.flowLand ?? 0.35) * 100)}
+              min={0}
+              max={60}
+              step={5}
+              suffix="%"
+              onCommit={(n) => patchWall(ci, { flowLand: Math.max(0, Math.min(0.6, n / 100)) })}
+            />
+          </span>
+        ) : null}
         <label className="wsc-check">
           <input type="checkbox" checked={wall.intro} onChange={(e) => patchWall(ci, { intro: e.target.checked })} /> intro
         </label>

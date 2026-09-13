@@ -65,6 +65,7 @@ export interface WallLike {
   items?: WallItemLike[];
   scenes?: WallSceneLike[];
   flow?: boolean;
+  flowLand?: number;
   intro?: boolean;
   introHoldSeconds?: number;
   outro?: boolean;
@@ -399,6 +400,8 @@ export interface WallSeg {
    *  carry velocity instead of stopping. Both 0 == the `smooth` curve exactly. */
   va?: number;
   vb?: number;
+  /** FLOW mode — glide: fraction of the segment (at the END) spent coasting at slope `vb`. */
+  coast?: number;
 }
 
 /** Quintic Hermite progress curve: p(0)=0, p(1)=1, p'(0)=a, p'(1)=b, p''(0)=p''(1)=0. With
@@ -411,6 +414,44 @@ export const hermiteFlow = (t: number, a: number, b: number): number => {
   return A * p + (10 - 6 * A - 4 * B) * p ** 3 + (-15 + 8 * A + 7 * B) * p ** 4 + (6 - 3 * A - 3 * B) * p ** 5;
 };
 
+/** Approach pace at the start of the landing (and end of the takeoff), as a fraction of the
+ *  glide's average pace. The landing then decelerates smoothly from this to the drift speed. */
+export const FLOW_APPROACH = 0.3;
+
+/** ∫₀ᵘ smoothstep = u³ − u⁴/2 — the distance covered while the speed eases from s0 to s1. */
+const smoothInt = (u: number) => u * u * u - (u * u * u * u) / 2;
+
+/** The flow glide curve, three phases in normalised time:
+ *    takeoff  [0, Ct)      speed eases a  -> s0   (quick: Ct = coast/3, only after a drifting hold)
+ *    bump     [Ct, 1-C)    quintic Hermite from slope s0 to slope s0 — the fast part
+ *    landing  [1-C, 1]     speed eases s0 -> b    (the slow approach INTO the scene point)
+ *  where s0 = b + (1-b)·FLOW_APPROACH. Speed is continuous everywhere and its derivative is 0 at
+ *  every phase boundary (smoothstep speed ramps + p''=0 Hermite ends), so the camera reaches the
+ *  slow approach pace EARLY and eases the rest of the way in, never stopping. Endpoint slopes are
+ *  exactly `a` and `b`, so both junctions still match the holds. With a = b = 0 it IS `smooth`. */
+export const flowCurve = (t: number, a: number, b: number, coast: number): number => {
+  const p = clamp(t);
+  const A = clamp(a, 0, 1);
+  const B = clamp(b, 0, 1);
+  const C = B > 0 ? clamp(coast, 0, 0.6) : 0; // landing time fraction
+  const Ct = A > 0 ? C / 3 : 0; // takeoff time fraction
+  if (C <= 0 && Ct <= 0) return hermiteFlow(p, A, B);
+  const s0 = B + (1 - B) * FLOW_APPROACH;
+  const dT = Ct * (A + s0) / 2; // distance covered by the takeoff
+  const dL = C * (s0 + B) / 2; // ... by the landing
+  const TB = 1 - Ct - C; // bump time
+  const dB = Math.max(1e-6, 1 - dT - dL); // bump distance
+  if (p < Ct) {
+    const u = p / Ct;
+    return Ct * (A * u + (s0 - A) * smoothInt(u));
+  }
+  if (p >= 1 - C) {
+    const u = (p - (1 - C)) / C;
+    return dT + dB + C * (s0 * u + (B - s0) * smoothInt(u));
+  }
+  const sB = clamp((s0 * TB) / dB, 0, 1); // the bump's endpoint slopes, in its own box
+  return dT + dB * hermiteFlow((p - Ct) / TB, Ct > 0 ? sB : clamp((A * TB) / dB, 0, 1), sB);
+};
 export interface WallSchedule {
   segs: WallSeg[];
   total: number;
@@ -519,16 +560,17 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       const vy = (ends[i].y - poses[i].y) / holdFrames[i];
       return Math.max(0, vx * dirX + vy * dirY);
     };
+    const coast = clamp(finite(w.flowLand, 0.35), 0, 0.6);
     const flowSlopes = (from: Cam, to: Cam, frames: number, prevScene: number, nextScene: number) => {
       if (!flow || frames <= 0) return {};
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const L = Math.hypot(dx, dy);
-      if (L < 1e-6) return { va: 0, vb: 0 };
+      if (L < 1e-6) return { va: 0, vb: 0, coast };
       const ux = dx / L;
       const uy = dy / L;
       // slope in progress-per-normalised-time = (wall units / frame) * frames / L
-      return { va: clamp((driftSpeedAlong(prevScene, ux, uy) * frames) / L, 0, 1), vb: clamp((driftSpeedAlong(nextScene, ux, uy) * frames) / L, 0, 1) };
+      return { va: clamp((driftSpeedAlong(prevScene, ux, uy) * frames) / L, 0, 1), vb: clamp((driftSpeedAlong(nextScene, ux, uy) * frames) / L, 0, 1), coast };
     };
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
@@ -664,7 +706,7 @@ export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
   }
   const len = seg.to - seg.from;
   const p = len <= 0 ? 1 : clamp((frame - seg.from) / len);
-  const ep = seg.va != null || seg.vb != null ? hermiteFlow(p, seg.va ?? 0, seg.vb ?? 0) : ease(seg.easing, p);
+  const ep = seg.va != null || seg.vb != null ? flowCurve(p, seg.va ?? 0, seg.vb ?? 0, seg.coast ?? 0) : ease(seg.easing, p);
 
   // (a) position + arc — quadratic Bezier; arc 0 collapses ALGEBRAICALLY to lerp.
   const Dx = b.x - a.x;

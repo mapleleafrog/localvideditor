@@ -145,6 +145,7 @@ const randWall = (nItems, nScenes) => {
   fitPadding: pick([0, 0.06, 0.12, 0.3]),
   breathing: 0,
   flow: rnd() < 0.4,
+  flowLand: pick([undefined, 0, 0.35, 0.6]),
   };
 };
 
@@ -390,13 +391,43 @@ startGroup(3, "bit-exact holds");
     near(posSpeed(g1, g1.to - 0.1, g1.to), vNext, 0.03 * vNext, "flow: the glide lands at the next hold's drift speed");
     near(posSpeed(h1, h1.from, h1.from + 0.1), vNext, 1e-9, "flow: the next hold picks up at exactly that speed");
     ok(segSpeed(g1, (g1.from + g1.to) / 2, W, H) > 3 * vHold, "flow: the middle of the glide is much faster than the drift");
+    // Landing: with flowLand 0.35 the last 35 % of the glide is a smooth DECELERATION from the
+    // approach pace down to the drift speed — monotonically slower, ending exactly at the drift.
+    const fc = scheduleWall({ ...fw, flowLand: 0.35 }, 30, W, H);
+    const gc = fc.segs[1];
+    const hc = fc.segs[2];
+    const vN = Math.hypot(hc.b.x - hc.a.x, hc.b.y - hc.a.y) / (hc.to - hc.from);
+    const gl = gc.to - gc.from;
+    const at = (frac) => posSpeed(gc, gc.from + gl * frac, gc.from + gl * frac + 0.05);
+    const v66 = at(0.66);
+    const v80 = at(0.8);
+    const v92 = at(0.92);
+    const v99 = at(0.995);
+    ok(v66 > v80 && v80 > v92 && v92 > v99, "flow land: speed falls monotonically through the landing");
+    near(v99, vN, 0.06 * vN + 0.02, "flow land: the landing ends at the drift speed");
+    ok(v66 < 0.5 * posSpeed(gc, gc.from + gl * 0.4, gc.from + gl * 0.4 + 0.05), "flow land: the landing starts well below the bump's speed");
+    ok(v66 > 3 * vN, "flow land: but the approach is still a visible glide, not the crawl");
+    const { flowCurve } = W_;
+    for (const [A, B, C] of [[0.02, 0.03, 0.35], [0, 0.5, 0.6], [1, 1, 0.3], [0.1, 0, 0.5]]) {
+      ok(flowCurve(0, A, B, C) === 0 && Math.abs(flowCurve(1, A, B, C) - 1) < 1e-12, "flowCurve hits 0 and 1 exactly");
+      let prev = 0;
+      for (let i = 1; i <= 1000; i++) {
+        const v = flowCurve(i / 1000, A, B, C);
+        ok(v >= prev - 1e-12, `flowCurve is monotonic (a=${A}, b=${B}, c=${C})`);
+        prev = v;
+      }
+      const hh = 1e-5;
+      near((flowCurve(hh, A, B, C) - 0) / hh, A, 1e-3, "flowCurve'(0) = a");
+      near((1 - flowCurve(1 - hh, A, B, C)) / hh, B, 1e-3, "flowCurve'(1) = b");
+    }
+    for (let i = 0; i <= 100; i++) near(flowCurve(i / 100, 0, 0, 0.35), EASE.smooth(i / 100), 1e-12, "flowCurve with still holds IS smooth");
     ok(h2.kind === "hold" && h2.a.x === h2.b.x, "flow: the last scene (nowhere to creep, no outro) is still");
     ok(g2.vb === 0, "flow: a glide into a still hold lands at zero");
     // Position continuity across every junction survives the linear holds.
     for (let f = 1; f < fs.total; f++) {
       const p0 = cameraAt(fs, f - 1, 0, { W, H, breathing: 0 }).cam;
       const p1 = cameraAt(fs, f, 0, { W, H, breathing: 0 }).cam;
-      ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 200, `flow: no jump at frame ${f}`);
+      ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 450, `flow: no jump at frame ${f}`);
     }
   }
   const still = sceneHoverCam({ ...wall.scenes[0], hover: "none" });

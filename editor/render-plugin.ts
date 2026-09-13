@@ -84,6 +84,17 @@ const qparam = (req: IncomingMessage, key: string) =>
 async function handleRender(req: IncomingMessage, res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" });
   const send = (msg: unknown) => res.write(JSON.stringify(msg) + "\n");
+  // ✕ Cancel in the editor aborts the fetch; the closed request cancels the render (the browser
+  // tabs are torn down and the partial file is discarded by Remotion).
+  const { makeCancelSignal } = await import("@remotion/renderer");
+  const { cancelSignal, cancel } = makeCancelSignal();
+  let cancelled = false;
+  req.on("close", () => {
+    if (!res.writableEnded) {
+      cancelled = true;
+      cancel();
+    }
+  });
   try {
     const body = await readJsonBody(req);
     const project = body?.project ?? body;
@@ -97,17 +108,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     if (transparent) inputProps = { ...inputProps, background: { ...(project.background ?? {}), type: "none" } };
     if (overlaysOnly) inputProps = { ...inputProps, clips: [] };
 
-    const { selectComposition, renderMedia, ensureBrowser, makeCancelSignal } = await import("@remotion/renderer");
-    // ✕ Cancel in the editor aborts the fetch; the closed request cancels the render (the browser
-    // tabs are torn down and the partial file is discarded by Remotion).
-    const { cancelSignal, cancel } = makeCancelSignal();
-    let cancelled = false;
-    req.on("close", () => {
-      if (!res.writableEnded) {
-        cancelled = true;
-        cancel();
-      }
-    });
+    const { selectComposition, renderMedia, ensureBrowser } = await import("@remotion/renderer");
     // Draft: half resolution, lighter compression — a quick look, not a master.
     const draft = !!options.draft;
     send({ type: "status", message: "Preparing browser…" });

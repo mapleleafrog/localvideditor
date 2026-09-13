@@ -20,8 +20,9 @@ export interface RenderOptions {
   gl?: string;
   /** H.264 quality (1–51, lower = higher quality). Default 16. */
   crf?: number;
-  /** Quick look: half resolution, lighter compression, "-draft" in the file name. */
-  draft?: boolean;
+  /** "full" (default) · "draft" = half resolution, lighter compression · "preview" = ~960 px wide,
+   *  15 fps (the project is re-timed client-side), 8 tabs, fast — a quick look, not a master. */
+  quality?: "full" | "draft" | "preview";
 }
 
 /** POST the project + render options to the dev-server endpoint and stream NDJSON progress. */

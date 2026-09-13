@@ -109,8 +109,10 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     if (overlaysOnly) inputProps = { ...inputProps, clips: [] };
 
     const { selectComposition, renderMedia, ensureBrowser } = await import("@remotion/renderer");
-    // Draft: half resolution, lighter compression — a quick look, not a master.
-    const draft = !!options.draft;
+    // Quality tiers. draft = half res; preview = ~960 px wide + fewer tabs (the client already
+    // halved the fps). Neither is a master.
+    const quality = options.quality === "draft" || options.quality === "preview" ? options.quality : "full";
+    const draft = quality !== "full";
     send({ type: "status", message: "Preparing browser…" });
     await ensureBrowser();
     send({ type: "status", message: "Bundling composition…" });
@@ -120,21 +122,24 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     await fs.mkdir(OUT_DIR, { recursive: true });
     const ext = transparent ? "mov" : "mp4";
     const tag = overlaysOnly ? "overlays" : options.wallOnly ? (transparent ? "wall-prores" : "wall") : transparent ? "alpha" : "video";
-    const fileName = `timeline-${tag}${draft ? "-draft" : ""}-${stamp()}.${ext}`;
+    const fileName = `timeline-${tag}${quality === "full" ? "" : `-${quality}`}-${stamp()}.${ext}`;
     const outputLocation = join(OUT_DIR, fileName);
     const kind = transparent ? "transparent ProRes" : "H.264";
     // Render-machine controls (overridable from the editor's Render settings).
-    const concurrency = Math.max(1, Number(options.concurrency) || cpus().length); // 0/unset → all cores
+    // Preview caps the tab count: every tab loads every photo before its first frame, so 24 tabs
+    // at once is the slow START the user perceives as "stuck"; 8 tabs start ~3× sooner.
+    const concurrency = Math.min(quality === "preview" ? 8 : Infinity, Math.max(1, Number(options.concurrency) || cpus().length)); // 0/unset → all cores
+    const scale = quality === "preview" ? Math.min(1, 960 / composition.width) : quality === "draft" ? 0.5 : 1;
     const gl = (typeof options.gl === "string" && options.gl) || "angle"; // "angle" | "swiftshader" | "default"
     const useGpu = gl !== "default";
     const crf = Number(options.crf) >= 1 ? Math.max(1, Math.min(51, Math.round(Number(options.crf)))) : 16; // lower = higher quality
     send({
       type: "status",
-      message: `Opening ${concurrency} browser tabs at ${Math.round(composition.width * (draft ? 0.5 : 1))}×${Math.round(composition.height * (draft ? 0.5 : 1))} — the first frames take a moment…`,
+      message: `Opening ${concurrency} browser tabs at ${Math.round(composition.width * scale)}×${Math.round(composition.height * scale)} — the first frames take a moment…`,
     });
     send({
       type: "status",
-      message: `Rendering ${composition.durationInFrames} frames (${kind}${draft ? ", draft ½ res" : ""}) · ${concurrency} cores · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
+      message: `Rendering ${composition.durationInFrames} frames @ ${composition.fps} fps (${kind}${quality === "full" ? "" : `, ${quality}`}) · ${concurrency} tabs · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
       durationInFrames: composition.durationInFrames,
     });
     await renderMedia({
@@ -149,11 +154,11 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) =>
         send({ type: "progress", progress, rendered: renderedFrames, encoded: encodedFrames, total: composition.durationInFrames, stage: stitchStage }),
       cancelSignal,
-      ...(draft ? { scale: 0.5 } : {}),
+      ...(scale !== 1 ? { scale } : {}),
       ...(transparent
         ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
         : // H.264: max-quality frame capture (jpegQuality 100) + configurable CRF, software x264.
-          { codec: "h264" as const, jpegQuality: draft ? 80 : 100, crf: draft ? Math.max(crf, 26) : crf }),
+          { codec: "h264" as const, jpegQuality: quality === "preview" ? 60 : draft ? 80 : 100, crf: quality === "preview" ? Math.max(crf, 30) : draft ? Math.max(crf, 26) : crf }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {

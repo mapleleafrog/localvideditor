@@ -3,7 +3,7 @@ import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave, migrate } from "
 import type { Project } from "../../../src/timeline/schema";
 import { renderVideo, saveProjectFile, deleteProject } from "../lib/api";
 import { ensureProjectName, safeName } from "../lib/names";
-import { firstWallClip, newWallClip, newWallProject, wallOnlyProject } from "../lib/wall-edit";
+import { firstWallClip, newWallClip, newWallProject, wallOnlyProject, withFps } from "../lib/wall-edit";
 
 type RenderState =
   | { phase: "idle" }
@@ -25,7 +25,9 @@ export const Topbar: React.FC = () => {
   const [mode, setMode] = useState<Mode>("mp4");
   const wallOnly = mode === "wall" || mode === "wall-prores";
   const isMov = mode !== "mp4" && mode !== "wall";
-  const [draft, setDraft] = useState(false);
+  type Quality = "full" | "draft" | "preview";
+  const [quality, setQuality] = useState<Quality>("full");
+  const draft = quality !== "full";
   const abortRef = useRef<AbortController | null>(null);
   // Opening the Wall view flips a still-default picker to "Wall only" — the thing the Wall view
   // previews. (Only from the plain default, so a deliberate choice is never overridden.)
@@ -70,6 +72,10 @@ export const Topbar: React.FC = () => {
       }
       toRender = reduced;
     }
+    // Preview: half the frame rate too (15 fps) — the wall's schedule is in seconds, so it re-fits
+    // exactly; overlays/audio scale linearly. Only for wall-only renders: a footage clip's trims
+    // are source frames and would not survive a re-time.
+    if (quality === "preview" && wallOnly) toRender = withFps(toRender, Math.max(10, Math.round((toRender.fps ?? 30) / 2)));
     const options = {
       transparent: mode === "alpha" || mode === "overlays",
       overlaysOnly: mode === "overlays",
@@ -79,7 +85,7 @@ export const Topbar: React.FC = () => {
       concurrency,
       gl,
       crf,
-      draft,
+      quality,
     };
     const ac = new AbortController();
     abortRef.current = ac;
@@ -281,9 +287,17 @@ export const Topbar: React.FC = () => {
         <option value="wall">Wall only · MP4</option>
         <option value="wall-prores">Wall only · ProRes 4444 (master)</option>
       </select>
-      <label className="render-draft" title="Quick look: half resolution and lighter compression — several times faster. File name gets -draft.">
-        <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} disabled={render.phase === "running"} /> draft
-      </label>
+      <select
+        className="render-mode"
+        value={quality}
+        onChange={(e) => setQuality(e.target.value as Quality)}
+        disabled={render.phase === "running"}
+        title="Full = the master. Draft = half resolution. Preview = ~960 px wide, 15 fps (wall-only), 8 tabs — starts fast, renders fast, looks like the editor preview."
+      >
+        <option value="full">Full quality</option>
+        <option value="draft">Draft · ½ res</option>
+        <option value="preview">Preview · ¼ res · 15 fps · fast</option>
+      </select>
       <span className="render-settings-wrap">
         <button onClick={() => setShowSettings((s) => !s)} title="Render settings" className={showSettings ? "on" : ""}>⚙</button>
         {showSettings && (
@@ -312,7 +326,7 @@ export const Topbar: React.FC = () => {
         )}
       </span>
       <button className="primary" onClick={onRender} disabled={render.phase === "running"}>
-        {render.phase === "running" ? "Rendering…" : `⏺ Render ${isMov ? ".mov" : "MP4"}${draft ? " draft" : ""}`}
+        {render.phase === "running" ? "Rendering…" : `⏺ Render ${isMov ? ".mov" : "MP4"}${draft ? ` ${quality}` : ""}`}
       </button>
     </header>
   );

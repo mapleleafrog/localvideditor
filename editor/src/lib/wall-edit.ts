@@ -446,6 +446,40 @@ export const liveWallProject = (p: Project, ci: number): Project | null => {
   return r ? { ...r, overlays: [] } : null;
 };
 
+/** Re-time a project to `fps` (used by the preview render: 15 fps = half the frames). Every
+ *  frame-denominated field is scaled by the ratio; a wall clip is re-fit from its schedule (the
+ *  schedule is in SECONDS, so it lands exactly). Overlays, audio and clip trims scale linearly. */
+export const withFps = (p: Project, fps: number): Project => {
+  const from = p.fps ?? 30;
+  if (fps === from) return p;
+  const r = fps / from;
+  const f = (n: number | undefined) => (n == null ? n : Math.max(0, Math.round(n * r)));
+  const W = p.width ?? 1920;
+  const H = p.height ?? 1080;
+  return {
+    ...p,
+    fps,
+    durationInFrames: p.durationInFrames ? Math.max(1, Math.round(p.durationInFrames * r)) : p.durationInFrames,
+    beatOffsetInFrames: f(p.beatOffsetInFrames) ?? p.beatOffsetInFrames,
+    clips: (p.clips ?? []).map((c) => ({
+      ...c,
+      durationInFrames: c.type === "wall" && c.wall ? Math.max(1, wallFitFrames(hardenWall(c.wall), fps, W, H)) : Math.max(1, Math.round(c.durationInFrames * r)),
+      transitionDurationInFrames: Math.max(1, Math.round(c.transitionDurationInFrames * r)),
+      trimBefore: f(c.trimBefore) ?? 0,
+      trimAfter: f(c.trimAfter) ?? 0,
+    })),
+    overlays: (p.overlays ?? []).map((o) => ({
+      ...o,
+      from: f(o.from) ?? 0,
+      durationInFrames: Math.max(1, Math.round(o.durationInFrames * r)),
+      windowInFrames: Math.max(1, Math.round(o.windowInFrames * r)),
+      enterDurationInFrames: f(o.enterDurationInFrames) ?? o.enterDurationInFrames,
+      exitDurationInFrames: f(o.exitDurationInFrames) ?? o.exitDurationInFrames,
+    })),
+    audio: (p.audio ?? []).map((a) => ({ ...a, from: f(a.from) ?? 0, trimBefore: f(a.trimBefore) ?? 0, trimAfter: f(a.trimAfter) ?? 0 })),
+  };
+};
+
 // ---------------------------------------------------------------------------------------------
 // The authoring loupe (design §0.4).
 // ---------------------------------------------------------------------------------------------

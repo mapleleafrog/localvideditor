@@ -468,6 +468,93 @@ startGroup(3, "bit-exact holds");
       const off = scheduleWall({ ...fw, flow: false, flowLand: -lead }, 30, W, H);
       ok(off.segs[2].a.x === 3000, "lead: ignored when flow is off (the hold starts on the pose)");
     }
+    // HEADING continuity: a flow hold is a cubic Hermite whose tangents point along the arriving
+    // and departing glides, so on a 90-degree turn the camera lands heading +x, bends through the
+    // scene and leaves heading +y — the velocity VECTOR (not just its speed) is continuous at both
+    // junctions. Collinear tangents collapse to the straight line exactly.
+    {
+      const turn = {
+        items: wall.items,
+        scenes: [
+          { x: 0, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0, hover: "toward", hoverAmount: 1 },
+          { x: 3000, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0, hover: "toward", hoverAmount: 1 },
+          { x: 3000, y: 3000, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0, hover: "toward", hoverAmount: 1 },
+        ],
+        intro: false,
+        outro: false,
+        flow: true,
+        flowLand: -0.1,
+      };
+      const ts = scheduleWall(turn, 30, W, H);
+      const gA = ts.segs[1];
+      const hB = ts.segs[2];
+      const gB = ts.segs[3];
+      ok(hB.kind === "hold" && hB.m0 && hB.m1, "turn: the flow hold carries Hermite tangents");
+      const vel = (seg, f) => {
+        const P0 = poseInSeg(seg, f, W);
+        const P1 = poseInSeg(seg, f + 0.01, W);
+        return { x: (P1.x - P0.x) / 0.01, y: (P1.y - P0.y) / 0.01 };
+      };
+      const vIn = vel(gA, gA.to - 0.01);
+      const vH0 = vel(hB, hB.from);
+      const vH1 = vel(hB, hB.to - 0.01);
+      const vOut = vel(gB, gB.from);
+      const mag = (v) => Math.hypot(v.x, v.y);
+      // (finite differences over 0.01 frame: headings are exact to ~1e-4 of the speed)
+      ok(vH0.x > 0 && Math.abs(vH0.y) < 1e-3 * mag(vH0), "turn: the hold departs heading +x (the arriving glide's heading)");
+      ok(vH1.y > 0 && Math.abs(vH1.x) < 1e-3 * mag(vH1), "turn: the hold ends heading +y (the departing glide's heading)");
+      ok(mag({ x: vIn.x - vH0.x, y: vIn.y - vH0.y }) < 0.04 * mag(vH0), "turn: the velocity VECTOR is continuous at the landing");
+      ok(mag({ x: vOut.x - vH1.x, y: vOut.y - vH1.y }) < 0.04 * mag(vH1), "turn: ...and at the departure");
+      near(mag(vH0), Math.hypot(hB.b.x - hB.a.x, hB.b.y - hB.a.y) / (hB.to - hB.from), 1e-3 * mag(vH0), "turn: the endpoint speed is the straight drift's chord/frames");
+      let maxMiss = 0;
+      let minMiss = Infinity;
+      for (let f = hB.from; f <= hB.to; f += 0.5) {
+        const P = poseInSeg(hB, f, W);
+        const d = Math.hypot(P.x - 3000, P.y - 0);
+        maxMiss = Math.max(maxMiss, d);
+        minMiss = Math.min(minMiss, d);
+      }
+      const chord = Math.hypot(hB.b.x - hB.a.x, hB.b.y - hB.a.y);
+      // A heading-continuous 90-degree bend cuts the corner by ~a quarter of the chord (measured
+      // 0.24): that is the price of no kink, and the chord is only lead + hover step long.
+      ok(minMiss < 0.35 * chord, "turn: the bend passes close to the authored pose");
+      ok(maxMiss < 1.2 * chord, "turn: ...and never wanders further than the chord");
+      for (let f = 1; f < ts.total; f++) {
+        const p0 = cameraAt(ts, f - 1, 0, { W, H, breathing: 0 }).cam;
+        const p1 = cameraAt(ts, f, 0, { W, H, breathing: 0 }).cam;
+        ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 450, `turn: no jump at frame ${f}`);
+      }
+      // Collinear: the Hermite IS the straight line (the earlier fixture's holds are on y = 0).
+      for (let f = h1.from; f <= h1.to; f += 0.5) {
+        const P = poseInSeg(h1, f, W);
+        const raw = (f - h1.from) / (h1.to - h1.from);
+        near(P.x, h1.a.x + (h1.b.x - h1.a.x) * raw, 1e-6, "collinear: a flow hold is exactly the linear drift");
+        ok(Math.abs(P.y) < 1e-9, "collinear: ...with no sideways bulge");
+      }
+      // ZOOM continuity: a flow glide zooms on the flow progress, so its zoom RATE at the landing
+      // matches the hold's linear zoom drift (exactly for a pure lead with no hover).
+      const zw = {
+        items: wall.items,
+        scenes: [
+          { x: 0, y: 0, zoom: 1, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0 },
+          { x: 3000, y: 0, zoom: 1.5, rotation: 0, holdSeconds: 2, glideSeconds: 1, easing: "smooth", arc: 0 },
+        ],
+        intro: false,
+        outro: false,
+        flow: true,
+        flowLand: -0.25,
+      };
+      const zs = scheduleWall(zw, 30, W, H);
+      const zg = zs.segs[1];
+      const zh = zs.segs[2];
+      const zoomRate = (seg, f) => (poseInSeg(seg, f + 0.01, W).zoom - poseInSeg(seg, f, W).zoom) / 0.01;
+      const rHold = zoomRate(zh, zh.from);
+      ok(rHold > 0, "zoom: the lead hold finishes the zoom-in");
+      near(zoomRate(zg, zg.to - 0.01), rHold, 0.03 * rHold, "zoom: the glide's zoom rate at the landing equals the hold's (no hitch)");
+      near(poseInSeg(zg, zg.to, W).zoom, zh.a.zoom, 1e-9, "zoom: ...and the zoom value is continuous");
+      const zoff = scheduleWall({ ...zw, flow: false }, 30, W, H);
+      ok(Math.abs(zoomRate(zoff.segs[1], zoff.segs[1].to - 0.01)) < 0.05 * rHold, "zoom: a non-flow glide still eases its zoom to a stop (unchanged)");
+    }
     // Position continuity across every junction survives the linear holds.
     for (let f = 1; f < fs.total; f++) {
       const p0 = cameraAt(fs, f - 1, 0, { W, H, breathing: 0 }).cam;

@@ -105,7 +105,11 @@ passed mid-drift instead of being the start of the drift. Try −20 % to −30 %
 sign changes the scene cycle** (hold + glide stays what you typed) — they only move where the arrival *reads*: positive
 settles early (the dwell feels longer), negative arrives late (the scene point comes part-way through the hold). If you cut
 scenes to the beat, keep the cycle and place the beat where the framing lands. Land overrides the glide easings (a still hold
-still meets its glide at zero). This is the "fast arrive, slow glide across, fast leave" profile; off is the classic stop-and-go.
+still meets its glide at zero). In flow the hold's drift is a gentle **bend**, not a straight line: it lands heading the way
+the glide came in and leaves heading the way the next glide goes, so a 90° turn between scenes reads as one continuous
+curve through the scene (it cuts the corner slightly) instead of a sideways kink at the landing; the zoom likewise keeps
+changing at one steady rate through the landing rather than stopping early and restarting. This is the "fast arrive, slow
+glide across, fast leave" profile; off is the classic stop-and-go.
 
 **The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased
 drift across the hold (**creep toward the next scene** — the default on new scenes, it anticipates the glide — or push

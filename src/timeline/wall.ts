@@ -402,6 +402,11 @@ export interface WallSeg {
   vb?: number;
   /** FLOW mode — glide: fraction of the segment (at the END) spent coasting at slope `vb`. */
   coast?: number;
+  /** FLOW mode — hold: cubic-Hermite path tangents (wall units per unit t). `m0` points along
+   *  the ARRIVING glide, `m1` along the DEPARTING one, both with the chord's length, so the hold
+   *  bends from one heading to the other instead of kinking at the junctions. Unset = straight. */
+  m0?: { x: number; y: number };
+  m1?: { x: number; y: number };
 }
 
 /** Quintic Hermite progress curve: p(0)=0, p(1)=1, p'(0)=a, p'(1)=b, p''(0)=p''(1)=0. With
@@ -570,14 +575,38 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       if (i === 0) return (w.intro ?? true) ? leadCam(whole, p) : p;
       return leadCam(ends[i - 1], p);
     });
-    // FLOW: the drift speed of each hold (wall units / frame), projected onto a glide's direction
-    // of travel, becomes that glide's endpoint slope. `va` = leaving the previous hold, `vb` =
-    // arriving into the next one. A still hold contributes 0 — the glide then eases as usual.
-    const driftSpeedAlong = (i: number, dirX: number, dirY: number): number => {
+    // FLOW hold path: a cubic Hermite whose start tangent points along the ARRIVING glide and whose
+    // end tangent points along the DEPARTING one (both the chord's length, so the endpoint SPEED is
+    // the straight drift's chord/frames). The camera therefore lands, bends through the scene and
+    // leaves without a change of heading at either junction — a straight hold only matches the
+    // glides along their own direction and kinks sideways on every turn. Collinear tangents give
+    // back the straight line exactly.
+    const unit = (dx: number, dy: number): { x: number; y: number } | null => {
+      const L = Math.hypot(dx, dy);
+      return L < 1e-6 ? null : { x: dx / L, y: dy / L };
+    };
+    const glideFrames = (i: number) => glideLen(scenes[i].glideSeconds ?? 1.5);
+    const tangents = starts.map((a, i): { m0: { x: number; y: number }; m1: { x: number; y: number } } | null => {
+      if (!flow || holdFrames[i] <= 0) return null;
+      const b = ends[i];
+      const chord = unit(b.x - a.x, b.y - a.y);
+      if (!chord) return null; // a still hold: no path, bit-exact
+      const c = Math.hypot(b.x - a.x, b.y - a.y);
+      const arriveFrom = i > 0 ? (glideFrames(i) > 0 ? ends[i - 1] : null) : (w.intro ?? true) && glideFrames(0) > 0 ? whole : null;
+      const departTo = i + 1 < poses.length ? (glideFrames(i + 1) > 0 ? poses[i + 1] : null) : (w.outro ?? true) && glideLen(w.outroSeconds ?? 2.4) > 0 ? whole : null;
+      const uIn = (arriveFrom && unit(a.x - arriveFrom.x, a.y - arriveFrom.y)) || chord;
+      const uOut = (departTo && unit(departTo.x - b.x, departTo.y - b.y)) || chord;
+      return { m0: { x: uIn.x * c, y: uIn.y * c }, m1: { x: uOut.x * c, y: uOut.y * c } };
+    });
+    // FLOW: the drift speed of each hold (wall units / frame) at the junction, projected onto the
+    // glide's direction of travel, becomes that glide's endpoint slope. `va` = leaving the previous
+    // hold (its END tangent), `vb` = arriving into the next one (its START tangent). A still hold
+    // contributes 0 — the glide then eases as usual.
+    const driftSpeedAlong = (i: number, dirX: number, dirY: number, end: "m0" | "m1"): number => {
       if (i < 0 || i >= scenes.length || holdFrames[i] <= 0) return 0;
-      const vx = (ends[i].x - starts[i].x) / holdFrames[i];
-      const vy = (ends[i].y - starts[i].y) / holdFrames[i];
-      return Math.max(0, vx * dirX + vy * dirY);
+      const m = tangents[i]?.[end];
+      if (!m) return 0;
+      return Math.max(0, (m.x * dirX + m.y * dirY) / holdFrames[i]);
     };
     const flowSlopes = (from: Cam, to: Cam, frames: number, prevScene: number, nextScene: number) => {
       if (!flow || frames <= 0) return {};
@@ -588,7 +617,7 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       const ux = dx / L;
       const uy = dy / L;
       // slope in progress-per-normalised-time = (wall units / frame) * frames / L
-      return { va: clamp((driftSpeedAlong(prevScene, ux, uy) * frames) / L, 0, 1), vb: clamp((driftSpeedAlong(nextScene, ux, uy) * frames) / L, 0, 1), coast };
+      return { va: clamp((driftSpeedAlong(prevScene, ux, uy, "m1") * frames) / L, 0, 1), vb: clamp((driftSpeedAlong(nextScene, ux, uy, "m0") * frames) / L, 0, 1), coast };
     };
     if (w.intro ?? true) {
       push(wholeSeg("hold", whole, whole, -1), holdLen(w.introHoldSeconds ?? 0.8));
@@ -608,7 +637,7 @@ export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number,
       sceneFrames[i] = cur;
       // A hold drifts from the authored pose (or its lead point) to its hover pose (b === a when
       // there is no hover and no lead).
-      push({ kind: "hold", a: starts[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false, ...(flow ? { linear: true } : {}) }, holdFrames[i]);
+      push({ kind: "hold", a: starts[i], b: ends[i], easing: easeIdOf(s.easing), arc: 0, scene: i, whole: false, ...(flow ? { linear: true, ...(tangents[i] ?? {}) } : {}) }, holdFrames[i]);
       sceneEnds[i] = cur;
     }
     if (w.outro ?? true) {
@@ -721,11 +750,24 @@ export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
     const raw = len <= 0 ? 1 : clamp((frame - seg.from) / len);
     // FLOW holds drift at a steady pace so the glides on either side can carry that velocity.
     const p = seg.linear ? raw : EASE.smooth(raw);
-    return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p, zoom: a.zoom + (b.zoom - a.zoom) * p, rot: a.rot + shortAngle(a.rot, b.rot) * p };
+    const zoom = a.zoom + (b.zoom - a.zoom) * p;
+    const rot = a.rot + shortAngle(a.rot, b.rot) * p;
+    if (seg.m0 && seg.m1) {
+      // FLOW: cubic Hermite through the tangents (heading-continuous at both junctions).
+      const p2 = p * p;
+      const p3 = p2 * p;
+      const h00 = 2 * p3 - 3 * p2 + 1;
+      const h10 = p3 - 2 * p2 + p;
+      const h01 = -2 * p3 + 3 * p2;
+      const h11 = p3 - p2;
+      return { x: h00 * a.x + h10 * seg.m0.x + h01 * b.x + h11 * seg.m1.x, y: h00 * a.y + h10 * seg.m0.y + h01 * b.y + h11 * seg.m1.y, zoom, rot };
+    }
+    return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p, zoom, rot };
   }
   const len = seg.to - seg.from;
   const p = len <= 0 ? 1 : clamp((frame - seg.from) / len);
-  const ep = seg.va != null || seg.vb != null ? flowCurve(p, seg.va ?? 0, seg.vb ?? 0, seg.coast ?? 0) : ease(seg.easing, p);
+  const isFlow = seg.va != null || seg.vb != null;
+  const ep = isFlow ? flowCurve(p, seg.va ?? 0, seg.vb ?? 0, seg.coast ?? 0) : ease(seg.easing, p);
 
   // (a) position + arc — quadratic Bezier; arc 0 collapses ALGEBRAICALLY to lerp.
   const Dx = b.x - a.x;
@@ -749,8 +791,11 @@ export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
     y = u * u * a.y + 2 * u * ep * cy + ep * ep * b.y;
   }
 
-  // (b) zoom — its own curve, with a lead and a span-damped mid-glide lift.
-  const ez = ease(seg.easing, clamp(p / (1 - ZOOM_LEAD)));
+  // (b) zoom — its own curve, with a lead and a span-damped mid-glide lift. FLOW glides zoom on
+  // the flow progress itself (no lead, no scene easing): the scene easing would bring the zoom to
+  // a dead stop 10 % early while the next hold's zoom drifts on linearly — a visible hitch at the
+  // landing. On `ep` the zoom rate at the junction matches the hold's (exactly for a pure lead).
+  const ez = isFlow ? ep : ease(seg.easing, clamp(p / (1 - ZOOM_LEAD)));
   const zb = mix(a.zoom, b.zoom, ez);
   const travel = L * ((a.zoom + b.zoom) / 2); // screen px actually crossed
   const norm = clamp(travel / Math.max(1, W), 0, 1.5); // 1 == a full frame-width traverse
@@ -760,7 +805,7 @@ export const poseInSeg = (seg: WallSeg, frame: number, W: number): Cam => {
   // (c) rotation — shortest arc, double-smoothed. A plain lerp over a +-180 field would sweep
   // 350 deg for a -175 -> +175 pair the user framed as a 10 deg adjustment. Rotation is also the
   // most nausea-inducing channel, so it starts and stops flatter than the pan.
-  const rot = a.rot + shortAngle(a.rot, b.rot) * smooth(ease(seg.easing, p));
+  const rot = a.rot + shortAngle(a.rot, b.rot) * (isFlow ? ep : smooth(ease(seg.easing, p)));
 
   return { x, y, zoom, rot };
 };

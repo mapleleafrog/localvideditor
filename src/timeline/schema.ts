@@ -150,6 +150,11 @@ export const wallSchema = z.object({
   handFont: z.enum(["caveat", "yomogi", "zenKurenaido"]).default("caveat"),
   /** Margin fraction for the whole-wall "fit all" pose (intro/outro/Fit-all/thumbnails). */
   fitPadding: z.number().min(0).max(0.4).default(0.06),
+  /** Wall-wide timing defaults: what a NEW scene gets for its hold / glide-in, and what
+   *  "Apply to all" writes onto every scene. Editor conveniences — the renderer reads only the
+   *  per-scene values. */
+  defaultHoldSeconds: z.number().min(0).optional(),
+  defaultGlideSeconds: z.number().min(0).optional(),
   timecodeOffsetInFrames: z.number().int().nonnegative().default(0),
 });
 

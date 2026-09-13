@@ -16,7 +16,7 @@
 import React, { useMemo, useState } from "react";
 import { useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWall, speedClass, wallFitFor, wallOf } from "../lib/wall-edit";
+import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWall, speedClass, wallFitFor, wallOf, withTimingApplied } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
 import { CommitNum } from "./WallInspector";
 
@@ -146,6 +146,38 @@ export const WallScenes: React.FC = () => {
           </button>
           <button className={live ? "on" : ""} onClick={() => setLive(true)}>
             Live
+          </button>
+        </span>
+        <span className="sep" />
+        {/* Wall-wide timing defaults: every NEW scene takes these; Apply to all rewrites every scene. */}
+        <span className="wsc-defaults" title="Defaults for every new scene (⊕ Set as scene). Apply to all overwrites every existing scene's hold and glide in one undo step.">
+          <span className="muted">defaults: hold</span>
+          <CommitNum
+            value={wall.defaultHoldSeconds ?? DEFAULT_SCENE.holdSeconds}
+            min={0}
+            step={0.1}
+            suffix="s"
+            onCommit={(n) => patchWall(ci, { defaultHoldSeconds: n })}
+          />
+          <span className="muted">glide</span>
+          <CommitNum
+            value={wall.defaultGlideSeconds ?? DEFAULT_GLIDE_SECONDS}
+            min={0}
+            step={0.1}
+            suffix="s"
+            onCommit={(n) => patchWall(ci, { defaultGlideSeconds: n })}
+          />
+          <button
+            disabled={!scenes.length}
+            onClick={() => {
+              const hold = wall.defaultHoldSeconds ?? DEFAULT_SCENE.holdSeconds;
+              const glide = wall.defaultGlideSeconds ?? DEFAULT_GLIDE_SECONDS;
+              patchWall(ci, withTimingApplied(wall, hold, glide));
+              flash(`All ${scenes.length} scenes: hold ${hold}s · glide ${glide}s (Ctrl+Z to undo)`);
+            }}
+            title="Write these defaults onto every scene's hold and glide (one undo step)"
+          >
+            Apply to all
           </button>
         </span>
         <span className="sep" />

@@ -271,13 +271,23 @@ export const hoverEndCam = (s: WallScene, next?: Cam): Cam => sceneHoverCam(s, n
 /** What `⊕ Set as scene` appends: the authoring pose, with a glide duration a motion designer would
  *  sign off (`suggestGlideSeconds` targets a peak px/second, so it is fps-independent). */
 export const appendedScene = (wall: Wall, cam: Cam): WallScene => {
-  const scenes = wall.scenes ?? [];
-  const prev = scenes.length ? camFromScene(scenes[scenes.length - 1]) : cam;
-  // A fixed 1 s glide by default (the user's ask); the speed dot on the strip still offers the
-  // velocity-based suggestion for long moves.
-  void prev;
-  return sceneFromCam(cam, { glideSeconds: DEFAULT_GLIDE_SECONDS });
+  // The wall's own timing defaults win; else the fixed 1 s glide / 1.8 s hold. The speed dot on the
+  // strip still offers the velocity-based suggestion for long moves.
+  const hold = Number.isFinite(wall.defaultHoldSeconds) ? (wall.defaultHoldSeconds as number) : DEFAULT_SCENE.holdSeconds;
+  const glide = Number.isFinite(wall.defaultGlideSeconds) ? (wall.defaultGlideSeconds as number) : DEFAULT_GLIDE_SECONDS;
+  return sceneFromCam(cam, { holdSeconds: hold, glideSeconds: glide });
 };
+
+/** "Apply to all": every scene takes the wall's default hold and/or glide (one immutable rebuild =
+ *  one undo step). Scene 0's glide is the intro glide and is left alone unless intro is on. */
+export const withTimingApplied = (wall: Wall, hold: number | undefined, glide: number | undefined): Wall => ({
+  ...wall,
+  scenes: (wall.scenes ?? []).map((s, i) => ({
+    ...s,
+    ...(hold != null ? { holdSeconds: hold } : {}),
+    ...(glide != null && (i > 0 || wall.intro) ? { glideSeconds: glide } : {}),
+  })),
+});
 
 // ---------------------------------------------------------------------------------------------
 // Items.

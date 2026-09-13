@@ -352,11 +352,11 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
           </button>
         )}
         <button
-          className={live ? "on" : ""}
+          className={live ? "stop" : ""}
           onClick={() => setLive(!live)}
-          title="Play the real camera schedule (breathing, intro/outro and overlays back on)"
+          title={live ? "Stop the preview and go back to arranging (Esc)" : "Play the real camera schedule — just the wall, with the song"}
         >
-          {live ? "▮ Arrange" : "▶ Live"}
+          {live ? "■ Stop preview" : "▶ Live"}
         </button>
 
         {wallClips.length > 1 && (

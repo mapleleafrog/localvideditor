@@ -95,11 +95,14 @@ export const App: React.FC = () => {
       const cur = () => Math.round(player?.getCurrentFrame() ?? 0);
       const seek = (f: number) => player?.seekTo(Math.max(0, Math.min(total - 1, f)));
 
-      // Esc closes the cheat sheet from anywhere.
+      // Esc closes the cheat sheet from anywhere, and stops a Wall Live preview (back to Arrange).
       if (e.key === "Escape") {
         if (st.showShortcuts) {
           e.preventDefault();
           st.toggleShortcuts(false);
+        } else if (st.view === "wall" && st.wallLive) {
+          e.preventDefault();
+          st.setWallLive(false);
         }
         return;
       }

@@ -589,6 +589,7 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .wsc-arrow.off { opacity: 0.45; }
 .wsc-arrow-line { font-size: 15px; line-height: 1; letter-spacing: 1px; }
 .wsc-arrow-box .wi-num input { width: 52px; padding: 2px 5px; font-size: 11px; text-align: center; }
+.wall-scenes button.stop, .wall-nav button.stop { background: #5a2233; border-color: #8a2d47; color: #ffd6df; }
 .wsc-dot-btn { font-size: 10px; padding: 1px 6px; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .wsc-dot-btn.flat { border: none; background: none; }
 .wsc-dot-btn.ok { color: #6ee7a8; border-color: #2c5c44; }

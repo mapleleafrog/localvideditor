@@ -61,6 +61,7 @@ const GROUPS: Group[] = [
       { keys: ["←↑→↓"], label: "Nudge 1 wall unit (Shift = 10)" },
       { keys: ["Enter"], label: "Set as scene (and select it)" },
       { keys: ["PgUp", "PgDn"], label: "Previous / next scene (select + jump the camera)" },
+      { keys: ["Esc"], label: "Stop the Live preview (back to Arrange)" },
       { keys: ["Alt"], label: "Hold to disable snapping" },
       { keys: ["Del"], label: "Delete selected item(s)" },
       { keys: [MOD, "D"], label: "Duplicate item" },

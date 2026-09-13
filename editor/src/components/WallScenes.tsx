@@ -82,6 +82,8 @@ export const WallScenes: React.FC = () => {
     setLive(true);
     requestSeek(0, { play: true, until: sched.total });
   };
+  /** Back to Arrange (the editor): the Player drops the live take and shows the authoring camera. */
+  const stopPreview = () => setLive(false);
 
   const onDrop = (to: number) => {
     if (dragIndex !== null && dragIndex !== to) reorderWallScene(ci, dragIndex, to);
@@ -96,9 +98,15 @@ export const WallScenes: React.FC = () => {
         <button className="primary" onClick={setAsScene} title="Append the current framing as a scene (Enter)">
           ⊕ Set as scene
         </button>
-        <button onClick={previewAll} disabled={!scenes.length} title="Play every scene in order (Live mode) — how they string together">
-          ▶ Preview all
-        </button>
+        {live ? (
+          <button className="stop" onClick={stopPreview} title="Stop the preview and go back to arranging (Esc)">
+            ■ Stop preview
+          </button>
+        ) : (
+          <button onClick={previewAll} disabled={!scenes.length} title="Play every scene in order (Live mode) — how they string together">
+            ▶ Preview all
+          </button>
+        )}
         <button
           // The SAME patch the Inspector, the Storyboard card and the clip context menu apply — it
           // honours project.durationInFrames, which fixes the video's length and caps every clip.

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useEditor, useTemporal, SAMPLE_PROJECT, clearAutosave, migrate } from "../store";
 import type { Project } from "../../../src/timeline/schema";
-import { renderVideo, saveProjectFile, deleteProject } from "../lib/api";
+import { renderVideo, saveProjectFile, deleteProject, type RenderOptions } from "../lib/api";
 import { ensureProjectName, safeName } from "../lib/names";
 import { firstWallClip, newWallClip, newWallProject, wallOnlyProject, withFps } from "../lib/wall-edit";
 
@@ -44,6 +44,8 @@ export const Topbar: React.FC = () => {
   const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem("soranji.render.concurrency")) || 0);
   const [gl, setGl] = useState(() => localStorage.getItem("soranji.render.gl") || "angle");
   const [crf, setCrf] = useState(() => Number(localStorage.getItem("soranji.render.crf")) || 16);
+  const [x264Preset, setX264Preset] = useState(() => localStorage.getItem("soranji.render.x264") || "fast");
+  useEffect(() => localStorage.setItem("soranji.render.x264", x264Preset), [x264Preset]);
   useEffect(() => localStorage.setItem("soranji.render.concurrency", String(concurrency)), [concurrency]);
   useEffect(() => localStorage.setItem("soranji.render.gl", gl), [gl]);
   useEffect(() => localStorage.setItem("soranji.render.crf", String(crf)), [crf]);
@@ -85,6 +87,7 @@ export const Topbar: React.FC = () => {
       concurrency,
       gl,
       crf,
+      x264Preset: x264Preset as RenderOptions["x264Preset"],
       quality,
     };
     const ac = new AbortController();
@@ -319,8 +322,18 @@ export const Topbar: React.FC = () => {
               <label>H.264 quality — CRF (lower = better)</label>
               <input type="number" min={1} max={51} value={crf} onChange={(e) => setCrf(Math.max(1, Math.min(51, Math.round(+e.target.value || 16))))} />
             </div>
+            <div className="fld">
+              <label>H.264 encoder speed (same CRF = same look; faster = bigger file)</label>
+              <select value={x264Preset} onChange={(e) => setX264Preset(e.target.value)}>
+                <option value="veryfast">veryfast</option>
+                <option value="faster">faster</option>
+                <option value="fast">fast (default)</option>
+                <option value="medium">medium — x264 default</option>
+                <option value="slow">slow — smallest file</option>
+              </select>
+            </div>
             <div className="muted" style={{ fontSize: 10 }}>
-              Defaults: all cores · ANGLE (GPU) · CRF 16. Switch to SwiftShader if a render fails to launch; lower concurrency if it runs out of memory. (ProRes/alpha exports ignore CRF.)
+              Defaults: all cores · ANGLE (GPU) · CRF 16 · fast. Switch to SwiftShader if a render fails to launch; lower concurrency if it runs out of memory (4K tabs are heavy). Draft/preview always encode with veryfast. (ProRes/alpha exports ignore CRF and the preset.)
             </div>
           </div>
         )}

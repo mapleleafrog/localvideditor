@@ -133,13 +133,18 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
     const gl = (typeof options.gl === "string" && options.gl) || "angle"; // "angle" | "swiftshader" | "default"
     const useGpu = gl !== "default";
     const crf = Number(options.crf) >= 1 ? Math.max(1, Math.min(51, Math.round(Number(options.crf)))) : 16; // lower = higher quality
+    // x264 speed preset: same CRF = same visual quality, faster presets just compress less
+    // efficiently (bigger file). Draft/preview always take the fastest sensible one.
+    const PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow"] as const;
+    type Preset = (typeof PRESETS)[number];
+    const x264Preset: Preset = draft ? "veryfast" : PRESETS.includes(options.x264Preset) ? (options.x264Preset as Preset) : "fast";
     send({
       type: "status",
       message: `Opening ${concurrency} browser tabs at ${Math.round(composition.width * scale)}×${Math.round(composition.height * scale)} — the first frames take a moment…`,
     });
     send({
       type: "status",
-      message: `Rendering ${composition.durationInFrames} frames @ ${composition.fps} fps (${kind}${quality === "full" ? "" : `, ${quality}`}) · ${concurrency} tabs · ${useGpu ? gl.toUpperCase() : "default GL"}…`,
+      message: `Rendering ${composition.durationInFrames} frames @ ${composition.fps} fps (${kind}${quality === "full" ? "" : `, ${quality}`}) · ${concurrency} tabs · ${useGpu ? gl.toUpperCase() : "default GL"}${transparent ? "" : ` · x264 ${x264Preset}`}…`,
       durationInFrames: composition.durationInFrames,
     });
     await renderMedia({
@@ -158,7 +163,7 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       ...(transparent
         ? { codec: "prores" as const, proResProfile: "4444" as const, pixelFormat: "yuva444p10le" as const, imageFormat: "png" as const }
         : // H.264: max-quality frame capture (jpegQuality 100) + configurable CRF, software x264.
-          { codec: "h264" as const, jpegQuality: quality === "preview" ? 60 : draft ? 80 : 100, crf: quality === "preview" ? Math.max(crf, 30) : draft ? Math.max(crf, 26) : crf }),
+          { codec: "h264" as const, jpegQuality: quality === "preview" ? 60 : draft ? 80 : 100, crf: quality === "preview" ? Math.max(crf, 30) : draft ? Math.max(crf, 26) : crf, x264Preset }),
     });
     send({ type: "done", file: outputLocation, fileName });
   } catch (err) {

@@ -244,6 +244,16 @@ the NLE — Remotion makes the elements, DaVinci makes the cut.
 The composition is bundled once per dev session and reused; restart `npm run editor` after changing
 composition/effect code to pick it up.
 
+**Render speed — what actually helps.** A render is Chrome painting every frame in parallel tabs, then
+x264 encoding them; there is nothing to pre-cache beyond the bundle (every frame is unique). In order of
+impact: (1) **resolution** — 4K is 4× the pixels of 1080p and roughly 3–4× the time; render 1080p unless
+the delivery is 4K (Canvas tab), or use **Preview** to check timing; (2) **encoder speed** (⚙ Render
+settings → *H.264 encoder speed*, default **fast**, draft/preview always *veryfast*) — the same CRF gives
+the same look, faster presets just make a somewhat larger file; (3) **concurrency** — more tabs than CPU
+cores does not help, and at 4K each tab is heavy on RAM (if the machine swaps, lower it); (4) the **GPU
+backend** (ANGLE) — keep it on for the wall's shadows and filters. Lowering the JPEG frame quality is
+*not* a lever: it barely saves time and the artefacts make the H.264 file bigger.
+
 ## Why it scales
 
 Every picker reads the live effect registry (`src/effects` via [effects-bridge.ts](editor/src/lib/effects-bridge.ts)).

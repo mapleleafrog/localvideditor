@@ -116,7 +116,7 @@ const randScene = () => ({
   rotation: rr(-200, 200),
   holdSeconds: pick([0, 0.6, 1.2, 1.8, 2.4]),
   glideSeconds: pick([0, 0.4, 0.8, 1.5, 2.4]),
-  easing: pick(["smooth", "sine", "cubic", "settle"]),
+  easing: pick(["smooth", "gentle", "sine", "cubic", "settle"]),
   arc: pick([0, 0, 0.6, -0.4, 1, -1]),
   hover: pick([undefined, "none", "toward", "toward", "pushIn", "pullOut", "left", "right", "up", "down"]),
   hoverAmount: pick([undefined, 0, 0.5, 1]),
@@ -194,6 +194,17 @@ startGroup(1, "ease endpoints, derivatives, settle peak");
   ok(flips === 1, `settle must flip from ascending to descending EXACTLY once (got ${flips} flips)`);
   ok(descending, "settle must end on its descending tail");
   ok(EASE.settle(1) === 1, "settle returns to exactly 1");
+  // gentle: C3 (zero jerk at both ends) and a longer dwell than smooth — its slope near the ends is
+  // strictly smaller, its peak slope strictly larger.
+  {
+    const hh = 1e-4;
+    const d2 = (f, p) => (f(p + hh) - 2 * f(p) + f(p - hh)) / (hh * hh);
+    ok(Math.abs(d2(EASE.gentle, hh)) < 0.05 && Math.abs(d2(EASE.gentle, 1 - hh)) < 0.05, "gentle: ~0 acceleration at both ends");
+    ok(EASE.gentle(0.1) < EASE.smooth(0.1) && EASE.gentle(0.9) > EASE.smooth(0.9), "gentle dwells longer at both ends than smooth");
+    const slope = (f, p) => (f(p + hh) - f(p - hh)) / (2 * hh);
+    ok(slope(EASE.gentle, 0.5) > slope(EASE.smooth, 0.5), "gentle is faster mid-glide than smooth (the time has to come from somewhere)");
+    near(slope(EASE.gentle, 0.5), 2.1875, 1e-3, "gentle peak slope is 35/16");
+  }
   // unknown ids fall back to the default (smooth), and p is clamped
   ok(ease("nope", 0.3) === EASE.smooth(0.3), "unknown ease id falls back to smooth");
   ok(ease(undefined, 0.3) === EASE.smooth(0.3), "undefined ease id falls back to smooth");

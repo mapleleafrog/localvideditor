@@ -133,7 +133,14 @@ export const CommitNum: React.FC<{
 
 const FRAMES: WallItem["frame"][] = ["none", "polaroid", "matte", "taped", "torn"];
 const FILTERS: WallItem["filter"][] = ["none", "sepia", "faded", "bw", "warm", "cool"];
-const SCENE_EASINGS: WallScene["easing"][] = ["smooth", "sine", "cubic", "settle"];
+const SCENE_EASINGS: WallScene["easing"][] = ["smooth", "gentle", "sine", "cubic", "settle"];
+const EASE_LABEL: Record<string, string> = {
+  smooth: "smooth — soft start and landing (default)",
+  gentle: "gentle — even softer ends, quicker middle",
+  sine: "sine — classic, slight push at the ends",
+  cubic: "cubic — snappy",
+  settle: "settle — overshoots and settles back",
+};
 const IO_LABEL: Record<TransitionKind, string> = {
   none: "none",
   fade: "fade",
@@ -375,17 +382,17 @@ export const WallInspector: React.FC = () => {
           <select
             value={scene.easing}
             disabled={!glideLive}
-            title="smooth = zero acceleration at both ends · cubic nearly doubles peak speed · settle overshoots (use at ≥ 1.0 s)"
+            title="How the glide spends its time: all options start and end at zero velocity; they differ in how long they linger at the ends vs. how fast the middle is. For an even softer feel, lengthen the glide seconds."
             onChange={(e) => patchWallScene(ci, si, { easing: e.target.value as WallScene["easing"] })}
           >
             {SCENE_EASINGS.map((e2) => (
               <option key={e2} value={e2}>
-                {e2}
+                {EASE_LABEL[e2] ?? e2}
               </option>
             ))}
           </select>
         </Field>
-        <Field label={`Path arc (${scene.arc})`}>
+        <Field label={`Path arc (${scene.arc}) — bow the travel path; 0 = straight line`}>
           <Slider value={scene.arc} min={-1} max={1} step={0.05} disabled={!glideLive} onChange={(v2) => patchWallScene(ci, si, { arc: v2 })} />
         </Field>
         <Field label="Scene">

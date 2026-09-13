@@ -129,10 +129,12 @@ export const normAngle = (deg: number) => (((deg + 180) % 360) + 360) % 360 - 18
 //      sine    1.5708 @ p=0.500     none             +-4.93 (C1)
 //      cubic   3.0000 @ p=0.500     none             +-12 (C1)      (a SNAP ease)
 //      settle  1.8780 @ p=0.544     +2.51% @ p=0.878 +-4.93 (C1)    (use only at >= 1.0 s)
+//      gentle  2.1875 @ p=0.500     none             0 (C3)         (septic: longer dwell at both ends,
+//                                                                    so the middle is faster — "more ease")
 // ---------------------------------------------------------------------------------------------
 
-export type EaseId = "smooth" | "sine" | "cubic" | "settle";
-export const EASE_IDS: readonly EaseId[] = ["smooth", "sine", "cubic", "settle"];
+export type EaseId = "smooth" | "gentle" | "sine" | "cubic" | "settle";
+export const EASE_IDS: readonly EaseId[] = ["smooth", "gentle", "sine", "cubic", "settle"];
 export const DEFAULT_EASE: EaseId = "smooth";
 
 /** Overshoot amplitude of `settle`. A polynomial term that vanishes to 2nd order at BOTH ends. */
@@ -140,6 +142,8 @@ export const SETTLE_A = 9;
 
 export const EASE: Record<EaseId, (p: number) => number> = {
   smooth: (p) => p * p * p * (p * (p * 6 - 15) + 10),
+  // Septic smootherstep: zero velocity, acceleration AND jerk at both ends.
+  gentle: (p) => p * p * p * p * (p * (p * (p * -20 + 70) - 84) + 35),
   sine: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p),
   cubic: (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2),
   settle: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p) + SETTLE_A * Math.pow(p, 6) * Math.pow(1 - p, 2),
@@ -454,7 +458,7 @@ export const sceneHoverCam = (s: WallSceneLike, next?: Cam): Cam => {
 };
 
 const easeIdOf = (v: string | undefined): EaseId =>
-  v === "sine" || v === "cubic" || v === "settle" ? v : DEFAULT_EASE;
+  v === "gentle" || v === "sine" || v === "cubic" || v === "settle" ? v : DEFAULT_EASE;
 
 export const scheduleWall = (wall: WallLike | undefined, fps: number, W: number, H: number): WallSchedule => {
   const w = wall ?? {};

@@ -95,7 +95,8 @@ mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to
 **The "never quite stops" feel.** Three layers, all in seconds: (1) **Hover** — in the Scene section, a slow eased
 drift across the hold (**creep toward the next scene** — the default on new scenes, it anticipates the glide — or push
 in / pull out / drift left·right·up·down, + amount), (2) the **glide** between scenes (the arrow box on the strip; 1 s by default, `smooth` easing ramps up and
-lands with zero velocity and zero acceleration; easing + arc live in the Scene section), — **click the arrow between two cards** to open the destination scene's "→ Transition into this scene" group —
+lands with zero velocity and zero acceleration, `gentle` lingers even longer at both ends; easing + arc live in the Scene
+section — arc bows the travel path sideways, 0 is a straight line), — **click the arrow between two cards** to open the destination scene's "→ Transition into this scene" group —
 and (3) **Breathing** under
 Wall settings — the random handheld tremor on top of everything, shown in Live only. Hover and breathing are separate
 on purpose: hover is a deliberate move you author per scene, breathing is texture.

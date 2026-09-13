@@ -118,7 +118,7 @@ const wallSceneSchema = z.object({
   /** Glide INTO this scene. On scene 0 this is the INTRO glide, used only when `intro` is on. */
   glideSeconds: z.number().min(0).default(1.5),
   /** `smooth` (default) has zero velocity AND zero acceleration at both ends — no shove on arrival. */
-  easing: z.enum(["smooth", "sine", "cubic", "settle"]).default("smooth"),
+  easing: z.enum(["smooth", "gentle", "sine", "cubic", "settle"]).default("smooth"),
   /** Path bow. 0 = provably identical to a straight lerp. Sign picks the side of travel
    *  (+ = left of the direction of travel). Deterministic and LOCAL. */
   arc: z.number().min(-1).max(1).default(0),

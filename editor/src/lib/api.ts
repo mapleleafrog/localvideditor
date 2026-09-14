@@ -1,4 +1,5 @@
 import type { Project } from "../../../src/timeline/schema";
+import { addProxy, makeProxy, proxyEligible, proxyName, removeProxy, setProxies } from "./proxies";
 
 export type RenderMsg =
   | { type: "status"; message: string; durationInFrames?: number }
@@ -101,13 +102,69 @@ const mediaList = async (project: string, key: "assets" | "audio"): Promise<stri
 /** Visual assets: root public/ + flat public/media/ + this project's folder. */
 export const listMedia = (project = ""): Promise<string[]> => mediaList(project, "assets");
 
+/** Assets + audio + the ref → proxy-ref map, in one call (also feeds the proxy store). */
+export async function listMediaFull(project = ""): Promise<{ assets: string[]; audio: string[]; proxies: Record<string, string> }> {
+  try {
+    const res = await fetch(`/api/media${project ? `?project=${encodeURIComponent(project)}` : ""}`);
+    const data = await res.json();
+    const proxies = data.proxies && typeof data.proxies === "object" ? (data.proxies as Record<string, string>) : {};
+    setProxies(proxies);
+    return { assets: Array.isArray(data.assets) ? data.assets : [], audio: Array.isArray(data.audio) ? data.audio : [], proxies };
+  } catch {
+    return { assets: [], audio: [], proxies: {} };
+  }
+}
+
+/** Upload a browser-made proxy for the stored file `storedRef` (e.g. "media/p/photo.jpg"); the
+ *  server files it under that folder's _proxy/ and the proxy store learns the pair. */
+export async function uploadProxy(storedRef: string, blob: Blob): Promise<string | null> {
+  try {
+    const parts = storedRef.split("/");
+    const name = parts.pop()!;
+    const project = parts.length === 2 ? parts[1] : "";
+    const q = `name=${encodeURIComponent(proxyName(name))}&proxy=1${project ? `&project=${encodeURIComponent(project)}` : ""}`;
+    const res = await fetch(`/api/upload?${q}`, { method: "POST", body: blob });
+    const r = (await res.json()) as { ok: boolean; ref?: string };
+    if (r.ok && r.ref) {
+      addProxy(storedRef, r.ref);
+      return r.ref;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Import a dropped/picked file into public/media/<project>/. Returns the ref (e.g.
- *  "media/my-wedding/photo.jpg"). With no project it lands in flat public/media/. */
+ *  "media/my-wedding/photo.jpg"). With no project it lands in flat public/media/.
+ *  A raster still bigger than PROXY_MAX_EDGE also gets an editor proxy right away (made in the
+ *  browser, stored beside it) — every import path goes through here, so every path gets one. */
 export async function uploadMedia(file: File, project = ""): Promise<{ ok: boolean; ref?: string; message?: string }> {
   try {
     const q = `name=${encodeURIComponent(file.name)}${project ? `&project=${encodeURIComponent(project)}` : ""}`;
     const res = await fetch(`/api/upload?${q}`, { method: "POST", body: file });
-    return await res.json();
+    const r = (await res.json()) as { ok: boolean; ref?: string; message?: string };
+    if (r.ok && r.ref && proxyEligible(file.name)) {
+      const px = await makeProxy(file, file.name).catch(() => null);
+      if (px) await uploadProxy(r.ref, px);
+    }
+    return r;
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Delete one imported file (+ its proxy) from public/media/. Root public/ assets are refused. */
+export async function deleteMedia(ref: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch("/api/delete-media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref }),
+    });
+    const r = (await res.json()) as { ok: boolean; message?: string };
+    if (r.ok) removeProxy(ref);
+    return r;
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) };
   }

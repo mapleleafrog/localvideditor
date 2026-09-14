@@ -5,11 +5,12 @@ import { readyTransitions } from "../lib/effects-bridge";
 import { fmtTime } from "../lib/timeline-utils";
 import { fitDurationPatch, wallFitStatus, wallOf, wallSummary } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
+import { proxyOr } from "../lib/proxies";
 
 const TRANSITIONS = readyTransitions().map((t) => ({ id: t.id, name: t.name }));
 
 /** Vite serves the project's public/ at "/", so local clip srcs resolve there. */
-const boardSrc = (src: string) => (/^https?:\/\//.test(src) ? src : "/" + src.replace(/^\/+/, ""));
+const boardSrc = (src: string) => (/^https?:\/\//.test(src) ? src : "/" + proxyOr(src).replace(/^\/+/, ""));
 /** Checked AFTER isWall — this regex would misfire on a leftover `.mp4` src on a converted clip. */
 const isVideo = (c: Clip) => c.type === "video" || /\.(mp4|webm|mov|m4v)$/i.test(c.src);
 const isWall = (c: Clip) => c.type === "wall";

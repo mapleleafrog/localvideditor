@@ -25,6 +25,7 @@ import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize } from "../lib/image";
 import { authoringProject, camFromScene, fitAll, importWidth, isWallClip, liveWallProject, newSeed, newWallItemFromAsset, spiralOffset, wallOf } from "../lib/wall-edit";
+import { useProxiesVersion, withProxies } from "../lib/proxies";
 import { wallViewport, zoomAtCursor, panBy, screenPtToWall, ZOOM_MAX, ZOOM_MIN } from "../lib/wall-coords";
 import { WallOverlay } from "./WallOverlay";
 import { WallMiniMap } from "./WallMiniMap";
@@ -200,7 +201,14 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
     () => (valid && wallClip != null ? authoringProject(project, wallClip, wallCam) : project),
     [valid, project, wallClip, wallCam],
   );
-  const inputProps = live ? liveProj : derived;
+  // Editor proxies: downscaled stills swapped in at THIS boundary only (never the store / JSON /
+  // render) — the layout, camera and filters are byte-identical, only the pixel density differs.
+  const proxiesVersion = useProxiesVersion();
+  const inputProps = useMemo(
+    () => withProxies(live ? liveProj : derived),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [live, liveProj, derived, proxiesVersion],
+  );
   // Live plays the REAL take, so it must be sized the way the render is: max(clips - transitions,
   // overlay end, AUDIO end). The audio term is measured in the browser (the JSON does not carry a
   // track's length), so Live has to read it too or a song-length project stops short here while the

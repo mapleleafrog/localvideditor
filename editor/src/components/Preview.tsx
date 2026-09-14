@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
+import { useProxiesVersion, withProxies } from "../lib/proxies";
 import { Timeline } from "../../../src/timeline/Timeline";
 import type { AudioTrack, Overlay } from "../../../src/timeline/schema";
 import { useEditor } from "../store";
@@ -27,6 +28,10 @@ const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trim
  *  transform tools (CanvasOverlay) can map screen px <-> composition coordinates 1:1. */
 export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }> = ({ playerRef }) => {
   const project = useEditor((s) => s.project);
+  // Editor proxies (downscaled stills) swapped in at the Player boundary only — see lib/proxies.ts.
+  const proxiesVersion = useProxiesVersion();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const proxied = useMemo(() => withProxies(project), [project, proxiesVersion]);
   const addOverlay = useEditor((s) => s.addOverlay);
   const addAudio = useEditor((s) => s.addAudio);
   const seekRequest = useEditor((s) => s.seekRequest);
@@ -119,7 +124,7 @@ export const Preview: React.FC<{ playerRef: React.RefObject<PlayerRef | null> }>
         <Player
           ref={playerRef}
           component={Timeline as React.ComponentType<Record<string, unknown>>}
-          inputProps={project as unknown as Record<string, unknown>}
+          inputProps={proxied as unknown as Record<string, unknown>}
           durationInFrames={duration}
           fps={project.fps ?? 30}
           compositionWidth={compW}

@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { staticFile } from "remotion";
 import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
-import { listMedia, uploadMedia } from "../lib/api";
+import { deleteMedia, listMediaFull, uploadMedia, uploadProxy } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
+import { makeProxy, proxyEligible, proxyFor, proxyOr, useProxiesVersion } from "../lib/proxies";
 import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
 import type { AudioTrack } from "../../../src/timeline/schema";
 import {
@@ -140,15 +141,67 @@ export const AssetsPanel: React.FC = () => {
   const [batch, setBatch] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // listMediaFull also refreshes the proxy store (ref → downscaled editor copy).
   const refresh = useCallback(
-    (proj = projectName) => listMedia(proj).then((a) => { if (a.length) setAssets(a); }),
+    (proj = projectName) => listMediaFull(proj).then(({ assets: a }) => { if (a.length) setAssets(a); }),
     [projectName],
   );
   useEffect(() => { refresh(); }, [refresh]);
+  useProxiesVersion(); // re-render when proxies appear/disappear (thumbnails + the ⚡ count)
 
   const flash = (m: string) => {
     setNote(m);
     setTimeout(() => setNote((n) => (n === m ? null : n)), 3000);
+  };
+
+  // --- delete (hover ×) ---
+  // Imports are COPIES into public/media/<project>/, so deleting one is low-stakes — unless the
+  // project still references it: then we say where and ask first. Root public/ demo assets have
+  // no ×. The project JSON is never edited here (a deleted src just shows as missing).
+  const project = useEditor((s) => s.project);
+  const usesOf = (ref: string) => {
+    let n = 0;
+    for (const c of project.clips ?? []) {
+      if (c.src === ref) n++;
+      if (c.type === "wall") for (const it of c.wall?.items ?? []) if (it.src === ref) n++;
+    }
+    for (const o of project.overlays ?? []) if (o.src === ref) n++;
+    for (const a of project.audio ?? []) if (a.src === ref) n++;
+    return n;
+  };
+  const deletable = (ref: string) => ref.startsWith("media/");
+  const removeAsset = async (ref: string) => {
+    const uses = usesOf(ref);
+    if (uses > 0 && !window.confirm(`"${ref.split("/").pop()}" is used ${uses}× in this project (it will show as missing). Delete the file anyway?`)) return;
+    const r = await deleteMedia(ref);
+    if (!r.ok) {
+      flash(`Couldn't delete: ${r.message ?? "unknown error"}`);
+      return;
+    }
+    setAssets((list) => list.filter((a) => a !== ref));
+    flash(`Deleted ${ref.split("/").pop()}`);
+  };
+
+  // --- proxies for photos imported before proxies existed ---
+  const [proxying, setProxying] = useState<string | null>(null);
+  const needProxy = assets.filter((a) => deletable(a) && proxyEligible(a) && !proxyFor(a));
+  const generateProxies = async () => {
+    const todo = [...needProxy];
+    let made = 0;
+    for (let i = 0; i < todo.length; i++) {
+      const ref = todo[i];
+      setProxying(`Making proxies… ${i + 1}/${todo.length}`);
+      try {
+        const blob = await (await fetch(srcUrl(ref))).blob();
+        const px = await makeProxy(blob, ref);
+        if (px && (await uploadProxy(ref, px))) made++;
+      } catch {
+        /* skip this one */
+      }
+    }
+    setProxying(null);
+    await refresh();
+    flash(`Proxies: ${made} made${made < todo.length ? ` · ${todo.length - made} already small enough or unreadable` : ""}`);
   };
 
   const importFiles = async (files: FileList | File[]) => {
@@ -248,15 +301,44 @@ export const AssetsPanel: React.FC = () => {
         </div>
       )}
 
+      {(needProxy.length > 0 || proxying) && (
+        <div className="asset-tools">
+          <button className="lib-item" disabled={!!proxying} onClick={() => void generateProxies()} title="Make a ≤ 2048 px editor copy of every large photo that has none yet. The editor's preview and thumbnails use the copies (far less memory); Save / Export / Render always use the originals.">
+            {proxying ?? `⚡ Generate proxies (${needProxy.length})`}
+          </button>
+          {!proxying && <span className="muted" style={{ fontSize: 10 }}>lighter editing — renders still use the originals</span>}
+        </div>
+      )}
+
       <div className="asset-grid">
         {assets.map((a) => (
-          <button key={a} className="asset-tile" title={a} onClick={() => addAsset(a)}>
+          <div
+            key={a}
+            className="asset-tile"
+            role="button"
+            tabIndex={0}
+            title={a + (proxyFor(a) ? " · proxied" : "")}
+            onClick={() => addAsset(a)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void addAsset(a); } }}
+          >
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (
-              <img className="asset-thumb" src={srcUrl(a)} alt="" loading="lazy" />
+              // thumbnails read the PROXY when there is one (a 48 MP photo decodes to ~190 MB otherwise)
+              <img className="asset-thumb" src={srcUrl(proxyOr(a))} alt="" loading="lazy" decoding="async" />
             )}
-          </button>
+            {usesOf(a) > 0 && <span className="asset-used" title="used in this project" />}
+            {deletable(a) && (
+              <button
+                className="asset-del"
+                title="Delete this file from the project's media folder"
+                aria-label={`Delete ${a}`}
+                onClick={(e) => { e.stopPropagation(); void removeAsset(a); }}
+              >
+                ×
+              </button>
+            )}
+          </div>
         ))}
       </div>
 

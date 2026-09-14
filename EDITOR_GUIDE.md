@@ -244,6 +244,18 @@ the NLE — Remotion makes the elements, DaVinci makes the cut.
 The composition is bundled once per dev session and reused; restart `npm run editor` after changing
 composition/effect code to pick it up.
 
+**Memory: proxies and deleting assets.** The browser keeps every photo it shows as a decoded bitmap
+(a 12 MP phone photo is ~48 MB, a 48 MP one ~190 MB, whatever the JPEG weighs), so a long session on a
+wall of phone photos plus an Assets grid of unused imports can sit at many GB. Two tools in the
+**Assets** tab: (1) **Proxies** — every large still you import now also gets a ≤ 2048 px copy stored
+beside it (`public/media/<project>/_proxy/`), and the Wall view, the Edit preview, the Storyboard and
+timeline thumbnails and the Assets grid all read the copy; **Save, Export and Render always use the
+original** (the swap happens only at the preview's input, never in your project). For photos imported
+before this existed, press **⚡ Generate proxies (N)** once. A tile's tooltip says "· proxied". (2)
+**Hover a tile → ×** deletes that file (and its proxy) from the project's media folder — imports are
+copies, so this is low-stakes; if the project still uses the file you're told how many times and asked
+first (a purple dot marks in-use assets). Root demo assets have no ×.
+
 **When a render "sits there".** Before the first frame, every tab has to load every photo of the
 composition (a 24-photo 4K wall in 8 tabs is a lot of decoding), so the status now shows a live
 **"Waiting for the first frame… Ns"** heartbeat instead of a frozen line. After 45 s it points you at

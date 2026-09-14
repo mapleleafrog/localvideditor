@@ -14,7 +14,7 @@ import { ContextMenu } from "./components/ContextMenu";
 import { EffectBrowser } from "./components/EffectBrowser";
 import { useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
-import { saveProjectFile } from "./lib/api";
+import { listMediaFull, saveProjectFile } from "./lib/api";
 import { ensureProjectName } from "./lib/names";
 import { appendedScene, fitAll, wallOf } from "./lib/wall-edit";
 
@@ -27,6 +27,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 export const App: React.FC = () => {
   const playerRef = useRef<PlayerRef>(null);
   const view = useEditor((s) => s.view);
+  // Load the image-proxy map for this project up front, so the Players use the downscaled copies
+  // even before the Assets tab has been opened (lib/proxies.ts).
+  const projectName = useEditor((s) => s.projectName);
+  useEffect(() => {
+    void listMediaFull(projectName);
+  }, [projectName]);
 
   // Resizable panels — persisted so the layout sticks across reloads.
   const [railLeft, setRailLeft] = useState(() => lsNum("soranji.layout.left", 248));

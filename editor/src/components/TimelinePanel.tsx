@@ -10,6 +10,7 @@ import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { newWallClip, wallFitStatus, wallOf, wallSummary } from "../lib/wall-edit";
 import { importPhotosToWall } from "../lib/wall-import";
+import { proxyOr } from "../lib/proxies";
 import { WallMiniMap } from "./WallMiniMap";
 
 const RULER_H = 24;
@@ -19,7 +20,7 @@ const HOVER_DELAY_MS = 450;
 const isAudioFile = (n: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(n);
 const isVideoFile = (n: string) => /\.(mp4|webm|mov)$/i.test(n);
 const audioTrack = (src: string): AudioTrack => ({ src, volume: 1, from: 0, trimBefore: 0, trimAfter: 0, loop: false });
-const previewUrl = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
+const previewUrl = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(proxyOr(src)));
 
 const newClip = (src = "clip-a.svg", type: "image" | "video" = "image"): Clip => ({
   type, src, durationInFrames: 60, motion: "none",

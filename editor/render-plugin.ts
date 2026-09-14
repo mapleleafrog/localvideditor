@@ -12,6 +12,8 @@ const OUT_DIR = resolve(projectRoot, "out");
 const PROJECTS_DIR = resolve(projectRoot, "projects");
 const MEDIA_DIR = resolve(projectRoot, "public/media");
 const PUBLIC_DIR = resolve(projectRoot, "public");
+/** Per-folder subdir of downscaled editor proxies (mirrors editor/src/lib/proxies.ts#PROXY_DIR). */
+const PROXY_DIR = "_proxy";
 
 /** Bundle once per dev session and reuse the serveUrl (the composition code rarely changes while editing). */
 let bundlePromise: Promise<string> | null = null;
@@ -260,10 +262,19 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse) {
   try {
     const safe = safeSeg(qparam(req, "name")) || "upload.bin";
     const project = safeSeg(qparam(req, "project"));
-    const dir = project ? join(MEDIA_DIR, project) : MEDIA_DIR;
-    const prefix = project ? `media/${project}` : "media";
+    // ?proxy=1 → an editor PROXY (a downscaled copy made in the browser, see editor/src/lib/proxies.ts):
+    // lives in <dir>/_proxy/<original name>.<jpg|png>, OVERWRITES (it is derived, never authored),
+    // and is never listed as an asset of its own.
+    const isProxy = qparam(req, "proxy") === "1";
+    const baseDir = project ? join(MEDIA_DIR, project) : MEDIA_DIR;
+    const dir = isProxy ? join(baseDir, PROXY_DIR) : baseDir;
+    const prefix = (project ? `media/${project}` : "media") + (isProxy ? `/${PROXY_DIR}` : "");
     const buf = await readRawBody(req);
     await fs.mkdir(dir, { recursive: true });
+    if (isProxy) {
+      await fs.writeFile(join(dir, safe), buf);
+      return sendJson(res, 200, { ok: true, ref: `${prefix}/${safe}` });
+    }
 
     const dot = safe.lastIndexOf(".");
     const stem = dot > 0 ? safe.slice(0, dot) : safe;
@@ -293,9 +304,23 @@ async function handleMedia(req: IncomingMessage, res: ServerResponse) {
   const isAudio = (f: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f);
   const assets: string[] = [];
   const audio: string[] = [];
+  // ref → proxy ref, for every asset that has a downscaled editor copy in its folder's _proxy/.
+  // The proxy's name is the original's name + one extension (see proxies.ts#proxyName).
+  const proxies: Record<string, string> = {};
   const sort = (name: string, ref: string) => {
     if (isVisual(name)) assets.push(ref);
     else if (isAudio(name)) audio.push(ref);
+  };
+  const collectProxies = async (dir: string, prefix: string) => {
+    try {
+      const files = await fs.readdir(join(dir, PROXY_DIR));
+      for (const f of files) {
+        const orig = f.replace(/\.(jpg|png)$/i, "");
+        if (orig && orig !== f) proxies[`${prefix}/${orig}`] = `${prefix}/${PROXY_DIR}/${f}`;
+      }
+    } catch {
+      /* no proxies here */
+    }
   };
   try {
     const root = await fs.readdir(PUBLIC_DIR, { withFileTypes: true });
@@ -306,18 +331,48 @@ async function handleMedia(req: IncomingMessage, res: ServerResponse) {
   try {
     const media = await fs.readdir(MEDIA_DIR, { withFileTypes: true });
     media.filter((d) => d.isFile()).forEach((d) => sort(d.name, `media/${d.name}`));
+    await collectProxies(MEDIA_DIR, "media");
   } catch {
     /* no media dir yet */
   }
   if (project) {
     try {
-      const files = await fs.readdir(join(MEDIA_DIR, project));
-      files.forEach((f) => sort(f, `media/${project}/${f}`));
+      const files = await fs.readdir(join(MEDIA_DIR, project), { withFileTypes: true });
+      files.filter((d) => d.isFile()).forEach((d) => sort(d.name, `media/${project}/${d.name}`));
+      await collectProxies(join(MEDIA_DIR, project), `media/${project}`);
     } catch {
       /* no folder for this project yet */
     }
   }
-  sendJson(res, 200, { assets, audio });
+  // Only proxies whose original still exists.
+  const have = new Set(assets);
+  for (const k of Object.keys(proxies)) if (!have.has(k)) delete proxies[k];
+  sendJson(res, 200, { assets, audio, proxies });
+}
+
+/** Delete ONE imported media file (+ its proxy). Only refs under public/media/ are deletable —
+ *  root public/ holds shared demo assets, and a ref is validated segment by segment so it can
+ *  never point outside the media tree. The project JSON is NOT touched: an item that used the
+ *  file simply shows as missing (the client warns and asks first when the file is in use). */
+async function handleDeleteMedia(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const { ref } = await readJsonBody(req);
+    const parts = String(ref || "").split("/");
+    const ok =
+      (parts.length === 2 || parts.length === 3) &&
+      parts[0] === "media" &&
+      parts.slice(1).every((s) => s && s === safeSeg(s) && s !== PROXY_DIR);
+    if (!ok) return sendJson(res, 400, { ok: false, message: "only files under public/media/ can be deleted" });
+    const rel = parts.slice(1);
+    const file = join(MEDIA_DIR, ...rel);
+    await fs.rm(file, { force: true });
+    const name = rel[rel.length - 1];
+    const proxyDir = join(MEDIA_DIR, ...rel.slice(0, -1), PROXY_DIR);
+    await Promise.all([fs.rm(join(proxyDir, `${name}.jpg`), { force: true }), fs.rm(join(proxyDir, `${name}.png`), { force: true })]);
+    sendJson(res, 200, { ok: true });
+  } catch (err) {
+    sendJson(res, 500, { ok: false, message: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 /** Delete a project: removes projects/<name>.json and its public/media/<name>/ folder. */
@@ -344,6 +399,7 @@ export function renderApiPlugin(): Plugin {
         if (req.method === "POST" && url === "/api/save-project") return void handleSaveProject(req, res);
         if (req.method === "POST" && url === "/api/upload") return void handleUpload(req, res);
         if (req.method === "POST" && url === "/api/delete-project") return void handleDeleteProject(req, res);
+        if (req.method === "POST" && url === "/api/delete-media") return void handleDeleteMedia(req, res);
         if (req.method === "GET" && url === "/api/media") return void handleMedia(req, res);
         next();
       });

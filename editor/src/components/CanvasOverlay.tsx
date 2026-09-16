@@ -12,6 +12,8 @@ interface Props {
 
 /** content signature — changes only when the rendered SIZE could change (not on transform edits). */
 const sig = (o: Overlay) => `${o.type}|${o.text}|${o.fontSize}|${o.src}|${o.width}`;
+/** Max measured-size entries kept. Far more than any project has layers; bounds a per-keystroke key. */
+const BASE_CACHE_CAP = 256;
 
 /** fallback base size (composition px) when the live node isn't measurable yet. */
 function estimateBase(o: Overlay): { w: number; h: number } {
@@ -45,6 +47,7 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
   const [measureTick, setMeasureTick] = useState(0);
   void measureTick; // bumped after measuring to refine estimated boxes
 
+  // Measured base sizes, keyed by an overlay signature. Capped — see the insert below.
   const baseCache = useRef<Map<string, { w: number; h: number }>>(new Map());
   const gestureRef = useRef<Gesture | null>(null);
 
@@ -97,6 +100,12 @@ export const CanvasOverlay: React.FC<Props> = ({ boxRef, playerRef }) => {
         const key = sig(o);
         const prev = baseCache.current.get(key);
         if (!prev || prev.w !== node.offsetWidth || prev.h !== node.offsetHeight) {
+          // FIFO cap: `sig` includes the overlay's TEXT, so every keystroke in a text layer mints a
+          // new key. Tiny entries, but no collection without a bound next to it.
+          if (baseCache.current.size >= BASE_CACHE_CAP) {
+            const oldest = baseCache.current.keys().next().value;
+            if (oldest !== undefined) baseCache.current.delete(oldest);
+          }
           baseCache.current.set(key, { w: node.offsetWidth, h: node.offsetHeight });
           changed = true;
         }

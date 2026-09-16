@@ -217,7 +217,26 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   // while dragging). "Motion" loops 3 s of that same still camera so animated GIFs, video items
   // and stacked item effects can be seen moving while you place them — the camera itself does not
   // move (the derived project has one scene and no breathing), so it is still a framing tool.
-  const [motion, setMotion] = useState(true);
+  //
+  // It defaults OFF, and it stops while the tab is hidden. A looping Player never lets the renderer
+  // go idle, and an idle renderer is exactly when Chrome purges its decoded-image and raster caches
+  // — so leaving this on all afternoon turns every transient allocation into a permanent high-water
+  // mark. (Measured: JS heap, DOM nodes and listeners stay flat while process RSS only climbs.)
+  // Turn it on to check a GIF or a stacked item effect, then turn it back off.
+  const [motion, setMotion] = useState(false);
+  const [tabVisible, setTabVisible] = useState(() => (typeof document === "undefined" ? true : !document.hidden));
+  useEffect(() => {
+    const onVis = () => setTabVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("blur", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("blur", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, []);
+  const animating = motion && tabVisible;
   const ARRANGE_LOOP_FRAMES = Math.max(1, Math.round(3 * fps));
   const duration = live ? computeDuration(liveProj, audioEnd) : motion ? ARRANGE_LOOP_FRAMES : 1;
 
@@ -354,7 +373,7 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
           <button
             className={motion ? "on" : ""}
             onClick={() => setMotion(!motion)}
-            title="Loop the still camera so GIFs, video items and stacked effects animate while you arrange (turn off if dragging feels heavy)"
+            title="Loop the still camera so GIFs, video items and stacked effects animate while you arrange. Off by default and paused while the tab is hidden: a permanently looping preview stops the browser reclaiming image memory, so leaving it on for hours is what makes the editor balloon. Turn it on to check something, then off again."
           >
             ⟳ Motion
           </button>
@@ -430,8 +449,8 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
             style={{ width: "100%", height: "100%" }}
             clickToPlay={false}
             controls={live}
-            autoPlay={!live && motion}
-            loop={!live && motion}
+            autoPlay={!live && animating}
+            loop={!live && animating}
           />
           {!live && fit.w > 0 && (
             <WallOverlay

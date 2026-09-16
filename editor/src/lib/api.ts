@@ -1,5 +1,5 @@
 import type { Project } from "../../../src/timeline/schema";
-import { addProxy, makeProxy, proxyEligible, proxyName, removeProxy, setProxies } from "./proxies";
+import { addProxy, makeTiers, proxyEligible, proxyName, removeProxy, setProxies, type Tier } from "./proxies";
 
 export type RenderMsg =
   | { type: "status"; message: string; durationInFrames?: number }
@@ -102,31 +102,35 @@ const mediaList = async (project: string, key: "assets" | "audio"): Promise<stri
 /** Visual assets: root public/ + flat public/media/ + this project's folder. */
 export const listMedia = (project = ""): Promise<string[]> => mediaList(project, "assets");
 
-/** Assets + audio + the ref → proxy-ref map, in one call (also feeds the proxy store). */
-export async function listMediaFull(project = ""): Promise<{ assets: string[]; audio: string[]; proxies: Record<string, string> }> {
+/** Assets + audio + both ref → derived-ref maps, in one call (also feeds the proxy store). */
+export async function listMediaFull(
+  project = "",
+): Promise<{ assets: string[]; audio: string[]; proxies: Record<string, string>; thumbs: Record<string, string> }> {
   try {
     const res = await fetch(`/api/media${project ? `?project=${encodeURIComponent(project)}` : ""}`);
     const data = await res.json();
-    const proxies = data.proxies && typeof data.proxies === "object" ? (data.proxies as Record<string, string>) : {};
-    setProxies(proxies);
-    return { assets: Array.isArray(data.assets) ? data.assets : [], audio: Array.isArray(data.audio) ? data.audio : [], proxies };
+    const obj = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, string>) : {});
+    const proxies = obj(data.proxies);
+    const thumbs = obj(data.thumbs);
+    setProxies(proxies, thumbs);
+    return { assets: Array.isArray(data.assets) ? data.assets : [], audio: Array.isArray(data.audio) ? data.audio : [], proxies, thumbs };
   } catch {
-    return { assets: [], audio: [], proxies: {} };
+    return { assets: [], audio: [], proxies: {}, thumbs: {} };
   }
 }
 
-/** Upload a browser-made proxy for the stored file `storedRef` (e.g. "media/p/photo.jpg"); the
+/** Upload one browser-made tier for the stored file `storedRef` (e.g. "media/p/photo.jpg"); the
  *  server files it under that folder's _proxy/ and the proxy store learns the pair. */
-export async function uploadProxy(storedRef: string, blob: Blob): Promise<string | null> {
+export async function uploadTier(storedRef: string, blob: Blob, tier: Tier): Promise<string | null> {
   try {
     const parts = storedRef.split("/");
     const name = parts.pop()!;
     const project = parts.length === 2 ? parts[1] : "";
-    const q = `name=${encodeURIComponent(proxyName(name))}&proxy=1${project ? `&project=${encodeURIComponent(project)}` : ""}`;
+    const q = `name=${encodeURIComponent(proxyName(name, tier))}&proxy=1${project ? `&project=${encodeURIComponent(project)}` : ""}`;
     const res = await fetch(`/api/upload?${q}`, { method: "POST", body: blob });
     const r = (await res.json()) as { ok: boolean; ref?: string };
     if (r.ok && r.ref) {
-      addProxy(storedRef, r.ref);
+      addProxy(storedRef, r.ref, tier);
       return r.ref;
     }
     return null;
@@ -135,19 +139,28 @@ export async function uploadProxy(storedRef: string, blob: Blob): Promise<string
   }
 }
 
+/** Make BOTH editor tiers for an already-stored file and upload whichever ones apply.
+ *  Returns how many were written. One decode of the source serves both. */
+export async function makeAndUploadTiers(storedRef: string, blob: Blob, name = storedRef): Promise<number> {
+  const tiers = await makeTiers(blob, name).catch(() => ({}) as Partial<Record<Tier, Blob>>);
+  let n = 0;
+  for (const tier of ["proxy", "thumb"] as Tier[]) {
+    const b = tiers[tier];
+    if (b && (await uploadTier(storedRef, b, tier))) n++;
+  }
+  return n;
+}
+
 /** Import a dropped/picked file into public/media/<project>/. Returns the ref (e.g.
  *  "media/my-wedding/photo.jpg"). With no project it lands in flat public/media/.
- *  A raster still bigger than PROXY_MAX_EDGE also gets an editor proxy right away (made in the
- *  browser, stored beside it) — every import path goes through here, so every path gets one. */
+ *  A raster still also gets its editor tiers right away (made in the browser, stored beside it) —
+ *  every import path goes through here, so every path gets them. */
 export async function uploadMedia(file: File, project = ""): Promise<{ ok: boolean; ref?: string; message?: string }> {
   try {
     const q = `name=${encodeURIComponent(file.name)}${project ? `&project=${encodeURIComponent(project)}` : ""}`;
     const res = await fetch(`/api/upload?${q}`, { method: "POST", body: file });
     const r = (await res.json()) as { ok: boolean; ref?: string; message?: string };
-    if (r.ok && r.ref && proxyEligible(file.name)) {
-      const px = await makeProxy(file, file.name).catch(() => null);
-      if (px) await uploadProxy(r.ref, px);
-    }
+    if (r.ok && r.ref && proxyEligible(file.name)) await makeAndUploadTiers(r.ref, file, file.name);
     return r;
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) };

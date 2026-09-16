@@ -304,9 +304,13 @@ async function handleMedia(req: IncomingMessage, res: ServerResponse) {
   const isAudio = (f: string) => /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f);
   const assets: string[] = [];
   const audio: string[] = [];
-  // ref → proxy ref, for every asset that has a downscaled editor copy in its folder's _proxy/.
-  // The proxy's name is the original's name + one extension (see proxies.ts#proxyName).
+  // ref → derived ref, for every asset that has a downscaled editor copy in its folder's _proxy/.
+  // A derived file is named `<original name>.e<edge>q<quality>.<jpg|png>` (see proxies.ts#proxyName);
+  // the stamp says which TIER it is, so bumping an edge constant misses instead of serving the wrong
+  // size. Files with no stamp are legacy 2048-px proxies from before the thumb tier existed.
   const proxies: Record<string, string> = {};
+  const thumbs: Record<string, string> = {};
+  const THUMB_EDGE = 320; // mirrors proxies.ts#THUMB_MAX_EDGE
   const sort = (name: string, ref: string) => {
     if (isVisual(name)) assets.push(ref);
     else if (isAudio(name)) audio.push(ref);
@@ -315,8 +319,11 @@ async function handleMedia(req: IncomingMessage, res: ServerResponse) {
     try {
       const files = await fs.readdir(join(dir, PROXY_DIR));
       for (const f of files) {
-        const orig = f.replace(/\.(jpg|png)$/i, "");
-        if (orig && orig !== f) proxies[`${prefix}/${orig}`] = `${prefix}/${PROXY_DIR}/${f}`;
+        const stamped = /^(.*)\.e(\d+)q\d+\.(?:jpg|png)$/i.exec(f);
+        const orig = stamped ? stamped[1] : f.replace(/\.(jpg|png)$/i, "");
+        if (!orig || orig === f) continue;
+        const target = stamped && Number(stamped[2]) <= THUMB_EDGE ? thumbs : proxies;
+        target[`${prefix}/${orig}`] = `${prefix}/${PROXY_DIR}/${f}`;
       }
     } catch {
       /* no proxies here */
@@ -344,10 +351,11 @@ async function handleMedia(req: IncomingMessage, res: ServerResponse) {
       /* no folder for this project yet */
     }
   }
-  // Only proxies whose original still exists.
+  // Only derived files whose original still exists.
   const have = new Set(assets);
   for (const k of Object.keys(proxies)) if (!have.has(k)) delete proxies[k];
-  sendJson(res, 200, { assets, audio, proxies });
+  for (const k of Object.keys(thumbs)) if (!have.has(k)) delete thumbs[k];
+  sendJson(res, 200, { assets, audio, proxies, thumbs });
 }
 
 /** Delete ONE imported media file (+ its proxy). Only refs under public/media/ are deletable —
@@ -366,9 +374,18 @@ async function handleDeleteMedia(req: IncomingMessage, res: ServerResponse) {
     const rel = parts.slice(1);
     const file = join(MEDIA_DIR, ...rel);
     await fs.rm(file, { force: true });
+    // Remove EVERY derived tier of this file — legacy `<name>.jpg` and stamped
+    // `<name>.e<edge>q<q>.<ext>` alike — by scanning the folder rather than guessing names.
     const name = rel[rel.length - 1];
     const proxyDir = join(MEDIA_DIR, ...rel.slice(0, -1), PROXY_DIR);
-    await Promise.all([fs.rm(join(proxyDir, `${name}.jpg`), { force: true }), fs.rm(join(proxyDir, `${name}.png`), { force: true })]);
+    try {
+      const derived = await fs.readdir(proxyDir);
+      await Promise.all(
+        derived.filter((f) => f === `${name}.jpg` || f === `${name}.png` || f.startsWith(`${name}.e`)).map((f) => fs.rm(join(proxyDir, f), { force: true })),
+      );
+    } catch {
+      /* no _proxy folder */
+    }
     sendJson(res, 200, { ok: true });
   } catch (err) {
     sendJson(res, 500, { ok: false, message: err instanceof Error ? err.message : String(err) });

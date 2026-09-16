@@ -54,14 +54,21 @@ export function startBlockDrag(
       onChange({ from: init.from, durationInFrames: end - init.from });
     }
   };
+  // `pointercancel` and window `blur` matter: releasing the button outside the browser window fires
+  // neither `pointerup` nor a click, so without them the pair stays attached forever — and each
+  // closure pins that render's snap array and the project it came from.
   const up = () => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    window.removeEventListener("blur", up);
     document.body.style.userSelect = "";
   };
   document.body.style.userSelect = "none";
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+  window.addEventListener("blur", up);
 }
 
 /** Drag/click on the ruler or playhead to scrub. Calls onSeek with the snapped frame.
@@ -80,10 +87,15 @@ export function startScrub(
     Math.max(0, Math.min(maxFrame, Math.round((clientX - originLeft + scrollLeft) / zoom)));
   onSeek(toFrame(e.clientX));
   const move = (ev: PointerEvent) => onSeek(toFrame(ev.clientX));
+  // Same cancel/blur fallback as startBlockDrag — a release outside the window must still detach.
   const up = () => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    window.removeEventListener("blur", up);
   };
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+  window.addEventListener("blur", up);
 }

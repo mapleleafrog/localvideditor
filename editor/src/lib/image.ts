@@ -1,11 +1,27 @@
 // Read an image's natural pixel size so imported layers land at their real resolution.
+//
+// Both probes RELEASE their element before resolving. Without that, every probe leaves a decoded
+// image (or a live demuxer) alive until GC happens to collect the wrapper — and these are called on
+// every asset click, every drop, every "Fit to frame" and once per photo in a batch import. Where
+// only the RATIO is wanted, callers should probe a proxy/thumb rather than the original.
 
 /** Natural size of an image URL (or object URL). Resolves {w:0,h:0} on error (e.g. video/audio). */
 export const imageNaturalSize = (url: string): Promise<{ w: number; h: number }> =>
   new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => resolve({ w: 0, h: 0 });
+    const done = (v: { w: number; h: number }) => {
+      img.onload = null;
+      img.onerror = null;
+      // Drop the decoded bitmap now instead of waiting for the wrapper to be collected.
+      try {
+        img.removeAttribute("src");
+      } catch {
+        /* ignore */
+      }
+      resolve(v);
+    };
+    img.onload = () => done({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => done({ w: 0, h: 0 });
     img.src = url;
   });
 
@@ -14,8 +30,20 @@ export const videoNaturalSize = (url: string): Promise<{ w: number; h: number }>
   new Promise((resolve) => {
     const v = document.createElement("video");
     v.preload = "metadata";
-    v.onloadedmetadata = () => resolve({ w: v.videoWidth, h: v.videoHeight });
-    v.onerror = () => resolve({ w: 0, h: 0 });
+    const done = (val: { w: number; h: number }) => {
+      v.onloadedmetadata = null;
+      v.onerror = null;
+      // Tear the demuxer down — a probe left with a src keeps one alive per call.
+      try {
+        v.removeAttribute("src");
+        v.load();
+      } catch {
+        /* ignore */
+      }
+      resolve(val);
+    };
+    v.onloadedmetadata = () => done({ w: v.videoWidth, h: v.videoHeight });
+    v.onerror = () => done({ w: 0, h: 0 });
     v.src = url;
   });
 

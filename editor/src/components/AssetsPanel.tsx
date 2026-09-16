@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { staticFile } from "remotion";
 import { useEditor } from "../store";
 import type { Overlay } from "../../../src/timeline/schema";
-import { deleteMedia, listMediaFull, uploadMedia, uploadProxy } from "../lib/api";
+import { deleteMedia, listMediaFull, makeAndUploadTiers, uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
-import { makeProxy, proxyEligible, proxyFor, proxyOr, useProxiesVersion } from "../lib/proxies";
+import { proxyEligible, proxyFor, thumbFor, thumbOr, useProxiesVersion } from "../lib/proxies";
 import { imageNaturalSize, videoNaturalSize, placeWidth } from "../lib/image";
 import type { AudioTrack } from "../../../src/timeline/schema";
 import {
@@ -83,7 +83,9 @@ export const AssetsPanel: React.FC = () => {
     const vid = isVideo(ref);
     const st0 = useEditor.getState();
     const wallMode = st0.view === "wall" && isWallClip(st0.project, st0.wallClip);
-    const { w, h } = await (vid ? videoNaturalSize : imageNaturalSize)(srcUrl(ref));
+    // Only the RATIO is needed here, so probe the small copy — probing the original decodes the
+    // full photo (a 48 MP one is ~190 MB) just to read two numbers.
+    const { w, h } = await (vid ? videoNaturalSize : imageNaturalSize)(srcUrl(vid ? ref : thumbOr(ref)));
     if (wallMode) {
       // Re-read + re-validate after the await: the clip may have been reordered, removed or undone
       // while the natural size was loading.
@@ -117,7 +119,7 @@ export const AssetsPanel: React.FC = () => {
   const buildWall = async (refs: string[]) => {
     const probed = await Promise.all(
       refs.map(async (src) => {
-        const { w, h } = await imageNaturalSize(srcUrl(src));
+        const { w, h } = await imageNaturalSize(srcUrl(thumbOr(src))); // ratio only — never the original
         return { src, aspect: w > 0 && h > 0 ? w / h : undefined, label: src };
       }),
     );
@@ -182,26 +184,27 @@ export const AssetsPanel: React.FC = () => {
     flash(`Deleted ${ref.split("/").pop()}`);
   };
 
-  // --- proxies for photos imported before proxies existed ---
+  // --- back-fill editor tiers for photos imported before they existed ---
+  // An asset needs work if it is missing EITHER tier: the 2048 px proxy the Player reads or the
+  // 320 px thumb this grid reads. Sequential on purpose — one decode alive at a time.
   const [proxying, setProxying] = useState<string | null>(null);
-  const needProxy = assets.filter((a) => deletable(a) && proxyEligible(a) && !proxyFor(a));
+  const needProxy = assets.filter((a) => deletable(a) && proxyEligible(a) && (!proxyFor(a) || !thumbFor(a)));
   const generateProxies = async () => {
     const todo = [...needProxy];
     let made = 0;
     for (let i = 0; i < todo.length; i++) {
       const ref = todo[i];
-      setProxying(`Making proxies… ${i + 1}/${todo.length}`);
+      setProxying(`Making editor copies… ${i + 1}/${todo.length}`);
       try {
         const blob = await (await fetch(srcUrl(ref))).blob();
-        const px = await makeProxy(blob, ref);
-        if (px && (await uploadProxy(ref, px))) made++;
+        if ((await makeAndUploadTiers(ref, blob, ref)) > 0) made++;
       } catch {
         /* skip this one */
       }
     }
     setProxying(null);
     await refresh();
-    flash(`Proxies: ${made} made${made < todo.length ? ` · ${todo.length - made} already small enough or unreadable` : ""}`);
+    flash(`Editor copies: ${made}/${todo.length} photos done`);
   };
 
   const importFiles = async (files: FileList | File[]) => {
@@ -303,8 +306,8 @@ export const AssetsPanel: React.FC = () => {
 
       {(needProxy.length > 0 || proxying) && (
         <div className="asset-tools">
-          <button className="lib-item" disabled={!!proxying} onClick={() => void generateProxies()} title="Make a ≤ 2048 px editor copy of every large photo that has none yet. The editor's preview and thumbnails use the copies (far less memory); Save / Export / Render always use the originals.">
-            {proxying ?? `⚡ Generate proxies (${needProxy.length})`}
+          <button className="lib-item" disabled={!!proxying} onClick={() => void generateProxies()} title="Make the two editor copies of every large photo that is missing them: a 2048 px one for the preview and a 320 px one for these thumbnails. Thumbnails served at 2048 px decode ~40× more pixels than the tile can show, which is where the editor's memory goes. Save / Export / Render always use the originals.">
+            {proxying ?? `⚡ Generate editor copies (${needProxy.length})`}
           </button>
           {!proxying && <span className="muted" style={{ fontSize: 10 }}>lighter editing — renders still use the originals</span>}
         </div>
@@ -324,8 +327,9 @@ export const AssetsPanel: React.FC = () => {
             {isVideo(a) ? (
               <video className="asset-thumb" src={srcUrl(a)} muted preload="metadata" />
             ) : (
-              // thumbnails read the PROXY when there is one (a 48 MP photo decodes to ~190 MB otherwise)
-              <img className="asset-thumb" src={srcUrl(proxyOr(a))} alt="" loading="lazy" decoding="async" />
+              // Tiles read the 320 px THUMB tier: this cell is ~64-96 px, so a 2048 px source would
+              // decode ~41× more pixels than it can ever show (11.2 MB vs 0.27 MB per asset).
+              <img className="asset-thumb" src={srcUrl(thumbOr(a))} alt="" loading="lazy" decoding="async" />
             )}
             {usesOf(a) > 0 && <span className="asset-used" title="used in this project" />}
             {deletable(a) && (

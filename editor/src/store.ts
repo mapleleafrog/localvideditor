@@ -769,6 +769,10 @@ export const useEditor = create<EditorState>()(
     {
       partialize: (s) => ({ project: s.project }),
       limit: 100,
+      // Without this, EVERY set() — a camera pan, a selection, a playhead move — pushes a history
+      // entry holding the same unchanged project reference, so the 100-entry cap is spent on
+      // non-edits and Ctrl+Z walks through nothing. Undo is for project changes only.
+      equality: (a, b) => a.project === b.project,
       // Coalesce rapid changes (drags/scrubs/typing) into one undo step.
       handleSet: (handleSet) => throttleHandleSet(handleSet, 600),
     },

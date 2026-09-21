@@ -283,16 +283,10 @@ export const App: React.FC = () => {
             break;
           case "PageUp":
           case "PageDown": {
-            // Step the selected scene card (footer strip) and jump the camera to it.
+            // Step the selected scene card (footer strip) and jump the camera to it — the same
+            // action as the strip's ‹ › buttons (store.ts#stepWallScene).
             e.preventDefault();
-            const scenes = wall.scenes ?? [];
-            if (!scenes.length) break;
-            const cur = scenes.findIndex((sc) => sc.id != null && sc.id === st.wallScene);
-            const next = e.key === "PageDown" ? Math.min(scenes.length - 1, cur + 1) : Math.max(0, cur < 0 ? 0 : cur - 1);
-            const sc = scenes[next];
-            st.setWallScene(sc.id ?? null);
-            if (ci != null) st.select({ kind: "clip", index: ci });
-            st.setWallCam({ x: sc.x, y: sc.y, zoom: sc.zoom, rot: sc.rotation });
+            st.stepWallScene(e.key === "PageDown" ? 1 : -1);
             break;
           }
           case "?":

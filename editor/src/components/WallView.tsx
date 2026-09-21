@@ -24,7 +24,7 @@ import { clipStarts, computeDuration } from "../lib/timeline-utils";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize } from "../lib/image";
-import { authoringProject, camFromScene, fitAll, importWidth, isWallClip, liveWallProject, newSeed, newWallItemFromAsset, spiralOffset, wallOf } from "../lib/wall-edit";
+import { authoringProject, camFromScene, fitAll, importWidth, isWallClip, liveWallProject, newSeed, newWallItemFromAsset, scheduleWall, spiralOffset, wallOf } from "../lib/wall-edit";
 import { useProxiesVersion, withProxies } from "../lib/proxies";
 import { wallViewport, zoomAtCursor, panBy, screenPtToWall, ZOOM_MAX, ZOOM_MIN } from "../lib/wall-coords";
 import { WallOverlay } from "./WallOverlay";
@@ -47,6 +47,8 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
   const setOverscan = useEditor((s) => s.setWallOverscan);
   const live = useEditor((s) => s.wallLive);
   const setLive = useEditor((s) => s.setWallLive);
+  const wallScene = useEditor((s) => s.wallScene);
+  const requestSeek = useEditor((s) => s.requestSeek);
   const hand = useEditor((s) => s.wallHand);
   const setHand = useEditor((s) => s.setWallHand);
   const wallFramed = useEditor((s) => s.wallFramed);
@@ -201,6 +203,18 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
     () => (valid && wallClip != null ? authoringProject(project, wallClip, wallCam) : project),
     [valid, project, wallClip, wallCam],
   );
+  // Where ▶ Live starts: the selected scene's arrival frame in the LIVE take (liveWallProject puts
+  // the wall at Player frame 0, so the schedule's own sceneFrames are the seek targets).
+  const liveSceneIdx = useMemo(() => {
+    if (!valid || wallClip == null) return -1;
+    const scenes = wallOf(project.clips?.[wallClip]).scenes ?? [];
+    return scenes.findIndex((sc) => sc.id != null && sc.id === wallScene);
+  }, [valid, wallClip, project, wallScene]);
+  const liveStartFrame = useMemo(() => {
+    if (liveSceneIdx < 0 || wallClip == null) return 0;
+    const sched = scheduleWall(wallOf(project.clips?.[wallClip]), fps, compW, compH);
+    return sched.sceneFrames[liveSceneIdx] ?? 0;
+  }, [liveSceneIdx, wallClip, project, fps, compW, compH]);
   // Editor proxies: downscaled stills swapped in at THIS boundary only (never the store / JSON /
   // render) — the layout, camera and filters are byte-identical, only the pixel density differs.
   const proxiesVersion = useProxiesVersion();
@@ -380,10 +394,25 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
         )}
         <button
           className={live ? "stop" : ""}
-          onClick={() => setLive(!live)}
-          title={live ? "Stop the preview and go back to arranging (Esc)" : "Play the real camera schedule — just the wall, with the song"}
+          onClick={() => {
+            if (live) {
+              setLive(false);
+              return;
+            }
+            // Start the take AT the selected scene (the strip card / PgUp-PgDn selection), not at
+            // frame 0 — checking one scene's timing should not mean scrubbing from the top.
+            setLive(true);
+            requestSeek(liveStartFrame, { play: true });
+          }}
+          title={
+            live
+              ? "Stop the preview and go back to arranging (Esc)"
+              : liveSceneIdx >= 0
+                ? `Play the real camera schedule from scene ${liveSceneIdx + 1} (${(liveStartFrame / fps).toFixed(1)}s) to the end — just the wall, with the song. ▶ Preview all on the strip plays from the top.`
+                : "Play the real camera schedule from the top — just the wall, with the song. Select a scene card first to start there."
+          }
         >
-          {live ? "■ Stop preview" : "▶ Live"}
+          {live ? "■ Stop preview" : liveSceneIdx >= 0 ? `▶ Live from ${liveSceneIdx + 1}` : "▶ Live"}
         </button>
 
         {wallClips.length > 1 && (

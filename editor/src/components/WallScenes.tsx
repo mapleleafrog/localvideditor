@@ -13,7 +13,7 @@
 // SCENE (by stable id) and jumps the camera to it; easing, arc and the rest live in the
 // inspector's `Scene` section. ▶ Preview all plays the whole schedule in Live mode. Drag a card to
 // reorder. Scene refs on items are by id, so reordering never re-targets a prop.
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
 import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWall, speedClass, wallFitFor, wallOf, withTimingApplied } from "../lib/wall-edit";
@@ -36,12 +36,22 @@ export const WallScenes: React.FC = () => {
   const patchWallScene = useEditor((s) => s.patchWallScene);
   const reorderWallScene = useEditor((s) => s.reorderWallScene);
   const requestSeek = useEditor((s) => s.requestSeek);
+  const stepWallScene = useEditor((s) => s.stepWallScene);
   const patchWall = useEditor((s) => s.patchWall);
   const patchClip = useEditor((s) => s.patchClip);
   const autoFit = useEditor((s) => s.wallAutoFit);
   const setAutoFit = useEditor((s) => s.setWallAutoFit);
   const flash = useEditor((s) => s.flash);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // Keep the selected card in view: with 20+ scenes the strip is wider than the window and ‹ › /
+  // PgUp-PgDn would otherwise step onto cards you cannot see. `block: "nearest"` so only the strip
+  // scrolls, never the page.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!wallScene || !stripRef.current) return;
+    const el = stripRef.current.querySelector<HTMLElement>(`[data-scene-id="${wallScene}"]`);
+    el?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [wallScene]);
 
   const clip = wallClip != null ? project.clips?.[wallClip] : undefined;
   const isWall = wallClip != null && !!clip && clip.type === "wall";
@@ -117,12 +127,25 @@ export const WallScenes: React.FC = () => {
         >
           ⟳ Re-frame {selIdx >= 0 ? selIdx + 1 : ""}
         </button>
+        {/* ‹ › step the selected scene (and scroll its card into view) — the strip is wider than
+            the window past ~8 scenes, and dragging its scrollbar to find a card is the slow way. */}
+        <span className="view-toggle" title="Previous / next scene — selects it, jumps the camera and scrolls the strip to it (PgUp / PgDn)">
+          <button disabled={!scenes.length || selIdx <= 0} onClick={() => stepWallScene(-1)} aria-label="Previous scene">
+            ‹
+          </button>
+          <span className="muted" style={{ padding: "0 6px", minWidth: 52, textAlign: "center", display: "inline-block" }}>
+            {selIdx >= 0 ? `${selIdx + 1} / ${scenes.length}` : `– / ${scenes.length}`}
+          </span>
+          <button disabled={!scenes.length || selIdx >= scenes.length - 1} onClick={() => stepWallScene(1)} aria-label="Next scene">
+            ›
+          </button>
+        </span>
         {live ? (
           <button className="stop" onClick={stopPreview} title="Stop the preview and go back to arranging (Esc)">
             ■ Stop preview
           </button>
         ) : (
-          <button onClick={previewAll} disabled={!scenes.length} title="Play every scene in order (Live mode) — how they string together">
+          <button onClick={previewAll} disabled={!scenes.length} title="Play every scene in order from the top (Live mode) — how they string together. To start at one scene, select its card and press ▶ Live in the nav bar.">
             ▶ Preview all
           </button>
         )}
@@ -213,7 +236,7 @@ export const WallScenes: React.FC = () => {
         </span>
       </div>
 
-      <div className="wsc-strip">
+      <div className="wsc-strip" ref={stripRef}>
         {/* Overview card: the whole wall with every frustum + glide path; click to jump. */}
         <div className="wsc-card wsc-timing">
           <div className="wsc-card-head">Overview</div>
@@ -294,6 +317,7 @@ export const WallScenes: React.FC = () => {
 
               <div
                 className={"wsc-card" + (via ? " via" : "") + (on ? " on" : "") + (dragIndex === i ? " dragging" : "")}
+                data-scene-id={s.id ?? undefined}
                 draggable
                 onDragStart={() => setDragIndex(i)}
                 onDragEnd={() => setDragIndex(null)}

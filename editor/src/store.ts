@@ -174,6 +174,9 @@ export interface EditorState {
   setWallCam: (cam: Cam) => void;
   setWallSel: (sel: number[]) => void;
   setWallScene: (id: string | null) => void;
+  /** Select the previous (−1) / next (+1) scene of the open wall clip and jump the camera to it —
+   *  the strip's ‹ › buttons and PgUp/PgDn. Clamped at both ends; no scene selected → the first. */
+  stepWallScene: (dir: 1 | -1) => void;
   setWallOverscan: (k: WallOverscan) => void;
   setWallLive: (v: boolean) => void;
   setWallHand: (v: boolean) => void;
@@ -734,6 +737,19 @@ export const useEditor = create<EditorState>()(
       setWallCam: (wallCam) => set({ wallCam }),
       setWallSel: (wallSel) => set({ wallSel }),
       setWallScene: (wallScene) => set({ wallScene }),
+      stepWallScene: (dir) =>
+        set((s) => {
+          const ci = s.wallClip;
+          const clip = ci != null ? s.project.clips?.[ci] : undefined;
+          if (ci == null || !clip || clip.type !== "wall") return {};
+          const scenes = clip.wall?.scenes ?? [];
+          if (!scenes.length) return {};
+          const cur = scenes.findIndex((sc) => sc.id != null && sc.id === s.wallScene);
+          const next = dir > 0 ? Math.min(scenes.length - 1, cur + 1) : Math.max(0, cur < 0 ? 0 : cur - 1);
+          const sc = scenes[next];
+          // Same three writes the strip's card click makes (select owns the wallSel invariant).
+          return { ...reconcileWallSel(s, { kind: "clip", index: ci }), wallScene: sc.id ?? null, wallCam: { x: sc.x, y: sc.y, zoom: sc.zoom, rot: sc.rotation } };
+        }),
       setWallOverscan: (wallOverscan) => set({ wallOverscan }),
       setWallLive: (wallLive) => set({ wallLive }),
       setWallHand: (wallHand) => set({ wallHand }),

@@ -91,7 +91,11 @@ off. ④ Pan to the next area and repeat. ⑤ **⟲ Fit clip duration** makes th
 Click a scene card and the inspector's **Scene N** section shows its **Hold** and **Glide in** in seconds, the
 easing, the arc, and a **colour-banded px/frame speed chip** — *"● 35 px/f → 1.8s"*, click to apply the suggested
 glide. **⟳ Re-frame** updates the pose from the viewport *keeping the timing*, **▸ Play** plays that scene in Live
-mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). `PgUp`/`PgDn` step scenes.
+mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). **‹ N / M ›** on the
+strip toolbar (or `PgUp`/`PgDn`) steps to the previous / next scene — selects it, jumps the camera, and scrolls
+the strip so its card is in view, which matters once the strip is wider than the window. **▶ Live in the nav bar
+starts at the selected scene** and plays to the end (its label reads `▶ Live from N`); the strip's **▶ Preview
+all** always plays from the top; the Scene panel's **▸ Play** plays just that one scene.
 
 **Seamless flow.** Tick **flow** in the strip toolbar and the camera never stops: each hold drifts at a steady pace
 (hover amount = how fast) and every glide is re-shaped to depart at the previous hold's drift speed and land at the

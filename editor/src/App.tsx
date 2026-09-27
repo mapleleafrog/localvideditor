@@ -16,13 +16,25 @@ import { useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
 import { listMediaFull, saveProjectFile } from "./lib/api";
 import { ensureProjectName } from "./lib/names";
-import { appendedScene, fitAll, insertedScene, wallOf } from "./lib/wall-edit";
+import { appendedScene, fitAll, insertedScene, scheduleWall, wallOf } from "./lib/wall-edit";
 
 const lsNum = (key: string, def: number) => {
   const v = Number(localStorage.getItem(key));
   return Number.isFinite(v) && v > 0 ? v : def;
 };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+/** <input type>s that take typed text; everything else (checkbox/radio/range/color/button/file) is a
+ *  one-shot control that must not swallow the editor's shortcuts. */
+const TEXT_INPUT_TYPES = /^(text|number|search|email|url|tel|password|date|time|datetime-local|month|week)$/i;
+/** One-shot controls give focus back after a change, so the next keypress is a shortcut again
+ *  instead of re-toggling / re-stepping that control (Space re-ticks a checkbox, arrows step a
+ *  select or slider). Delegated from `document` once, so every current and future control gets it. */
+const releasesFocusOnChange = (el: EventTarget | null) => {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.tagName === "SELECT") return true;
+  if (el.tagName !== "INPUT") return false;
+  return /^(checkbox|radio|range|color)$/i.test((el as HTMLInputElement).type);
+};
 
 export const App: React.FC = () => {
   const playerRef = useRef<PlayerRef>(null);
@@ -33,6 +45,38 @@ export const App: React.FC = () => {
   useEffect(() => {
     void listMediaFull(projectName);
   }, [projectName]);
+
+  // Hand focus back after a checkbox / select / slider / colour change (see releasesFocusOnChange).
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      if (releasesFocusOnChange(e.target)) (e.target as HTMLElement).blur();
+    };
+    document.addEventListener("change", onChange, true);
+    return () => document.removeEventListener("change", onChange, true);
+  }, []);
+
+  // A file dropped anywhere that is NOT a drop target (the strip, the inspector, the toolbar) made
+  // Chrome navigate the tab to the image — losing undo history, the camera and any upload in
+  // flight. Real drop targets call preventDefault in their own React handlers first; this only
+  // catches the misses, and says where to drop instead.
+  useEffect(() => {
+    const isFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+    const over = (e: DragEvent) => {
+      if (isFiles(e)) e.preventDefault();
+    };
+    const drop = (e: DragEvent) => {
+      if (!isFiles(e) || e.defaultPrevented) return;
+      e.preventDefault();
+      const st = useEditor.getState();
+      st.flash(st.view === "wall" ? "Drop photos on the wall viewport (or the Assets tab) to import them" : "Drop media on the preview, the timeline or the Assets tab to import it");
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
 
   // Resizable panels — persisted so the layout sticks across reloads.
   const [railLeft, setRailLeft] = useState(() => lsNum("soranji.layout.left", 248));
@@ -91,8 +135,17 @@ export const App: React.FC = () => {
       }
 
       const el = e.target as HTMLElement | null;
+      // "Typing" = a field that consumes KEYSTROKES as text: text/number-like inputs, textareas,
+      // contentEditable. NOT checkboxes, radios, sliders, colour pickers or selects — counting those
+      // as typing left every shortcut dead after one click on a checkbox, while Space (armed by the
+      // Wall view's own listener) still toggled that checkbox on release: ticking "intro" then
+      // Space-panning silently shifted every scene by the intro length. See also the blur-on-change
+      // listener below.
       const typing =
-        !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+        !!el &&
+        (el.tagName === "TEXTAREA" ||
+          el.isContentEditable ||
+          (el.tagName === "INPUT" && TEXT_INPUT_TYPES.test((el as HTMLInputElement).type || "text")));
       const mod = e.ctrlKey || e.metaKey;
       const st = useEditor.getState();
       const player = playerRef.current;
@@ -113,20 +166,26 @@ export const App: React.FC = () => {
         return;
       }
 
-      // --- modifier combos (work even while a field is focused) ---
-      if (mod && (e.key === "z" || e.key === "Z")) {
+      // --- modifier combos ---
+      // Undo/redo defer to a focused text field: the wall's number boxes commit on blur/Enter, so a
+      // project undo there reverted some unrelated edit while the half-typed value still committed
+      // on blur afterwards. In a field, Ctrl+Z is the field's own undo.
+      if (mod && (e.key === "z" || e.key === "Z") && !typing) {
         e.preventDefault();
         if (e.shiftKey) useTemporal.getState().redo();
         else useTemporal.getState().undo();
         return;
       }
-      if (mod && (e.key === "y" || e.key === "Y")) {
+      if (mod && (e.key === "y" || e.key === "Y") && !typing) {
         e.preventDefault();
         useTemporal.getState().redo();
         return;
       }
       if (mod && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
+        // Commit whatever is being typed FIRST (commit-on-blur fields write the store synchronously),
+        // so the saved file contains the value on screen.
+        if (typing) (el as HTMLElement).blur();
         void saveProject();
         return;
       }
@@ -222,12 +281,69 @@ export const App: React.FC = () => {
           });
         };
 
+        // --- LIVE: a transport, not an editor. The edit layer is hidden in Live but the selection
+        // survives, so the arrange map below would nudge / delete / add scenes on a wall you cannot
+        // see (→ moved a hidden photo; Enter appended a scene at the stale arrange camera and
+        // auto-fit grew the clip). Here the keys drive the Player instead, in the LIVE take's own
+        // frames (liveWallProject puts the wall at Player frame 0, so sceneFrames are seek targets).
+        if (st.wallLive) {
+          if (!player) return;
+          const sched = scheduleWall(wall, fps, compW, compH);
+          const last = Math.max(0, sched.total - 1);
+          const now = player.getCurrentFrame();
+          const seek = (f: number) => player.seekTo(Math.max(0, Math.min(last, Math.round(f))));
+          const starts = sched.sceneFrames;
+          switch (e.key) {
+            case " ":
+              e.preventDefault();
+              player.toggle();
+              break;
+            case "ArrowLeft":
+            case "ArrowRight":
+              e.preventDefault();
+              player.pause();
+              seek(now + (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? fps : 1));
+              break;
+            case "Home":
+              e.preventDefault();
+              seek(0);
+              break;
+            case "End":
+              e.preventDefault();
+              seek(last);
+              break;
+            case "PageUp":
+            case "PageDown": {
+              // Jump to the previous / next scene's arrival (a small back-off so PgUp from just
+              // after an arrival goes to the scene BEFORE it, like a DAW's previous-marker).
+              e.preventDefault();
+              let k: number;
+              if (e.key === "PageDown") {
+                k = starts.findIndex((f) => f > now);
+                if (k < 0) break;
+              } else {
+                k = -1;
+                for (let j = starts.length - 1; j >= 0; j--) if (starts[j] < now - Math.round(fps / 3)) { k = j; break; }
+                if (k < 0) k = 0;
+              }
+              seek(starts[k]);
+              const sc = (wall.scenes ?? [])[k];
+              if (sc?.id) st.setWallScene(sc.id);
+              break;
+            }
+            default:
+              // Everything else (nudges, Delete, Enter, F, [ ], …) is an EDIT and edits are off in
+              // Live. Esc (stop preview) is handled above; Ctrl combos never reach here.
+              break;
+          }
+          return;
+        }
+
         switch (e.key) {
           case " ":
-            // In Live mode Space plays; while arranging it is the pan modifier the gesture layer
-            // reads, so it is only swallowed here (never scrolls the page).
+            // While arranging Space is the pan modifier the gesture layer reads, so it is only
+            // swallowed here (never scrolls the page). Live's play/pause is in the Live block above.
             e.preventDefault();
-            if (st.wallLive) player?.toggle();
             break;
           case "f":
           case "F":

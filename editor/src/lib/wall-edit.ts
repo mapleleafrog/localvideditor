@@ -778,7 +778,7 @@ export const scatterIntoWall = (refs: ScatterRef[], opts: ScatterOpts): Wall => 
   clusters.forEach((group) => {
     if (!group.length) return;
     const cam = fitAll(group, opts.W, opts.H, pad);
-    const glide = prev ? Math.round(suggestGlideSeconds(prev, cam) * 100) / 100 : DEFAULT_SCENE.glideSeconds;
+    const glide = prev ? Math.round(suggestGlideSeconds(prev, cam, opts.W) * 100) / 100 : DEFAULT_SCENE.glideSeconds;
     scenes.push(sceneFromCam(cam, { glideSeconds: glide }));
     prev = cam;
   });

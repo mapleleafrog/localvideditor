@@ -291,8 +291,8 @@ export const WallInspector: React.FC = () => {
     const a = si === 0 ? sched.whole : hoverEndCam(scenes[si - 1], camFromScene(scene));
     const b = camFromScene(scene);
     const glideLive = si === 0 ? wall.intro : true;
-    const v = peakVelocity(a, b, scene.glideSeconds, fps);
-    const suggested = suggestGlideSeconds(a, b);
+    const v = peakVelocity(a, b, scene.glideSeconds, fps, W);
+    const suggested = suggestGlideSeconds(a, b, W);
     const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
     const appearing = items.filter((it) => it.appearIn === scene.id).length;
     const leaving = items.filter((it) => it.leaveAfter === scene.id).length;
@@ -376,7 +376,7 @@ export const WallInspector: React.FC = () => {
             {glideLive && scene.glideSeconds > 0 && dist > 0 ? (
               <button
                 className={"wsc-speed " + speedClass(v)}
-                title={`${scene.glideSeconds}s over ${dist} screen px — ${v.toFixed(0)} px/frame peak. Suggested ${suggested.toFixed(2)}s. Click to apply.`}
+                title={`${scene.glideSeconds}s over ${dist} screen px — ${v.toFixed(0)} px/frame peak (1080p-equivalent). Suggested ${suggested.toFixed(2)}s. Click to apply.`}
                 onClick={() => patchWallScene(ci, si, { glideSeconds: Math.round(suggested * 100) / 100 })}
               >
                 ● {v.toFixed(0)} px/f → {suggested.toFixed(1)}s

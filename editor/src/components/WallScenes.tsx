@@ -287,8 +287,10 @@ export const WallScenes: React.FC = () => {
           const a = prevCam(i);
           const b = camFromScene(s);
           const glideLive = i === 0 ? wall.intro : true;
-          const v = peakVelocity(a, b, s.glideSeconds, fps);
-          const suggested = suggestGlideSeconds(a, b);
+          // Both in 1920-wide pixels (wall.ts#SPEED_REF_WIDTH), so a 4K project's dots mean the same
+          // as a 1080p one's instead of reading twice as fast.
+          const v = peakVelocity(a, b, s.glideSeconds, fps, W);
+          const suggested = suggestGlideSeconds(a, b, W);
           const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
           const via = s.holdSeconds === 0;
           const on = !!s.id && s.id === wallScene;
@@ -302,7 +304,7 @@ export const WallScenes: React.FC = () => {
                 className={"wsc-arrow" + (glideLive ? "" : " off")}
                 title={
                   glideLive
-                    ? `Glide into scene ${i + 1}${dist ? ` — ${dist} screen px, ${v.toFixed(0)} px/frame peak. Suggested ${suggested.toFixed(2)}s (click the dot to apply).` : ""}`
+                    ? `Glide into scene ${i + 1}${dist ? ` — ${dist} screen px, ${v.toFixed(0)} px/frame peak (1080p-equivalent). Suggested ${suggested.toFixed(2)}s (click the dot to apply).` : ""}`
                     : "No glide into the first scene (intro is off)"
                 }
               >
@@ -352,7 +354,7 @@ export const WallScenes: React.FC = () => {
                       e.stopPropagation();
                       patchWallScene(ci, i, { glideSeconds: Math.round(suggested * 100) / 100 });
                     }}
-                    title={`${v.toFixed(0)} px/frame — click to use the suggested ${suggested.toFixed(2)}s`}
+                    title={`${v.toFixed(0)} px/frame (1080p-equivalent) — click to use the suggested ${suggested.toFixed(2)}s`}
                   >
                     ● {v.toFixed(0)}
                   </button>

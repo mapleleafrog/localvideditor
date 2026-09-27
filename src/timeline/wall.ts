@@ -913,15 +913,25 @@ export const cameraAt = (
 /** Peak slope of the default `smooth` ease — the factor between mean and peak glide speed. */
 export const PEAK_SLOPE = 1.875;
 
-/** JUDDER — px per FRAME. This is what strobes, and it is fps-dependent. Drives the editor chip. */
-export const peakVelocity = (a: Cam, b: Cam, sec: number, fps: number) =>
-  sec <= 0 ? Infinity : (PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / (fps * sec);
+/** The frame width every speed number here is expressed in. Speeds are PERCEPTUAL: the same move
+ *  crosses the same fraction of the screen at 1080p and at 4K, but twice as many raw pixels at 4K.
+ *  Measuring raw pixels made every glide on a 4K project read twice as fast as it looks (every
+ *  dot red) and made every suggestion twice as long. Pass the composition width `W` and the value
+ *  comes back in 1920-wide pixels, so the bands and the target mean the same thing at any size. */
+export const SPEED_REF_WIDTH = 1920;
+const speedScale = (W: number | undefined) => (W && W > 0 ? SPEED_REF_WIDTH / W : 1);
 
-/** FEEL — targets PEAK px per SECOND, so the suggestion is identical at 30 and 60 fps. */
+/** JUDDER — px per FRAME (1920-wide pixels). This is what strobes, and it is fps-dependent.
+ *  Drives the editor chip. `W` = composition width; omitted = already 1920-wide. */
+export const peakVelocity = (a: Cam, b: Cam, sec: number, fps: number, W?: number) =>
+  sec <= 0 ? Infinity : (speedScale(W) * PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / (fps * sec);
+
+/** FEEL — targets PEAK px per SECOND (1920-wide pixels), so the suggestion is identical at 30 and
+ *  60 fps, and at 1080p and 4K. */
 export const V_TARGET_PER_SEC = 480;
 
 /** What "Set as scene" writes: the tool's default is always a move a motion designer would sign
  *  off, and the user has to work to make a bad one. 480 px/s peak == 16 px/frame at 30 fps (inside
- *  the glassy band) and 8 px/frame at 60 fps — cleaner for free, which is right. */
-export const suggestGlideSeconds = (a: Cam, b: Cam) =>
-  clamp((PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / V_TARGET_PER_SEC, 0.6, 6.0);
+ *  the glassy band) and 8 px/frame at 60 fps — cleaner for free, which is right. `W` as above. */
+export const suggestGlideSeconds = (a: Cam, b: Cam, W?: number) =>
+  clamp((speedScale(W) * PEAK_SLOPE * Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2)) / V_TARGET_PER_SEC, 0.6, 6.0);

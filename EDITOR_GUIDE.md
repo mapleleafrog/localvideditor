@@ -100,7 +100,9 @@ camera jumps there, so you can frame it and press ⟳ Re-frame. The new scene ta
 glide, so **every scene after it starts that much later** — the toast says by how much; if your defaults are a
 whole number of beats, everything downstream stays on the beat. **‹ N / M ›** on the
 strip toolbar (or `PgUp`/`PgDn`) steps to the previous / next scene — selects it, jumps the camera, and scrolls
-the strip so its card is in view, which matters once the strip is wider than the window. **▶ Live in the nav bar
+the strip so its card is in view, which matters once the strip is wider than the window. **In Live the keyboard is a transport**:
+`Space` play/pause, `←`/`→` one frame (`Shift` = 1 s), `Home`/`End`, `PgUp`/`PgDn` previous / next scene arrival (and
+selects that card) — editing keys do nothing until you press `Esc` / ■ Stop preview. **▶ Live in the nav bar
 starts at the selected scene** and plays to the end (its label reads `▶ Live from N`); the strip's **▶ Preview
 all** always plays from the top; the Scene panel's **▸ Play** plays just that one scene.
 

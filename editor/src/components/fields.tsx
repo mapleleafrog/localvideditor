@@ -44,7 +44,13 @@ export const Slider: React.FC<{
     <input type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(e) => onChange(+e.target.value)} />
     <input
       type="number" className="sld-num" min={min} max={max} step={step} value={value} disabled={disabled}
-      onChange={(e) => onChange(+e.target.value)}
+      // Only a real number reaches the store: clearing the box used to write 0 and a lone "-" wrote
+      // NaN (into hover amount, arc, …) on the way to typing a new value.
+      onChange={(e) => {
+        if (e.target.value.trim() === "") return;
+        const n = Number(e.target.value);
+        if (Number.isFinite(n)) onChange(n);
+      }}
     />
     {suffix ? <span className="muted">{suffix}</span> : null}
   </div>

@@ -20,7 +20,7 @@ import { Timeline } from "../../../src/timeline/Timeline";
 import { useEditor, type WallOverscan } from "../store";
 import { useContainFit } from "../lib/fit";
 import { useAudioEnd } from "../lib/audio";
-import { clipStarts, computeDuration } from "../lib/timeline-utils";
+import { computeDuration } from "../lib/timeline-utils";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize } from "../lib/image";
@@ -349,7 +349,6 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
       ? [selection.index]
       : [];
   const selItems = selIdx.map((i) => items[i]).filter(Boolean);
-  const absStart = clipStarts(project)[wallClip] ?? 0;
 
   return (
     <div className="wall-view">
@@ -526,7 +525,11 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
             </div>
           </div>
         )}
-        {live && <div className="wall-live-note muted">Live — the real schedule from frame {absStart}. Press ▮ Arrange to keep editing.</div>}
+        {live && (
+          <div className="wall-live-note muted">
+            Live — just this wall with the song, from its first frame. Space play/pause · ←/→ frame (⇧ 1 s) · PgUp/PgDn previous/next scene · Esc or ■ Stop preview to keep editing.
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { clipStarts } from "./lib/timeline-utils";
 import {
   IDENTITY_CAM,
   clearSceneRefs,
+  camFromScene,
   duplicatedItem,
   fitDurationPatch,
   insertAt,
@@ -748,7 +749,9 @@ export const useEditor = create<EditorState>()(
           const next = dir > 0 ? Math.min(scenes.length - 1, cur + 1) : Math.max(0, cur < 0 ? 0 : cur - 1);
           const sc = scenes[next];
           // Same three writes the strip's card click makes (select owns the wallSel invariant).
-          return { ...reconcileWallSel(s, { kind: "clip", index: ci }), wallScene: sc.id ?? null, wallCam: { x: sc.x, y: sc.y, zoom: sc.zoom, rot: sc.rotation } };
+          // camFromScene hardens missing/NaN fields (a hand-written scene without `rotation` made the
+          // camera readout call .toFixed on undefined and crashed the view).
+          return { ...reconcileWallSel(s, { kind: "clip", index: ci }), wallScene: sc.id ?? null, wallCam: camFromScene(sc) };
         }),
       setWallOverscan: (wallOverscan) => set({ wallOverscan }),
       setWallLive: (wallLive) => set({ wallLive }),
@@ -797,6 +800,32 @@ export const useEditor = create<EditorState>()(
 
 /** zundo temporal store (undo/redo). */
 export const useTemporal = useEditor.temporal;
+
+/** Keep the transient selection pointing at things that EXIST. zundo restores only `project`, so an
+ *  undo of "add item" / "duplicate" / "set scene" left `selection`, `wallSel` and `wallScene`
+ *  pointing past the end of a list (or at a scene id that is gone), and the next Delete recorded a
+ *  no-op edit. One subscription covers undo, redo and every other project change. Selection-only
+ *  writes never enter history (temporal `equality` compares `project`). */
+useEditor.subscribe((s, prev) => {
+  if (s.project === prev.project) return;
+  const clips = s.project.clips ?? [];
+  const patch: Partial<EditorState> = {};
+  const sel = s.selection;
+  if (sel) {
+    const ok =
+      sel.kind === "clip"
+        ? sel.index < clips.length
+        : sel.kind === "overlay"
+          ? sel.index < (s.project.overlays ?? []).length
+          : clips[sel.clip]?.type === "wall" && sel.index < (clips[sel.clip]?.wall?.items ?? []).length;
+    if (!ok) patch.selection = null;
+  }
+  const wc = s.wallClip != null ? clips[s.wallClip] : undefined;
+  const nItems = wc?.type === "wall" ? (wc.wall?.items ?? []).length : 0;
+  if (s.wallSel.some((k) => k >= nItems)) patch.wallSel = s.wallSel.filter((k) => k < nItems);
+  if (s.wallScene && !(wc?.type === "wall" && (wc.wall?.scenes ?? []).some((sc) => sc.id === s.wallScene))) patch.wallScene = null;
+  if (Object.keys(patch).length) useEditor.setState(patch);
+});
 
 /** Debounced autosave of the project to localStorage (transient UI state is not persisted). */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;

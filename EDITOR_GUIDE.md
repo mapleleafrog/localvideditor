@@ -91,7 +91,14 @@ off. ④ Pan to the next area and repeat. ⑤ **⟲ Fit clip duration** makes th
 Click a scene card and the inspector's **Scene N** section shows its **Hold** and **Glide in** in seconds, the
 easing, the arc, and a **colour-banded px/frame speed chip** — *"● 35 px/f → 1.8s"*, click to apply the suggested
 glide. **⟳ Re-frame** updates the pose from the viewport *keeping the timing*, **▸ Play** plays that scene in Live
-mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). **‹ N / M ›** on the
+mode, **⧉** duplicates, **×** deletes (objects that appeared there go back to always-on). **Inserting a scene in the middle:** every connector between two cards has a small **+** —
+click it to insert the current viewport framing as a new scene right there (the + before card 1 inserts at the
+front). **⊕ Insert after N** on the toolbar (or `Ctrl+Enter`) does the same right after the selected scene;
+`Enter` / ⊕ Set as scene still append at the end. If the viewport is still parked exactly on one of the two
+neighbours (you clicked a card and haven't panned yet), the new scene goes **halfway between them** instead and the
+camera jumps there, so you can frame it and press ⟳ Re-frame. The new scene takes the wall's default hold +
+glide, so **every scene after it starts that much later** — the toast says by how much; if your defaults are a
+whole number of beats, everything downstream stays on the beat. **‹ N / M ›** on the
 strip toolbar (or `PgUp`/`PgDn`) steps to the previous / next scene — selects it, jumps the camera, and scrolls
 the strip so its card is in view, which matters once the strip is wider than the window. **▶ Live in the nav bar
 starts at the selected scene** and plays to the end (its label reads `▶ Live from N`); the strip's **▶ Preview

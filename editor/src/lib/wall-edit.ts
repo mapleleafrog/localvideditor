@@ -278,6 +278,39 @@ export const appendedScene = (wall: Wall, cam: Cam): WallScene => {
   return sceneFromCam(cam, { holdSeconds: hold, glideSeconds: glide });
 };
 
+/** What `+` on a strip connector / `Ctrl+Enter` inserts at position `at` (0 = before the first
+ *  scene, scenes.length = append). Normally the CURRENT VIEWPORT framing with the wall's default
+ *  timing — the same scene ⊕ Set as scene would make, just placed mid-list.
+ *
+ *  One case would be useless as-is: the viewport is still sitting exactly on one of the two
+ *  neighbours' poses (the user clicked a card, then clicked `+` without panning). That would insert
+ *  a duplicate pose — a zero-length "still" glide. Then the new scene goes HALFWAY between the two
+ *  neighbours instead (x / y / zoom lerped, rotation along the short way round), a waypoint the user
+ *  can re-frame with ⟳ Re-frame. `midpoint` reports which happened so the UI can say so. */
+export const insertedScene = (wall: Wall, cam: Cam, at: number): { scene: WallScene; midpoint: boolean } => {
+  const scenes = wall.scenes ?? [];
+  const prev = at > 0 ? scenes[at - 1] : undefined;
+  const next = at < scenes.length ? scenes[at] : undefined;
+  const same = (s: WallScene | undefined) =>
+    !!s &&
+    Math.abs(s.x - cam.x) < 1 &&
+    Math.abs(s.y - cam.y) < 1 &&
+    Math.abs(s.zoom - cam.zoom) < 1e-4 &&
+    Math.abs(shortDeg(s.rotation, cam.rot)) < 0.01;
+  if (prev && next && (same(prev) || same(next))) {
+    const mid: Cam = {
+      x: (prev.x + next.x) / 2,
+      y: (prev.y + next.y) / 2,
+      // Geometric mean: halfway in PERCEIVED scale (a 1× → 4× move reads as 2× in the middle).
+      zoom: Math.sqrt(Math.max(1e-4, prev.zoom) * Math.max(1e-4, next.zoom)),
+      rot: prev.rotation + shortDeg(prev.rotation, next.rotation) / 2,
+    };
+    return { scene: appendedScene(wall, mid), midpoint: true };
+  }
+  return { scene: appendedScene(wall, cam), midpoint: false };
+};
+const shortDeg = (a: number, b: number) => ((((b - a + 180) % 360) + 360) % 360) - 180;
+
 /** "Apply to all": every scene takes the wall's default hold and/or glide (one immutable rebuild =
  *  one undo step). Scene 0's glide is the intro glide and is left alone unless intro is on. */
 export const withTimingApplied = (wall: Wall, hold: number | undefined, glide: number | undefined): Wall => ({

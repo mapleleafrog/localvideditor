@@ -62,6 +62,7 @@ const GROUPS: Group[] = [
       { keys: ["Enter"], label: "Set as scene (and select it)" },
       { keys: ["Shift", "Enter"], label: "Re-frame the selected scene from the viewport (timing kept)" },
       { keys: ["PgUp", "PgDn"], label: "Previous / next scene (select + jump the camera + scroll the strip to it; same as ‹ › on the strip)" },
+      { keys: ["Ctrl", "Enter"], label: "Insert the current framing as a new scene right after the selected one (same as ⊕ Insert after N / the + on a connector)" },
       { keys: ["Esc"], label: "Stop the Live preview (back to Arrange)" },
       { keys: ["Alt"], label: "Hold to disable snapping" },
       { keys: ["Del"], label: "Delete selected item(s)" },

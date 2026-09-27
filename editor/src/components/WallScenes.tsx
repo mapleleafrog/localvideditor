@@ -16,7 +16,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, scheduleWall, speedClass, wallFitFor, wallOf, withTimingApplied } from "../lib/wall-edit";
+import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, insertedScene, scheduleWall, speedClass, wallFitFor, wallOf, withTimingApplied } from "../lib/wall-edit";
 import { WallMiniMap } from "./WallMiniMap";
 import { CommitNum } from "./WallInspector";
 
@@ -78,6 +78,21 @@ export const WallScenes: React.FC = () => {
     flash(`Scene ${scenes.length + 1} set`);
   };
 
+  /** Insert a scene at `at` (0 = before scene 1) from the current viewport — or halfway between the
+   *  neighbours when the viewport is still parked on one of them (see wall-edit#insertedScene).
+   *  Everything after it moves later by the new scene's hold + glide; the toast says by how much so
+   *  a beat-timed edit knows what it just shifted. */
+  const insertAt = (at: number) => {
+    const { scene, midpoint } = insertedScene(wall, wallCam, at);
+    addWallScene(ci, scene, at);
+    if (midpoint) setWallCam(camFromScene(scene));
+    const shift = (scene.holdSeconds ?? 0) + (scene.glideSeconds ?? 0);
+    flash(
+      `Scene ${at + 1} inserted${midpoint ? " halfway between its neighbours — frame it, then ⟳ Re-frame" : " from the viewport"}` +
+        (at < scenes.length ? ` · scenes after it start ${secs(shift)}s later` : ""),
+    );
+  };
+
   /** Click = select the scene (inspector shows its timing) + jump the camera to its pose. A
    *  selected scene replaces an item selection so the right rail shows exactly one thing. */
   const pick = (i: number) => {
@@ -117,8 +132,21 @@ export const WallScenes: React.FC = () => {
   return (
     <div className="tl wall-scenes">
       <div className="tl-toolbar">
-        <button className="primary" onClick={setAsScene} title="Append the current framing as a NEW scene (Enter)">
+        <button className="primary" onClick={setAsScene} title="Append the current framing as a NEW scene at the end (Enter). To put one in the middle, use the + on a connector between two cards, or Ctrl+Enter to insert after the selected scene.">
           ⊕ Set as scene
+        </button>
+        <button
+          onClick={() => insertAt(selIdx + 1)}
+          disabled={selIdx < 0 || selIdx >= scenes.length - 1}
+          title={
+            selIdx < 0
+              ? "Select a scene card first"
+              : selIdx >= scenes.length - 1
+                ? "The last scene is selected — ⊕ Set as scene appends"
+                : `Insert the current framing as a new scene between ${selIdx + 1} and ${selIdx + 2} (Ctrl+Enter)`
+          }
+        >
+          ⊕ Insert after {selIdx >= 0 ? selIdx + 1 : ""}
         </button>
         <button
           onClick={reframe}
@@ -278,6 +306,24 @@ export const WallScenes: React.FC = () => {
                     : "No glide into the first scene (intro is off)"
                 }
               >
+                {!live && (
+                  <button
+                    className="wsc-insert"
+                    title={
+                      i === 0
+                        ? "Insert a new scene BEFORE scene 1, from the current viewport (Ctrl+Enter inserts after the selected scene)"
+                        : `Insert a new scene between ${i} and ${i + 1}, from the current viewport. If the viewport is still on scene ${i} or ${i + 1}, it goes halfway between them. Scenes after it move later by its hold + glide.`
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      insertAt(i);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label={i === 0 ? "Insert scene before scene 1" : `Insert scene between ${i} and ${i + 1}`}
+                  >
+                    +
+                  </button>
+                )}
                 <button
                   className="wsc-arrow-line"
                   title={`Transition into scene ${i + 1}: click to open its settings (seconds, easing, arc) on the right`}

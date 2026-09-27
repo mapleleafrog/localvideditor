@@ -16,7 +16,7 @@ import { useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
 import { listMediaFull, saveProjectFile } from "./lib/api";
 import { ensureProjectName } from "./lib/names";
-import { appendedScene, fitAll, wallOf } from "./lib/wall-edit";
+import { appendedScene, fitAll, insertedScene, wallOf } from "./lib/wall-edit";
 
 const lsNum = (key: string, def: number) => {
   const v = Number(localStorage.getItem(key));
@@ -157,6 +157,33 @@ export const App: React.FC = () => {
       if (mod && (e.key === "v" || e.key === "V") && !typing) {
         e.preventDefault();
         st.pasteAt(cur());
+        return;
+      }
+
+      // Ctrl/⌘+Enter in the Wall view: insert the current framing as a new scene right AFTER the
+      // selected one (the strip's "⊕ Insert after N"). Not while typing — a focused hold/glide box
+      // commits on Enter and must not also insert a scene.
+      if (mod && e.key === "Enter" && !typing && st.view === "wall" && !st.wallLive) {
+        e.preventDefault();
+        const ci = st.wallClip;
+        const clip = ci != null ? st.project.clips?.[ci] : undefined;
+        if (ci == null || clip?.type !== "wall") return;
+        const w = wallOf(clip);
+        const scenes = w.scenes ?? [];
+        const sel = scenes.findIndex((sc) => sc.id != null && sc.id === st.wallScene);
+        if (sel < 0) {
+          st.flash("Select a scene card first — Ctrl+Enter inserts after it");
+          return;
+        }
+        const at = sel + 1;
+        const { scene, midpoint } = insertedScene(w, st.wallCam, at);
+        st.addWallScene(ci, scene, at);
+        if (midpoint) st.setWallCam({ x: scene.x, y: scene.y, zoom: scene.zoom, rot: scene.rotation });
+        const shift = (scene.holdSeconds ?? 0) + (scene.glideSeconds ?? 0);
+        st.flash(
+          `Scene ${at + 1} inserted${midpoint ? " halfway between its neighbours — frame it, then ⟳ Re-frame" : " from the viewport"}` +
+            (at < scenes.length ? ` · scenes after it start ${shift.toFixed(1)}s later` : ""),
+        );
         return;
       }
 

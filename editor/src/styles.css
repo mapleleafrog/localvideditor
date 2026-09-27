@@ -605,6 +605,15 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .wsc-arrow.off { opacity: 0.45; }
 .wsc-arrow-line { font-size: 15px; line-height: 1; letter-spacing: 1px; background: none; border: 1px solid transparent; border-radius: 4px; padding: 2px 6px; color: var(--muted); cursor: pointer; }
 .wsc-arrow-line:hover { border-color: var(--accent-2); color: var(--accent-2); }
+/* + on a connector: insert a scene between the two cards it joins. Quiet until hovered so 23
+   connectors don't shout, but always there and always clickable. */
+.wsc-insert {
+  width: 20px; height: 20px; padding: 0; line-height: 18px; border-radius: 50%;
+  font-size: 14px; font-weight: 700; text-align: center;
+  background: transparent; border: 1px dashed var(--border); color: var(--muted); cursor: pointer;
+}
+.wsc-arrow:hover .wsc-insert { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.wsc-insert:hover { background: var(--accent); color: #fff !important; }
 .wi-subhead { margin: 10px 0 4px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 11px; color: var(--muted); }
 .wsc-arrow-box .wi-num input { width: 52px; padding: 2px 5px; font-size: 11px; text-align: center; }
 .wall-scenes button.stop, .wall-nav button.stop { background: #5a2233; border-color: #8a2d47; color: #ffd6df; }

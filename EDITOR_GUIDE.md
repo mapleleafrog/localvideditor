@@ -104,7 +104,34 @@ the strip so its card is in view, which matters once the strip is wider than the
 `Space` play/pause, `←`/`→` one frame (`Shift` = 1 s), `Home`/`End`, `PgUp`/`PgDn` previous / next scene arrival (and
 selects that card) — editing keys do nothing until you press `Esc` / ■ Stop preview. **▶ Live in the nav bar
 starts at the selected scene** and plays to the end (its label reads `▶ Live from N`); the strip's **▶ Preview
-all** always plays from the top; the Scene panel's **▸ Play** plays just that one scene.
+all** always plays from the top; the Scene panel's **▸ Play** plays that one scene *including the glide into it*
+(it starts half a second before the glide departs and stops at the end of the scene's hold).
+
+**Scene cards show their own frame.** Each card's thumbnail is what the camera records at that scene — the photos
+the scene's framing actually contains (drawn from the 320 px editor copies, with the renderer's own camera maths,
+so parallax and roll match), and anything that hasn't appeared yet (or has left) is left out. The card head shows
+the arrival time.
+
+**Live playhead.** While a Live take plays, a red needle runs along the strip — across the glide connector while the
+camera travels, across the card while it holds — the playing card is outlined red and the strip scrolls to follow
+it. Clicking a card during Live seeks the take to that scene's arrival.
+
+**Timing to the beat — 🔒 lock beats and ⏱ slot.** A scene's *slot* is arrival → next arrival: its hold plus the
+glide into the next scene. With **🔒 lock beats** ticked (strip toolbar, remembered), changing a hold or a glide
+moves the boundary *inside* the slot instead of pushing everything after it: a longer glide takes its time from the
+hold before it, a longer hold takes it from the glide after it, so every arrival stays exactly where you put it.
+If the neighbour doesn't have enough time, the edit takes what is there and the toast says so; scene 1's glide
+borrows from the intro hold, and the last scene's hold has nothing after it, so it pushes the outro. The speed dot
+honours the lock too — clicking it stretches the glide into the hold before it (leaving that hold ≥ 0.4 s). The
+**⏱ slot** box on each card is the other direction: type the total you want the scene to last and the glide
+after it becomes *total − hold* — that one deliberately **does** push every later scene by the difference.
+
+**Several scenes at once.** `Shift`-click a card for a range, `Ctrl`/`⌘`-click to add or remove one. The inspector
+then shows **N scenes selected** with Hold, Glide in, Hover (+ amount), Easing and Arc — a value typed there is
+written onto all of them in one undo step (hold / glide go through lock beats when it's on). **✕ Delete** on the
+strip toolbar, the inspector's **× Delete N scenes** or the `Delete` key (with no photo selected) removes the
+selected scene cards in one undo step; photos are never touched, objects that appeared in a deleted scene go back to
+always-on, and the scene now in that position is selected.
 
 **Seamless flow.** Tick **flow** in the strip toolbar and the camera never stops: each hold drifts at a steady pace
 (hover amount = how fast) and every glide is re-shaped to depart at the previous hold's drift speed and land at the

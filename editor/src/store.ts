@@ -14,12 +14,22 @@ import {
   mapAt,
   moveAt,
   removeAt,
+  retimedScene,
   uniqueSceneId,
+  type TimingPatch,
   withSceneIds,
   withWall,
 } from "./lib/wall-edit";
 
 const AUTOFIT_KEY = "soranji.wall.autofit";
+const LOCK_KEY = "soranji.wall.lockBeats";
+const readLock = (): boolean => {
+  try {
+    return localStorage.getItem(LOCK_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 const readAutoFit = (): boolean => {
   try {
     return localStorage.getItem(AUTOFIT_KEY) !== "0";
@@ -125,6 +135,14 @@ export interface EditorState {
   addWallScene: (ci: number, scene: WallScene, at?: number) => void;
   patchWallScene: (ci: number, i: number, patch: Partial<WallScene>) => void;
   removeWallScene: (ci: number, i: number) => void;
+  /** Delete several scenes (by id) in ONE undo step; items referencing them fall back to always-on. */
+  removeWallScenes: (ci: number, ids: string[]) => void;
+  /** Hold / glide edit on the scenes `ids` (in strip order), through wall-edit#retimedScene — with
+   *  `wallLockBeats` on, the change moves a boundary inside each slot instead of rippling. One undo
+   *  step; returns whether any edit was clamped / rippled so the caller can say so. */
+  retimeWallScenes: (ci: number, ids: string[], patch: TimingPatch) => { capped: boolean; rippled: boolean };
+  /** Same non-timing patch (hover, easing, arc…) onto several scenes, one undo step. */
+  patchWallScenes: (ci: number, ids: string[], patch: Partial<WallScene>) => void;
   reorderWallScene: (ci: number, from: number, to: number) => void;
 
   // transient UI state (not undone)
@@ -155,6 +173,14 @@ export interface EditorState {
   /** The scene card the footer strip has selected (by STABLE id, so a reorder/undo never
    *  re-targets it). The inspector shows that scene's timing while no item is selected. */
   wallScene: string | null;
+  /** Multi-selected scene ids (Shift / Ctrl-click on the strip). Only meaningful while it contains
+   *  `wallScene` — read it through `selectedSceneIds`, which falls back to just the primary, so any
+   *  path that moves `wallScene` elsewhere collapses the multi-selection for free. */
+  wallSceneSel: string[];
+  setWallSceneSel: (ids: string[], primary: string | null) => void;
+  /** Lock beats: timing edits keep every scene's ARRIVAL time (persisted preference, default off). */
+  wallLockBeats: boolean;
+  setWallLockBeats: (v: boolean) => void;
   /** Seeing wall outside the recorded frame — applied as a COMPOSITION-SIZE change, never a zoom
    *  divide, so every zoom-dependent look term stays bit-identical to the render (design §0.4). */
   wallOverscan: WallOverscan;
@@ -312,6 +338,8 @@ export const useEditor = create<EditorState>()(
       wallCam: { ...IDENTITY_CAM },
       wallSel: [],
       wallScene: null,
+      wallSceneSel: [],
+      wallLockBeats: readLock(),
       wallOverscan: 1.6,
       wallLive: false,
       wallHand: false,
@@ -322,7 +350,7 @@ export const useEditor = create<EditorState>()(
       // Import / Reset / Delete replace the whole project, so every index-bearing transient goes
       // with it — a stale wallClip would otherwise point into a different clip list.
       setProject: (project) =>
-        set({ project, selection: null, wallClip: null, wallSel: [], wallScene: null, wallFramed: null }),
+        set({ project, selection: null, wallClip: null, wallSel: [], wallScene: null, wallSceneSel: [], wallFramed: null }),
       setProjectName: (projectName) => set({ projectName }),
 
       patchProject: (patch) => set((s) => ({ project: { ...s.project, ...patch } })),
@@ -449,7 +477,7 @@ export const useEditor = create<EditorState>()(
             const scenes = w.scenes ?? [];
             return { ...w, scenes: at == null ? [...scenes, sc] : insertAt(scenes, at, sc) };
           });
-          return project ? { project: withFit(project, ci, s.wallAutoFit), wallScene: id ?? null } : {};
+          return project ? { project: withFit(project, ci, s.wallAutoFit), wallScene: id ?? null, wallSceneSel: id ? [id] : [] } : {};
         }),
 
       patchWallScene: (ci, i, patch) =>
@@ -472,6 +500,54 @@ export const useEditor = create<EditorState>()(
           }));
           if (!project) return {};
           return { project: withFit(project, ci, s.wallAutoFit), wallScene: s.wallScene === gone ? null : s.wallScene };
+        }),
+
+      removeWallScenes: (ci, ids) =>
+        set((s) => {
+          const gone = new Set(ids);
+          if (!gone.size) return {};
+          const project = withWall(s.project, ci, (w) => {
+            let items = w.items ?? [];
+            for (const id of gone) items = clearSceneRefs(items, id);
+            return { ...w, scenes: (w.scenes ?? []).filter((sc) => !(sc.id && gone.has(sc.id))), items };
+          });
+          if (!project) return {};
+          // Select the scene that now sits where the first deleted one was (or the new last one),
+          // so repeated Delete / PgUp keep working without a click.
+          const before = s.project.clips?.[ci]?.wall?.scenes ?? [];
+          const first = before.findIndex((sc) => sc.id && gone.has(sc.id));
+          const after = project.clips?.[ci]?.wall?.scenes ?? [];
+          const next = after[Math.min(Math.max(0, first), after.length - 1)]?.id ?? null;
+          return { project: withFit(project, ci, s.wallAutoFit), wallScene: next, wallSceneSel: next ? [next] : [] };
+        }),
+
+      retimeWallScenes: (ci, ids, patch) => {
+        const res = { capped: false, rippled: false };
+        set((s) => {
+          const project = withWall(s.project, ci, (w) => {
+            let cur = w;
+            // Strip order, so a batch hold edit under lock borrows from each NEXT glide in turn.
+            const idx = (w.scenes ?? []).map((sc, i) => (sc.id && ids.includes(sc.id) ? i : -1)).filter((i) => i >= 0);
+            for (const i of idx) {
+              const r = retimedScene(cur, i, patch, s.wallLockBeats);
+              cur = r.wall;
+              res.capped ||= r.capped;
+              res.rippled ||= r.rippled;
+            }
+            return cur;
+          });
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
+        });
+        return res;
+      },
+
+      patchWallScenes: (ci, ids, patch) =>
+        set((s) => {
+          const project = withWall(s.project, ci, (w) => ({
+            ...w,
+            scenes: (w.scenes ?? []).map((sc) => (sc.id && ids.includes(sc.id) ? { ...sc, ...patch } : sc)),
+          }));
+          return project ? { project: withFit(project, ci, s.wallAutoFit) } : {};
         }),
 
       reorderWallScene: (ci, from, to) =>
@@ -737,7 +813,16 @@ export const useEditor = create<EditorState>()(
       setWallFramed: (wallFramed) => set({ wallFramed }),
       setWallCam: (wallCam) => set({ wallCam }),
       setWallSel: (wallSel) => set({ wallSel }),
-      setWallScene: (wallScene) => set({ wallScene }),
+      setWallScene: (wallScene) => set({ wallScene, wallSceneSel: wallScene ? [wallScene] : [] }),
+      setWallSceneSel: (ids, primary) => set({ wallSceneSel: primary && !ids.includes(primary) ? [...ids, primary] : ids, wallScene: primary }),
+      setWallLockBeats: (v) => {
+        try {
+          localStorage.setItem(LOCK_KEY, v ? "1" : "0");
+        } catch {
+          /* in-memory flag still works */
+        }
+        set({ wallLockBeats: v });
+      },
       stepWallScene: (dir) =>
         set((s) => {
           const ci = s.wallClip;
@@ -751,7 +836,7 @@ export const useEditor = create<EditorState>()(
           // Same three writes the strip's card click makes (select owns the wallSel invariant).
           // camFromScene hardens missing/NaN fields (a hand-written scene without `rotation` made the
           // camera readout call .toFixed on undefined and crashed the view).
-          return { ...reconcileWallSel(s, { kind: "clip", index: ci }), wallScene: sc.id ?? null, wallCam: camFromScene(sc) };
+          return { ...reconcileWallSel(s, { kind: "clip", index: ci }), wallScene: sc.id ?? null, wallSceneSel: sc.id ? [sc.id] : [], wallCam: camFromScene(sc) };
         }),
       setWallOverscan: (wallOverscan) => set({ wallOverscan }),
       setWallLive: (wallLive) => set({ wallLive }),
@@ -798,6 +883,11 @@ export const useEditor = create<EditorState>()(
   ),
 );
 
+/** The scenes the strip has selected, in no particular order: the multi-selection when it still
+ *  contains the primary `wallScene`, else just the primary (or nothing). */
+export const selectedSceneIds = (s: Pick<EditorState, "wallScene" | "wallSceneSel">): string[] =>
+  s.wallScene ? (s.wallSceneSel.includes(s.wallScene) ? s.wallSceneSel : [s.wallScene]) : [];
+
 /** zundo temporal store (undo/redo). */
 export const useTemporal = useEditor.temporal;
 
@@ -823,7 +913,9 @@ useEditor.subscribe((s, prev) => {
   const wc = s.wallClip != null ? clips[s.wallClip] : undefined;
   const nItems = wc?.type === "wall" ? (wc.wall?.items ?? []).length : 0;
   if (s.wallSel.some((k) => k >= nItems)) patch.wallSel = s.wallSel.filter((k) => k < nItems);
-  if (s.wallScene && !(wc?.type === "wall" && (wc.wall?.scenes ?? []).some((sc) => sc.id === s.wallScene))) patch.wallScene = null;
+  const sceneIds = new Set(wc?.type === "wall" ? (wc.wall?.scenes ?? []).map((sc) => sc.id) : []);
+  if (s.wallScene && !sceneIds.has(s.wallScene)) patch.wallScene = null;
+  if (s.wallSceneSel.some((id) => !sceneIds.has(id))) patch.wallSceneSel = s.wallSceneSel.filter((id) => sceneIds.has(id));
   if (Object.keys(patch).length) useEditor.setState(patch);
 });
 

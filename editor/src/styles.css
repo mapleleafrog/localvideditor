@@ -582,7 +582,14 @@ input, select { font: inherit; color: var(--text); background: var(--panel-2); b
 .wsc-fit.fit { color: #6ee7a8; }
 .wsc-fit.short { color: #ff8fa3; }
 .wsc-fit.long { color: #ffcf70; }
-.wsc-strip { flex: 1; min-height: 0; display: flex; gap: 10px; overflow-x: auto; overflow-y: auto; padding: 10px; align-items: flex-start; }
+.wsc-strip { position: relative; flex: 1; min-height: 0; display: flex; gap: 10px; overflow-x: auto; overflow-y: auto; padding: 10px; align-items: flex-start; }
+/* Live playhead: moved with a transform on every Player frame (lib/live-frame.ts), never re-rendered. */
+.wsc-needle { position: absolute; top: 4px; bottom: 4px; left: 0; width: 2px; margin-left: -1px; background: #ff5a7a; box-shadow: 0 0 6px rgba(255, 90, 122, 0.7); border-radius: 1px; pointer-events: none; z-index: 3; display: none; }
+.wsc-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.wsc-card.playing { border-color: #ff5a7a; box-shadow: 0 0 0 1px #ff5a7a; }
+.wsc-at { font-size: 10px; font-variant-numeric: tabular-nums; flex: none; }
+.wsc-thumb { display: block; }
+.wall-scenes .tl-toolbar button.danger { color: #ff8fa3; border-color: #702038; }
 .wsc-card {
   flex: 0 0 176px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px;
   padding: 7px; display: flex; flex-direction: column; gap: 5px;

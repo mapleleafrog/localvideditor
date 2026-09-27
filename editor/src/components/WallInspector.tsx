@@ -17,13 +17,13 @@
 //   Wall settings — camera globals + paper & finish + the viewport roll (collapsed).
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { staticFile } from "remotion";
-import { useEditor } from "../store";
+import { selectedSceneIds, useEditor } from "../store";
 import type { WallItem, WallScene } from "../../../src/timeline/schema";
 import { FONT_OPTIONS } from "../../../src/timeline/fonts";
 import { TRANSITION_KINDS, type TransitionKind } from "../../../src/effects/io";
 import { EASING_NAMES, type EasingName } from "../../../src/effects/easing";
 import { itemBox, itemDepth, itemWindow, peakVelocity, sceneIndexById, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { camFromScene, hasJapanese, hoverEndCam, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary } from "../lib/wall-edit";
+import { camFromScene, hasJapanese, hoverEndCam, lockedGlideTarget, sceneOptions, scheduleWall, speedClass, wallOf, wallSummary, type TimingPatch } from "../lib/wall-edit";
 import { imageNaturalSize } from "../lib/image";
 import { uploadMedia } from "../lib/api";
 import { ensureProjectName } from "../lib/names";
@@ -206,6 +206,11 @@ export const WallInspector: React.FC = () => {
   const addWallScene = useEditor((s) => s.addWallScene);
   const patchWallScene = useEditor((s) => s.patchWallScene);
   const removeWallScene = useEditor((s) => s.removeWallScene);
+  const removeWallScenes = useEditor((s) => s.removeWallScenes);
+  const retimeWallScenes = useEditor((s) => s.retimeWallScenes);
+  const patchWallScenes = useEditor((s) => s.patchWallScenes);
+  const wallSceneSel = useEditor((s) => s.wallSceneSel);
+  const lock = useEditor((s) => s.wallLockBeats);
   const openBrowser = useEditor((s) => s.openBrowser);
   const setWallSel = useEditor((s) => s.setWallSel);
   const select = useEditor((s) => s.select);
@@ -238,6 +243,13 @@ export const WallInspector: React.FC = () => {
   const item = idx >= 0 ? items[idx] : undefined;
   const si = item ? -1 : sceneIndexById(wall, wallScene ?? undefined);
   const scene = si >= 0 ? scenes[si] : undefined;
+  const selIds = item ? [] : selectedSceneIds({ wallScene, wallSceneSel });
+  /** Hold / glide edits honour 🔒 lock beats (strip toolbar) — same path as the strip's boxes. */
+  const retime = (ids: string[], p: TimingPatch) => {
+    const r = retimeWallScenes(ci, ids, p);
+    if (lock && r.capped) flash("Lock beats: not enough time in the neighbouring hold / glide — took what was there");
+    else if (lock && r.rippled) flash("Lock beats: nothing to borrow from here, so the scenes after it moved");
+  };
 
   /** Re-read the source's intrinsic ratio (the same call AssetsPanel makes at import). Async, so
    *  the store is re-read and the item re-validated (same index, same src) before patching. */
@@ -287,6 +299,7 @@ export const WallInspector: React.FC = () => {
 
   // --- scene panel maths ---
   const scenePanel = (() => {
+    if (selIds.length > 1) return multiPanel();
     if (!scene || si < 0) return null;
     const a = si === 0 ? sched.whole : hoverEndCam(scenes[si - 1], camFromScene(scene));
     const b = camFromScene(scene);
@@ -296,10 +309,13 @@ export const WallInspector: React.FC = () => {
     const dist = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * ((a.zoom + b.zoom) / 2));
     const appearing = items.filter((it) => it.appearIn === scene.id).length;
     const leaving = items.filter((it) => it.leaveAfter === scene.id).length;
-    // Live shows JUST the wall (liveWallProject), so the clip starts at Player frame 0.
+    // Live shows JUST the wall (liveWallProject), so the clip starts at Player frame 0. Starts half a
+    // second before the glide INTO the scene (the end of the previous hold), so the move that
+    // brings you here is part of what you see; scene 1 plays from the top (its intro).
+    const playFrom = si === 0 ? 0 : Math.max(0, (sched.sceneEnds[si - 1] ?? 0) - Math.round(0.5 * fps));
     const playScene = () => {
       setLive(true);
-      requestSeek(sched.sceneFrames[si] ?? 0, { play: true, until: sched.sceneEnds[si] ?? sched.total });
+      requestSeek(playFrom, { play: true, until: sched.sceneEnds[si] ?? sched.total });
     };
     return (
       <Section title={`Scene ${si + 1} of ${scenes.length}`} defaultOpen>
@@ -313,7 +329,7 @@ export const WallInspector: React.FC = () => {
         </div>
         <Field label="Hold (seconds the camera stays)">
           <div className="wi-row">
-            <CommitNum value={scene.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => patchWallScene(ci, si, { holdSeconds: n })} />
+            <CommitNum value={scene.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => scene.id && retime([scene.id], { holdSeconds: n })} />
             <span className="muted">{Math.round(scene.holdSeconds * fps)}f{scene.holdSeconds === 0 ? " · via (no stop)" : ""}</span>
           </div>
         </Field>
@@ -371,13 +387,17 @@ export const WallInspector: React.FC = () => {
               suffix="s"
               disabled={!glideLive}
               title={glideLive ? undefined : "no glide into the first scene (intro is off)"}
-              onCommit={(n) => patchWallScene(ci, si, { glideSeconds: n })}
+              onCommit={(n) => scene.id && retime([scene.id], { glideSeconds: n })}
             />
             {glideLive && scene.glideSeconds > 0 && dist > 0 ? (
               <button
                 className={"wsc-speed " + speedClass(v)}
                 title={`${scene.glideSeconds}s over ${dist} screen px — ${v.toFixed(0)} px/frame peak (1080p-equivalent). Suggested ${suggested.toFixed(2)}s. Click to apply.`}
-                onClick={() => patchWallScene(ci, si, { glideSeconds: Math.round(suggested * 100) / 100 })}
+                onClick={() => {
+                  const t = lockedGlideTarget(wall, si, suggested, lock);
+                  if (t == null) flash("Lock beats: no spare hold before this glide to stretch into");
+                  else if (scene.id) retime([scene.id], { glideSeconds: t });
+                }}
               >
                 ● {v.toFixed(0)} px/f → {suggested.toFixed(1)}s
               </button>
@@ -417,7 +437,7 @@ export const WallInspector: React.FC = () => {
             >
               ⟳ Re-frame
             </button>
-            <button title="Play this scene (Live)" onClick={playScene}>
+            <button title={`Play this scene in Live — from ${secs(playFrom / fps)}s, so the glide into it is included — to the end of its hold`} onClick={playScene}>
               ▸ Play
             </button>
             <button title="Duplicate scene" onClick={() => addWallScene(ci, { ...scene }, si + 1)}>
@@ -434,6 +454,77 @@ export const WallInspector: React.FC = () => {
       </Section>
     );
   })();
+
+  /** Several scene cards selected (Shift / Ctrl-click on the strip): one value written onto all of
+   *  them, one undo step. A box shows the first scene's value; "mixed" says they differ. */
+  function multiPanel() {
+    const sel = scenes.filter((sc) => sc.id && selIds.includes(sc.id));
+    const ids = sel.flatMap((sc) => (sc.id ? [sc.id] : []));
+    const first = sel[0];
+    if (!first) return null;
+    const mixed = <K extends keyof WallScene>(k: K) => sel.some((sc) => sc[k] !== first[k]);
+    const nums = sel.map((sc) => scenes.indexOf(sc) + 1).join(", ");
+    return (
+      <Section title={`${sel.length} scenes selected`} defaultOpen>
+        <div className="muted wi-lint">
+          Scenes {nums}. Each box sets the value on all of them (one Ctrl+Z).
+          {lock ? " Lock beats is on: hold / glide edits borrow from each scene's neighbour." : ""}
+        </div>
+        <Field label={`Hold (s)${mixed("holdSeconds") ? " — mixed" : ""}`}>
+          <CommitNum value={first.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => retime(ids, { holdSeconds: n })} />
+        </Field>
+        <Field label={`Glide in (s)${mixed("glideSeconds") ? " — mixed" : ""}`}>
+          <CommitNum value={first.glideSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => retime(ids, { glideSeconds: n })} />
+        </Field>
+        <Field label={`Hover${mixed("hover") ? " — mixed" : ""}`}>
+          <select
+            value={first.hover ?? "none"}
+            onChange={(e) => {
+              const v = e.target.value as WallScene["hover"];
+              patchWallScenes(ci, ids, { hover: v === "none" ? undefined : v });
+            }}
+          >
+            <option value="none">still</option>
+            <option value="toward">creep toward the next scene</option>
+            <option value="pushIn">push in</option>
+            <option value="pullOut">pull out</option>
+            <option value="left">drift left</option>
+            <option value="right">drift right</option>
+            <option value="up">drift up</option>
+            <option value="down">drift down</option>
+          </select>
+          <Slider value={first.hoverAmount ?? 0.5} min={0} max={1} step={0.05} onChange={(v2) => patchWallScenes(ci, ids, { hoverAmount: v2 })} />
+        </Field>
+        <Field label={`Easing${mixed("easing") ? " — mixed" : ""}`}>
+          <select value={first.easing} onChange={(e) => patchWallScenes(ci, ids, { easing: e.target.value as WallScene["easing"] })}>
+            {SCENE_EASINGS.map((e2) => (
+              <option key={e2} value={e2}>
+                {EASE_LABEL[e2] ?? e2}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={`Path arc${mixed("arc") ? " — mixed" : ""}`}>
+          <Slider value={first.arc} min={-1} max={1} step={0.05} onChange={(v2) => patchWallScenes(ci, ids, { arc: v2 })} />
+        </Field>
+        <div className="wi-row">
+          <button
+            className="del"
+            onClick={() => {
+              removeWallScenes(ci, ids);
+              flash(`${ids.length} scenes deleted (Ctrl+Z to undo)`);
+            }}
+            title="Delete these scene cards (Delete key). Photos are not touched; objects that appeared in them go back to always-on."
+          >
+            × Delete {ids.length} scenes
+          </button>
+          <button className="muted" onClick={() => setWallScene(null)}>
+            done
+          </button>
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <div className="insp">

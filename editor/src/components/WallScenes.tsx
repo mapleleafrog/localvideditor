@@ -14,11 +14,30 @@
 // inspector's `Scene` section. ▶ Preview all plays the whole schedule in Live mode. Drag a card to
 // reorder. Scene refs on items are by id, so reordering never re-targets a prop.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useEditor } from "../store";
+import { selectedSceneIds, useEditor } from "../store";
 import { peakVelocity, suggestGlideSeconds } from "../../../src/timeline/wall";
-import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, insertedScene, scheduleWall, speedClass, wallFitFor, wallOf, withTimingApplied } from "../lib/wall-edit";
+import { DEFAULT_GLIDE_SECONDS, DEFAULT_SCENE, appendedScene, camFromScene, fitDurationPatch, hoverEndCam, insertedScene, lockedGlideTarget, sceneSlot, scheduleWall, speedClass, wallFitFor, wallOf, withSceneSlot, withTimingApplied, type TimingPatch } from "../lib/wall-edit";
+import type { WallSchedule } from "../../../src/timeline/wall";
+import { getLiveFrame, subscribeLiveFrame, useLiveFrameSelect } from "../lib/live-frame";
 import { WallMiniMap } from "./WallMiniMap";
+import { WallSceneThumb } from "./WallSceneThumb";
 import { CommitNum } from "./WallInspector";
+
+/** Where the Live playhead is: the scene it is ARRIVING at or holding (the glide into scene i counts
+ *  as scene i), and whether it is still in that glide. −1 before the first glide starts. */
+const livePhase = (sched: WallSchedule, n: number, f: number): { i: number; glide: boolean; frac: number; outro: boolean } | null => {
+  if (f < 0 || !n) return null;
+  const glideStart = (i: number) => (i === 0 ? 0 : (sched.sceneEnds[i - 1] ?? 0));
+  let i = 0;
+  while (i + 1 < n && f >= glideStart(i + 1)) i++;
+  const gs = glideStart(i);
+  const at = sched.sceneFrames[i] ?? 0;
+  const end = sched.sceneEnds[i] ?? at;
+  if (f < at) return { i, glide: true, frac: at > gs ? (f - gs) / (at - gs) : 1, outro: false };
+  if (f < end || i < n - 1) return { i, glide: false, frac: end > at ? Math.min(1, (f - at) / (end - at)) : 1, outro: false };
+  const total = sched.total;
+  return { i, glide: false, frac: total > end ? Math.min(1, (f - end) / (total - end)) : 1, outro: true };
+};
 
 const HOVER_LABEL: Record<string, string> = { toward: "creep → next", pushIn: "push in", pullOut: "pull out", left: "drift ←", right: "drift →", up: "drift ↑", down: "drift ↓" };
 
@@ -42,6 +61,12 @@ export const WallScenes: React.FC = () => {
   const autoFit = useEditor((s) => s.wallAutoFit);
   const setAutoFit = useEditor((s) => s.setWallAutoFit);
   const flash = useEditor((s) => s.flash);
+  const wallSceneSel = useEditor((s) => s.wallSceneSel);
+  const setWallSceneSel = useEditor((s) => s.setWallSceneSel);
+  const lock = useEditor((s) => s.wallLockBeats);
+  const setLock = useEditor((s) => s.setWallLockBeats);
+  const retime = useEditor((s) => s.retimeWallScenes);
+  const removeScenes = useEditor((s) => s.removeWallScenes);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   // Keep the selected card in view: with 20+ scenes the strip is wider than the window and ‹ › /
   // PgUp-PgDn would otherwise step onto cards you cannot see. `block: "nearest"` so only the strip
@@ -63,12 +88,59 @@ export const WallScenes: React.FC = () => {
   // re-renders on every camera move.
   const wall = useMemo(() => (isWall ? wallOf(clip) : wallOf(undefined)), [isWall, clip]);
   const sched = useMemo(() => scheduleWall(wall, fps, W, H), [wall, fps, W, H]);
+  const nScenes = (wall.scenes ?? []).length;
+  // Live playhead: the strip re-renders only when the PLAYING SCENE changes; the needle moves
+  // imperatively on every frame (see lib/live-frame.ts).
+  const liveIdx = useLiveFrameSelect((f) => (live ? (livePhase(sched, nScenes, f)?.i ?? -1) : -1));
+  const needleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = stripRef.current;
+    const needle = needleRef.current;
+    if (!live || !strip || !needle) return;
+    const place = () => {
+      const ph = livePhase(sched, nScenes, getLiveFrame());
+      const el = ph
+        ? strip.querySelector<HTMLElement>(ph.outro ? "[data-outro]" : ph.glide ? `[data-glide-idx="${ph.i}"]` : `[data-card-idx="${ph.i}"]`)
+        : null;
+      if (!ph || !el) {
+        needle.style.display = "none";
+        return;
+      }
+      needle.style.display = "block";
+      needle.style.transform = `translateX(${el.offsetLeft + ph.frac * el.offsetWidth}px)`;
+    };
+    place();
+    return subscribeLiveFrame(place);
+  }, [live, sched, nScenes]);
+  // Follow the take: keep the playing card in view (same rule as the selection scroll below).
+  useEffect(() => {
+    if (liveIdx < 0 || !stripRef.current) return;
+    stripRef.current.querySelector<HTMLElement>(`[data-card-idx="${liveIdx}"]`)?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [liveIdx]);
   const fit = useMemo(() => (isWall ? wallFitFor(project, wallClip) : null), [isWall, project, wallClip]);
   if (!isWall || wallClip == null || !clip) {
     return <div className="muted pad">No wall clip selected.</div>;
   }
   const ci = wallClip;
   const scenes = wall.scenes ?? [];
+  const selIds = selectedSceneIds({ wallScene, wallSceneSel });
+  const multi = selIds.length > 1;
+
+  /** Every hold / glide edit on the strip goes through here, so 🔒 lock beats applies to all of them. */
+  const retimeOne = (i: number, patch: TimingPatch) => {
+    const id = scenes[i]?.id;
+    if (!id) return;
+    const r = retime(ci, [id], patch);
+    if (lock && r.capped) flash("Lock beats: not enough time in the neighbouring hold / glide — took what was there");
+    else if (lock && r.rippled) flash("Lock beats: nothing to borrow from here, so the scenes after it moved");
+  };
+
+  /** Selected scenes, deleted in one undo step. */
+  const deleteSelected = () => {
+    if (!selIds.length) return;
+    removeScenes(ci, selIds);
+    flash(`${selIds.length} scene${selIds.length === 1 ? "" : "s"} deleted (Ctrl+Z to undo)`);
+  };
 
   /** The pose a scene glides FROM: the previous scene, or the whole-wall fit pose for scene 0. */
   const prevCam = (i: number) => (i === 0 ? sched.whole : hoverEndCam(scenes[i - 1], camFromScene(scenes[i])));
@@ -101,6 +173,31 @@ export const WallScenes: React.FC = () => {
     setWallScene(s.id ?? null);
     select({ kind: "clip", index: ci });
     setWallCam(camFromScene(s));
+    // In Live the camera is the take's, so a click SEEKS the take to that scene's arrival instead.
+    if (live) requestSeek(sched.sceneFrames[i] ?? 0);
+  };
+
+  /** Card click: plain = select one; Shift = range from the selected scene; Ctrl/⌘ = toggle. */
+  const clickCard = (i: number, e: React.MouseEvent) => {
+    const s = scenes[i];
+    if (!s?.id) return;
+    if (e.shiftKey && selIdx >= 0) {
+      const [a, b] = selIdx < i ? [selIdx, i] : [i, selIdx];
+      const ids = scenes.slice(a, b + 1).flatMap((sc) => (sc.id ? [sc.id] : []));
+      setWallSceneSel(ids, wallScene);
+      select({ kind: "clip", index: ci });
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) {
+      const has = selIds.includes(s.id);
+      const ids = has ? selIds.filter((id) => id !== s.id) : [...selIds, s.id];
+      // Keep a primary that is still selected; toggling the primary off hands it to another one.
+      const primary = has ? (s.id === wallScene ? (ids[ids.length - 1] ?? null) : wallScene) : (wallScene ?? s.id);
+      setWallSceneSel(ids, primary);
+      select({ kind: "clip", index: ci });
+      return;
+    }
+    pick(i);
   };
 
   /** Play the whole schedule in Live mode. Live shows JUST the wall (liveWallProject), so the clip
@@ -191,6 +288,17 @@ export const WallScenes: React.FC = () => {
         <label className="wsc-check" title="Keep the clip exactly as long as the camera schedule — refits after every scene edit (same undo step). Dragging the block on the timeline still overrides it until the next scene edit.">
           <input type="checkbox" checked={autoFit} onChange={(e) => setAutoFit(e.target.checked)} /> auto-fit
         </label>
+        <label
+          className="wsc-check"
+          title="Lock beats: keep every scene's ARRIVAL time when you change a hold or a glide. A longer glide takes its time from the hold before it; a longer hold takes it from the glide after it — so scenes you timed to the beat stay on the beat. Off = the edit pushes every later scene. (The ⏱ slot box on a card always pushes: it is the 'make this scene last N seconds' edit.)"
+        >
+          <input type="checkbox" checked={lock} onChange={(e) => setLock(e.target.checked)} /> 🔒 lock beats
+        </label>
+        {selIds.length > 0 && !live ? (
+          <button className="danger" onClick={deleteSelected} title="Delete the selected scene card(s) — Delete key; one Ctrl+Z restores them. Photos are not touched.">
+            ✕ Delete {multi ? `${selIds.length} scenes` : `scene ${selIdx + 1}`}
+          </button>
+        ) : null}
         <span className="view-toggle">
           <button className={!live ? "on" : ""} onClick={() => setLive(false)}>
             Arrange
@@ -265,6 +373,7 @@ export const WallScenes: React.FC = () => {
       </div>
 
       <div className="wsc-strip" ref={stripRef}>
+        {live ? <div className="wsc-needle" ref={needleRef} aria-hidden /> : null}
         {/* Overview card: the whole wall with every frustum + glide path; click to jump. */}
         <div className="wsc-card wsc-timing">
           <div className="wsc-card-head">Overview</div>
@@ -276,7 +385,7 @@ export const WallScenes: React.FC = () => {
             {secs(Math.max(0, (sched.sceneEnds[scenes.length - 1] ?? sched.total) - (sched.sceneFrames[0] ?? 0)) / fps)}s · outro{" "}
             {secs(Math.max(0, sched.total - (sched.sceneEnds[scenes.length - 1] ?? sched.total)) / fps)}s
           </div>
-          <span className="muted wsc-hint">Type hold / glide seconds right on the strip. Click a card for more. Drag to reorder.</span>
+          <span className="muted wsc-hint">Type hold / glide seconds right on the strip. Click a card for more; Shift / Ctrl-click to select several. Drag to reorder.</span>
         </div>
 
         {scenes.length === 0 && (
@@ -301,6 +410,7 @@ export const WallScenes: React.FC = () => {
             <React.Fragment key={s.id ?? i}>
               {/* Connector: the glide INTO this scene (for scene 0 the intro glide, when intro is on). */}
               <div
+                data-glide-idx={i}
                 className={"wsc-arrow" + (glideLive ? "" : " off")}
                 title={
                   glideLive
@@ -344,7 +454,7 @@ export const WallScenes: React.FC = () => {
                     step={0.1}
                     suffix="s"
                     disabled={!glideLive}
-                    onCommit={(n) => patchWallScene(ci, i, { glideSeconds: n })}
+                    onCommit={(n) => retimeOne(i, { glideSeconds: n })}
                   />
                 </span>
                 {glideLive && s.glideSeconds > 0 && dist > 0 ? (
@@ -352,9 +462,14 @@ export const WallScenes: React.FC = () => {
                     className={"wsc-dot-btn " + speedClass(v)}
                     onClick={(e) => {
                       e.stopPropagation();
-                      patchWallScene(ci, i, { glideSeconds: Math.round(suggested * 100) / 100 });
+                      const target = lockedGlideTarget(wall, i, suggested, lock);
+                      if (target == null) {
+                        flash("Lock beats: no spare hold before this glide to stretch into");
+                        return;
+                      }
+                      retimeOne(i, { glideSeconds: target });
                     }}
-                    title={`${v.toFixed(0)} px/frame (1080p-equivalent) — click to use the suggested ${suggested.toFixed(2)}s`}
+                    title={`${v.toFixed(0)} px/frame (1080p-equivalent) — click to use the suggested ${suggested.toFixed(2)}s${lock ? " (lock beats: capped by the hold before it)" : ""}`}
                   >
                     ● {v.toFixed(0)}
                   </button>
@@ -364,40 +479,69 @@ export const WallScenes: React.FC = () => {
               </div>
 
               <div
-                className={"wsc-card" + (via ? " via" : "") + (on ? " on" : "") + (dragIndex === i ? " dragging" : "")}
+                className={
+                  "wsc-card" +
+                  (via ? " via" : "") +
+                  (on ? " on" : "") +
+                  (s.id && multi && selIds.includes(s.id) ? " sel" : "") +
+                  (liveIdx === i ? " playing" : "") +
+                  (dragIndex === i ? " dragging" : "")
+                }
                 data-scene-id={s.id ?? undefined}
+                data-card-idx={i}
                 draggable
                 onDragStart={() => setDragIndex(i)}
                 onDragEnd={() => setDragIndex(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDrop(i)}
-                onClick={() => pick(i)}
-                title={`Scene ${i + 1} — starts at ${startsAt}s. Click to select and jump the camera.`}
+                onClick={(e) => clickCard(i, e)}
+                title={`Scene ${i + 1} — arrives at ${startsAt}s. Click to select and jump the camera${live ? " (Live: jump the take here)" : ""}; Shift-click for a range, Ctrl/⌘-click to add or remove.`}
               >
                 <div className="wsc-card-head">
                   <span className="wsc-idx">{i + 1}</span>
-                  <span className="wsc-name-ro">{s.name || `x ${Math.round(s.x)} y ${Math.round(s.y)}`}</span>
+                  <span className="wsc-name-ro">{s.name || (via ? "via" : "")}</span>
+                  <span className="muted wsc-at">{startsAt}s</span>
                 </div>
-                {!via && (
-                  <div className="wsc-mini">
-                    <WallMiniMap wall={wall} W={W} H={H} fps={fps} width={148} height={84} highlight={i} onJump={undefined} />
-                  </div>
-                )}
+                {/* The scene's OWN frame — what the camera records when it gets there. */}
+                <div className="wsc-mini">
+                  <WallSceneThumb wall={wall} scene={s} index={i} W={W} H={H} width={148} height={Math.round((148 * H) / W)} />
+                </div>
                 <div className="wsc-meta" onClick={stop} onPointerDown={stop}>
                   <span className="muted">hold</span>
-                  <CommitNum value={s.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => patchWallScene(ci, i, { holdSeconds: n })} />
+                  <CommitNum value={s.holdSeconds} min={0} step={0.1} suffix="s" onCommit={(n) => retimeOne(i, { holdSeconds: n })} />
                   {via ? <span className="muted">via</span> : null}
                 </div>
-                <div className="wsc-meta muted">
-                  @ {startsAt}s{s.hover && s.hover !== "none" ? ` · ${HOVER_LABEL[s.hover] ?? s.hover}` : ""}
-                  {appearing ? ` · +${appearing} appear` : ""}
+                <div
+                  className="wsc-meta"
+                  onClick={stop}
+                  onPointerDown={stop}
+                  title={
+                    i < scenes.length - 1
+                      ? `Scene ${i + 1}'s slot: arrival → next arrival = hold + the glide into scene ${i + 2}. Type a total and the glide becomes total − hold. Pushes every later scene by the difference.`
+                      : "The last scene's slot is its hold."
+                  }
+                >
+                  <span className="muted">⏱ slot</span>
+                  <CommitNum
+                    value={Math.round(sceneSlot(wall, i) * 1000) / 1000}
+                    min={0}
+                    step={0.1}
+                    suffix="s"
+                    onCommit={(n) => patchWall(ci, { scenes: withSceneSlot(wall, i, n).scenes })}
+                  />
                 </div>
+                {(s.hover && s.hover !== "none") || appearing ? (
+                  <div className="wsc-meta muted">
+                    {s.hover && s.hover !== "none" ? HOVER_LABEL[s.hover] ?? s.hover : ""}
+                    {appearing ? `${s.hover && s.hover !== "none" ? " · " : ""}+${appearing} appear` : ""}
+                  </div>
+                ) : null}
               </div>
             </React.Fragment>
           );
         })}
         {scenes.length > 0 && wall.outro ? (
-          <div className="wsc-arrow" title="Outro: glide back out to the whole wall (Wall settings)">
+          <div className="wsc-arrow" data-outro title="Outro: glide back out to the whole wall (Wall settings)">
             <span className="wsc-arrow-line">→ outro</span>
             <span className="muted">{secs(wall.outroSeconds)}s</span>
           </div>

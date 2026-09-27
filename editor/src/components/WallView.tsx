@@ -26,6 +26,7 @@ import { ensureProjectName } from "../lib/names";
 import { imageNaturalSize, videoNaturalSize } from "../lib/image";
 import { authoringProject, camFromScene, fitAll, importWidth, isWallClip, liveWallProject, newSeed, newWallItemFromAsset, scheduleWall, spiralOffset, wallOf } from "../lib/wall-edit";
 import { useProxiesVersion, withProxies } from "../lib/proxies";
+import { setLiveFrame } from "../lib/live-frame";
 import { wallViewport, zoomAtCursor, panBy, screenPtToWall, ZOOM_MAX, ZOOM_MIN } from "../lib/wall-coords";
 import { WallOverlay } from "./WallOverlay";
 import { WallMiniMap } from "./WallMiniMap";
@@ -198,6 +199,23 @@ export const WallView: React.FC<{ playerRef?: React.RefObject<PlayerRef | null> 
     return () => p.removeEventListener("frameupdate", onFrame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekRequest?.n]);
+
+  // Publish the Live take's frame for the Scenes strip's playhead (lib/live-frame.ts). −1 outside
+  // Live, so the strip drops its needle the moment the take stops.
+  useEffect(() => {
+    const p = playerRef?.current;
+    if (!live || !valid || !p) {
+      setLiveFrame(-1);
+      return;
+    }
+    const onFrame = (e: { detail: { frame: number } }) => setLiveFrame(e.detail.frame);
+    setLiveFrame(p.getCurrentFrame());
+    p.addEventListener("frameupdate", onFrame);
+    return () => {
+      p.removeEventListener("frameupdate", onFrame);
+      setLiveFrame(-1);
+    };
+  }, [live, valid, playerRef]);
 
   const derived = useMemo(
     () => (valid && wallClip != null ? authoringProject(project, wallClip, wallCam) : project),

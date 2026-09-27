@@ -65,14 +65,16 @@ const GROUPS: Group[] = [
       { keys: ["Ctrl", "Enter"], label: "Insert the current framing as a new scene right after the selected one (same as ⊕ Insert after N / the + on a connector)" },
       { keys: ["Esc"], label: "Stop the Live preview (back to Arrange)" },
       { keys: ["Alt"], label: "Hold to disable snapping" },
-      { keys: ["Del"], label: "Delete selected item(s)" },
+      { keys: ["Del"], label: "Delete selected item(s) — or, with no photo selected, the selected scene card(s)" },
+      { keys: ["Shift", "click"], label: "Scene cards: select a range (batch-edit in the inspector)" },
+      { keys: [MOD, "click"], label: "Scene cards: add / remove one from the selection" },
       { keys: [MOD, "D"], label: "Duplicate item" },
       { keys: [MOD, "C"], label: "Copy item" },
       { keys: [MOD, "V"], label: "Paste item" },
       { keys: ["Shift", "drag"], label: "Marquee select (Alt+Shift replaces)" },
       { keys: ["Alt", "drag"], label: "Roll the camera (empty wall)" },
     ],
-    note: "Delete / ⌘D / ⌘C act on wall ITEMS only here — never the clip. Camera navigation is not undoable; scene keyframes and item edits are.",
+    note: "Delete / ⌘D / ⌘C act on wall items (Delete also on selected scene cards) — never the clip. Camera navigation is not undoable; scene keyframes and item edits are.",
   },
 ];
 

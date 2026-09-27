@@ -12,7 +12,7 @@ import { WallScenes } from "./components/WallScenes";
 import { ShortcutsModal, Toast } from "./components/ShortcutsModal";
 import { ContextMenu } from "./components/ContextMenu";
 import { EffectBrowser } from "./components/EffectBrowser";
-import { useEditor, useTemporal } from "./store";
+import { selectedSceneIds, useEditor, useTemporal } from "./store";
 import { computeDuration } from "./lib/timeline-utils";
 import { listMediaFull, saveProjectFile } from "./lib/api";
 import { ensureProjectName } from "./lib/names";
@@ -420,8 +420,14 @@ export const App: React.FC = () => {
             if (ci != null && sel.length) {
               // Descending, so each removal cannot shift the indices still to be removed.
               [...sel].sort((a, b) => b - a).forEach((k) => st.removeWallItem(ci, k));
+            } else if (ci != null && selectedSceneIds(st).length) {
+              // No photo selected but scene card(s) are: delete THOSE (one undo step). Photos are
+              // never touched by a scene delete.
+              const ids = selectedSceneIds(st);
+              st.removeWallScenes(ci, ids);
+              st.flash(`${ids.length} scene${ids.length === 1 ? "" : "s"} deleted (Ctrl+Z to undo)`);
             } else {
-              st.flash("Select an item on the wall to delete it");
+              st.flash("Select a photo on the wall, or a scene card, to delete it");
             }
             break;
           case "PageUp":

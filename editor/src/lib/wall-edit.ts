@@ -323,6 +323,120 @@ export const withTimingApplied = (wall: Wall, hold: number | undefined, glide: n
 });
 
 // ---------------------------------------------------------------------------------------------
+// Beat-locked retiming. A scene's SLOT is arrival → next arrival = its hold + the glide INTO the
+// next scene; the arrivals are what a beat-timed edit lines up. With `lock` on, a timing edit moves
+// the boundary INSIDE a slot instead of rippling everything after it:
+//   glide into i  ±d  ↔  hold of scene i−1 ∓d   (scene 0: the intro hold, when intro is on)
+//   hold of i     ±d  ↔  glide into i+1 ∓d      (last scene: nothing after it to borrow from → ripple)
+// Clamped so the partner never goes below 0 — a clamped edit gets only what the partner had, and
+// `capped` says so. Lock off = the plain patch (ripples downstream, as before).
+// ---------------------------------------------------------------------------------------------
+
+export interface TimingPatch {
+  holdSeconds?: number;
+  glideSeconds?: number;
+}
+export interface Retimed {
+  wall: Wall;
+  /** The requested change did not fit in the partner and was clamped. */
+  capped: boolean;
+  /** No partner exists (last scene's hold, scene 0 without intro) — the edit rippled. */
+  rippled: boolean;
+}
+
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+export const retimedScene = (wall: Wall, i: number, patch: TimingPatch, lock: boolean): Retimed => {
+  const scenes = [...(wall.scenes ?? [])];
+  const s = scenes[i];
+  const out: Retimed = { wall, capped: false, rippled: false };
+  if (!s) return out;
+  let w: Wall = wall;
+  if (patch.glideSeconds != null) {
+    const want = Math.max(0, patch.glideSeconds);
+    let d = want - s.glideSeconds;
+    if (lock && d !== 0) {
+      if (i > 0) {
+        const p = scenes[i - 1];
+        if (d > p.holdSeconds) {
+          d = p.holdSeconds;
+          out.capped = true;
+        }
+        scenes[i - 1] = { ...p, holdSeconds: r3(p.holdSeconds - d) };
+      } else if (wall.intro) {
+        const ih = wall.introHoldSeconds ?? 0.8;
+        if (d > ih) {
+          d = ih;
+          out.capped = true;
+        }
+        w = { ...w, introHoldSeconds: r3(ih - d) };
+      } else out.rippled = true;
+    }
+    scenes[i] = { ...scenes[i], glideSeconds: r3(s.glideSeconds + d) };
+  }
+  if (patch.holdSeconds != null) {
+    const cur = scenes[i];
+    const want = Math.max(0, patch.holdSeconds);
+    let d = want - cur.holdSeconds;
+    if (lock && d !== 0) {
+      if (i < scenes.length - 1) {
+        const n = scenes[i + 1];
+        if (d > n.glideSeconds) {
+          d = n.glideSeconds;
+          out.capped = true;
+        }
+        scenes[i + 1] = { ...n, glideSeconds: r3(n.glideSeconds - d) };
+      } else out.rippled = true;
+    }
+    scenes[i] = { ...cur, holdSeconds: r3(cur.holdSeconds + d) };
+  }
+  out.wall = { ...w, scenes };
+  return out;
+};
+
+/** The glide seconds a speed-dot click should apply to scene i: the suggestion, or — under lock
+ *  beats — as much of it as fits in the hold before it, leaving that hold ≥ 0.4 s (so it does not
+ *  turn into a "via"). `null` = no room at all. */
+export const lockedGlideTarget = (wall: Wall, i: number, suggested: number, lock: boolean): number | null => {
+  const sc = wall.scenes ?? [];
+  const s = sc[i];
+  if (!s) return null;
+  const want = Math.round(suggested * 100) / 100;
+  if (!lock || want <= s.glideSeconds) return want;
+  const room = i > 0 ? sc[i - 1].holdSeconds : wall.intro ? (wall.introHoldSeconds ?? 0.8) : Infinity;
+  const max = s.glideSeconds + Math.max(0, room - 0.4);
+  const t = Math.round(Math.min(want, max) * 100) / 100;
+  return t > s.glideSeconds ? t : null;
+};
+
+/** Scene i's slot length: its hold + the glide into the next scene (the last scene: its hold). */
+export const sceneSlot = (wall: Wall, i: number): number => {
+  const sc = wall.scenes ?? [];
+  if (!sc[i]) return 0;
+  return sc[i].holdSeconds + (i < sc.length - 1 ? sc[i + 1].glideSeconds : 0);
+};
+
+/** Set scene i's slot to `total` seconds by changing the glide AFTER it (glide = total − hold); a
+ *  total shorter than the hold shortens the hold and zeroes that glide. The last scene has no glide
+ *  after it, so its hold becomes the total. Deliberately RIPPLES — this is the "make this scene
+ *  last N seconds" edit; everything after it moves by the difference. */
+export const withSceneSlot = (wall: Wall, i: number, total: number): Wall => {
+  const scenes = [...(wall.scenes ?? [])];
+  const s = scenes[i];
+  if (!s) return wall;
+  const T = Math.max(0, total);
+  if (i >= scenes.length - 1) {
+    scenes[i] = { ...s, holdSeconds: r3(T) };
+  } else if (T >= s.holdSeconds) {
+    scenes[i + 1] = { ...scenes[i + 1], glideSeconds: r3(T - s.holdSeconds) };
+  } else {
+    scenes[i] = { ...s, holdSeconds: r3(T) };
+    scenes[i + 1] = { ...scenes[i + 1], glideSeconds: 0 };
+  }
+  return { ...wall, scenes };
+};
+
+// ---------------------------------------------------------------------------------------------
 // Items.
 // ---------------------------------------------------------------------------------------------
 

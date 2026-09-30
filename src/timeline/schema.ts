@@ -249,6 +249,10 @@ const overlaySchema = z.object({
   /** Per-character reveal for text overlays (charFadeUp / charBlurReveal / typewriterChar /
    *  wordHighlight). Optional — unset or "none" = static text. */
   textAnimation: z.enum(["none", "charFadeUp", "charBlurReveal", "typewriterChar", "wordHighlight"]).optional(),
+  /** Text look preset. `goldTitle` = the promo reel's layered title: a pale-gold outer stroke, a
+   *  dark-brown outline, a multi-stop gold gradient fill and a hard drop shadow (Lilita One unless
+   *  a font is set). Unset / "none" = the plain text, so existing projects are byte-identical. */
+  textStyle: z.enum(["none", "goldTitle"]).optional(),
   /** Frames between successive characters/words in the reveal (default 3). */
   textAnimationStagger: z.number().int().nonnegative().optional(),
   width: z.number().default(200),

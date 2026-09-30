@@ -16,7 +16,7 @@ import { getMotion, getTransitionPresentation, scaleStrength, EASINGS } from "..
 import { beatKick, clamp } from "../effects/helpers";
 import { Layer } from "../components/Layer";
 import type { Project, Clip, Overlay, Background, AudioTrack } from "./schema";
-import { resolveFontFamily } from "./fonts";
+import { SINGLE_WEIGHT_FONTS, resolveFontFamily } from "./fonts";
 import { WallClip } from "./WallClip"; // NOT "./Wall": on a case-insensitive FS (Windows) that resolves to wall.ts
 
 const FILL: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
@@ -32,7 +32,7 @@ const ClipContent: React.FC<{ clip: Clip; absStart: number; bpm: number; beatOff
   beatOffsetInFrames,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const progress = clamp(frame / clip.durationInFrames);
   // A wall clip carries its own camera on an ABSOLUTE clock (breathing / item motions / the REC
   // blink must not restart at a cut), so a beat-reactive clip.motion on it pulses on the same grid.
@@ -51,6 +51,9 @@ const ClipContent: React.FC<{ clip: Clip; absStart: number; bpm: number; beatOff
             beat: beatKick(t, bpm, 6, beatOffsetInFrames / fps),
             z: 0,
             params: {},
+            local: frame / fps,
+            width,
+            height,
           }),
           clip.strength ?? 1,
         )
@@ -185,6 +188,32 @@ const AnimatedChars: React.FC<{ o: Overlay }> = ({ o }) => {
 };
 
 // --- a positioned overlay with stacked effects ---
+/** The promo reel's layered gold title, as three stacked copies of the same text: a pale-gold
+ *  outer stroke, a dark-brown outline, and a multi-stop gold gradient fill clipped to the glyphs,
+ *  under one hard drop shadow. The first copy stays in flow so the box (and the editor's
+ *  on-canvas size measure) is the plain text's; the other two sit on top of it. Stroke widths are
+ *  the reel's (34 / 18 px on a 156 px line) as em fractions, so any font size keeps the look. */
+const GoldTitle: React.FC<{ box: React.CSSProperties; children: React.ReactNode }> = ({ box, children }) => {
+  const layer: React.CSSProperties = { ...box, position: "absolute", inset: 0, textShadow: "none" };
+  return (
+    <div style={{ position: "relative", filter: "drop-shadow(0 0.064em 0 rgba(60,30,0,0.45))", fontSize: box.fontSize }}>
+      <div style={{ ...box, textShadow: "none", color: "#FFF4B8", WebkitTextStroke: "0.218em #FFF4B8" }}>{children}</div>
+      <div style={{ ...layer, color: "#5E3706", WebkitTextStroke: "0.115em #5E3706" }}>{children}</div>
+      <div
+        style={{
+          ...layer,
+          color: "transparent",
+          backgroundImage: "linear-gradient(180deg, #FFFBE0 0%, #FFE66A 30%, #F2B51E 50%, #F7C63A 66%, #FFF1A0 78%, #FFF1A0 100%)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; beatOffsetInFrames: number }> = ({
   overlay: o,
   index,
@@ -213,25 +242,33 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
         motionParams={o.motionParams}
         flipX={o.flipX}
         flipY={o.flipY}
+        // Centre (% of the frame) + size for the positioned full-frame effects (heroGlow, rays,
+        // bloom, ring, sparkles). Every older fx motion ignores params, so this is inert for them.
+        params={{ cx: o.x ?? 50, cy: o.y ?? 50, size: o.scale ?? 1 }}
         dataIndex={index}
         style={{ left: 0, top: 0, width: "100%", height: "100%", opacity: o.opacity ?? 1 }}
       />
     );
   }
+  const gold = o.type === "text" && o.textStyle === "goldTitle";
+  // The gold title defaults to the reel's Lilita One; otherwise unset stays monospace (unchanged).
+  const fontId = o.fontFamily ?? (gold ? "lilitaOne" : undefined);
+  const textBox: React.CSSProperties = {
+    fontSize: o.fontSize ?? 80,
+    color: o.color ?? "#fff",
+    fontFamily: resolveFontFamily(fontId),
+    fontWeight: (fontId && SINGLE_WEIGHT_FONTS[fontId]) || 700,
+    whiteSpace: "nowrap",
+    textShadow: o.glow || "none",
+  };
+  const textBody = o.textAnimation && o.textAnimation !== "none" ? <AnimatedChars o={o} /> : o.text;
   const content =
     o.type === "text" ? (
-      <div
-        style={{
-          fontSize: o.fontSize ?? 80,
-          color: o.color ?? "#fff",
-          fontFamily: resolveFontFamily(o.fontFamily),
-          fontWeight: 700,
-          whiteSpace: "nowrap",
-          textShadow: o.glow || "none",
-        }}
-      >
-        {o.textAnimation && o.textAnimation !== "none" ? <AnimatedChars o={o} /> : o.text}
-      </div>
+      gold ? (
+        <GoldTitle box={textBox}>{textBody}</GoldTitle>
+      ) : (
+        <div style={textBox}>{textBody}</div>
+      )
     ) : o.type === "video" ? (
       // Video layer — rebased to start at the overlay's `from` so it plays from its beginning.
       <Sequence from={o.from ?? 0} layout="none">
@@ -262,8 +299,33 @@ const OverlayLayer: React.FC<{ overlay: Overlay; index?: number; bpm: number; be
       rotation={o.rotation ?? 0}
       flipX={o.flipX}
       flipY={o.flipY}
+      ioChars={o.type === "text" ? Array.from(o.text ?? "").length : undefined}
       dataIndex={index}
       centered
+      // Shine sweep: masked to the image's own alpha, or clipped to the glyphs for text.
+      shineMask={o.type === "image" && o.src ? `url("${resolveSrc(o.src)}")` : undefined}
+      renderShine={
+        o.type === "text"
+          ? (bg) => (
+              <div
+                style={{
+                  ...textBox,
+                  position: "absolute",
+                  inset: 0,
+                  color: "transparent",
+                  textShadow: "none",
+                  backgroundImage: bg,
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  mixBlendMode: "overlay",
+                  pointerEvents: "none",
+                }}
+              >
+                {o.text}
+              </div>
+            )
+          : undefined
+      }
       style={{ left: `${o.x ?? 50}%`, top: `${o.y ?? 50}%`, opacity: o.opacity ?? 1 }}
     >
       {content}

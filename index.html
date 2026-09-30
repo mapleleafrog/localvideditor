@@ -102,6 +102,12 @@
       #bg { z-index: 0; }
       #sprite-wrap { z-index: 1; }
       #overlay { z-index: 2; pointer-events: none; }
+      #under { z-index: 0; pointer-events: none; }
+      #shine {
+        position: absolute; left: 50%; top: 56%; width: 190px; height: 190px; pointer-events: none;
+        mix-blend-mode: overlay; -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      }
       #sprite {
         position: absolute; left: 50%; top: 56%; width: 190px; height: 190px;
         transform: translate(-50%, -50%); image-rendering: pixelated;
@@ -151,7 +157,8 @@
       <div class="stage-wrap">
         <div class="stage" id="stage">
           <div class="layer" id="bg"></div>
-          <div class="layer" id="sprite-wrap"><img id="sprite" alt="sprite" /></div>
+          <div class="layer" id="under"></div>
+          <div class="layer" id="sprite-wrap"><img id="sprite" alt="sprite" /><div id="shine"></div></div>
           <div class="layer" id="overlay"></div>
           <div class="layer scene" id="sceneA" style="display:none"><span class="lab">A</span></div>
           <div class="layer scene" id="sceneB" style="display:none"><span class="lab">B</span></div>
@@ -179,8 +186,10 @@
 
       // ===== motions: built from the generated bundle (zero formulas declared here) =====
       // Backgrounds -> bg layer; these specific ids -> overlay; everything else -> sprite.
-      const OVERLAY_IDS = new Set(["beatFlash", "crtScanlines", "grainLoop", "vignette"]);
-      const layerOf = (id, cat) => (cat === "Backgrounds" ? "bg" : OVERLAY_IDS.has(id) ? "overlay" : "sprite");
+      const OVERLAY_IDS = new Set(["beatFlash", "crtScanlines", "grainLoop", "vignette", "sparkleBurst", "sparkleTwinkle", "impactFlash"]);
+      // Reel glow set draws BEHIND the sprite (the reel paints rays/bloom/ring under the hero).
+      const UNDER_IDS = new Set(["heroGlow", "glowRays", "glowBloom", "shockwaveRing"]);
+      const layerOf = (id, cat) => (cat === "Backgrounds" ? "bg" : UNDER_IDS.has(id) ? "under" : OVERLAY_IDS.has(id) ? "overlay" : "sprite");
       const MOTIONS = {};
       for (const id in SE.MOTION_FORMULAS) {
         const meta = SE.MOTION_META[id] || { name: id, category: "", tier: "" };
@@ -306,12 +315,17 @@
         const dt = (now - last) / 1000; last = now;
         if (state.playing) clock += dt * state.speed;
         const t = clock, fr = Math.floor(t * FPS), winSec = state.win;
-        const ctx = { progress: clamp((t % winSec) / winSec), frame: fr, fps: FPS, t, beat: beatKick(t, state.bpm), z: 0.4, params: { speed: 1, radius: 30, angle: 8, z: 0.6 } };
+        // local = seconds into the current window, so the reel one-shots (burst, ring, punch,
+        // squash, flash, shine) re-fire every loop; width/height + cx/cy/size centre the glow set
+        // on the sprite (left 50 %, top 56 %, ~190 px).
+        const st = $("stage"), SW = st.clientWidth || 960, SH = st.clientHeight || 540;
+        const ctx = { progress: clamp((t % winSec) / winSec), frame: fr, fps: FPS, t, beat: beatKick(t, state.bpm), z: 0.4, local: t % winSec, width: SW, height: SH, params: { speed: 1, radius: 30, angle: 8, z: 0.6, cx: 50, cy: 56, size: 240 / (0.74 * Math.min(SW, SH)) } };
 
         const transMode = state.tab === "transitions";
         $("sceneA").style.display = transMode ? "" : "none";
         $("sceneB").style.display = transMode ? "" : "none";
         $("sprite-wrap").style.display = transMode ? "none" : "";
+        $("under").style.display = transMode ? "none" : "";
         $("bg").style.display = transMode ? "none" : "";
 
         if (!transMode) {
@@ -319,9 +333,16 @@
           const bgEl = $("bg");
           if (state.bg !== "none" && MOTIONS[state.bg]) applyStyle(bgEl, MOTIONS[state.bg].fn(ctx)); else { for (const p of RESET) bgEl.style[p] = ""; bgEl.style.background = "transparent"; }
           // sprite stack (sprite-layer motions) + overlay stack (overlay-layer)
-          const spriteList = [], overlayList = [];
-          for (const id of state.motions) { const e = MOTIONS[id]; (e.layer === "overlay" ? overlayList : spriteList).push(e.fn(ctx)); }
-          applyStyle($("sprite"), composeStyles(spriteList), "translate(-50%, -50%)");
+          const spriteList = [], overlayList = [], underList = [];
+          for (const id of state.motions) { const e = MOTIONS[id]; (e.layer === "overlay" ? overlayList : e.layer === "under" ? underList : spriteList).push(e.fn(ctx)); }
+          const spriteStyle = composeStyles(spriteList);
+          const shineBg = spriteStyle["--shine"]; delete spriteStyle["--shine"];
+          applyStyle($("sprite"), spriteStyle, "translate(-50%, -50%)");
+          // Shine sweep: the band over the sprite, masked to the sprite's own alpha, moving with it.
+          const sh = $("shine");
+          if (shineBg) { sh.style.display = ""; sh.style.backgroundImage = shineBg; sh.style.transform = `translate(-50%, -50%) ${spriteStyle.transform || ""}`; sh.style.transformOrigin = spriteStyle.transformOrigin || ""; sh.style.webkitMaskImage = sh.style.maskImage = `url("${sprite.src}")`; }
+          else sh.style.display = "none";
+          const un = $("under"); if (underList.length) applyStyle(un, composeStyles(underList)); else { for (const p of RESET) un.style[p] = ""; un.style.background = "transparent"; }
           const ov = $("overlay"); if (overlayList.length) applyStyle(ov, composeStyles(overlayList)); else { for (const p of RESET) ov.style[p] = ""; ov.style.background = "transparent"; }
           $("badge").innerHTML = `MOTIONS<br><span class="stack">${state.motions.size} stacked${state.bg !== "none" ? " · bg:" + state.bg : ""}</span>`;
           $("help").textContent = "stack effects ← left panel";

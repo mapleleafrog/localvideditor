@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import { depthShadow, stackMotions, type EasingName, type MotionParam } from "../effects";
-import { combineIo, type TransitionKind } from "../effects/io";
+import { REEL_TUNED_KINDS, combineIo, type TransitionKind } from "../effects/io";
 import { beatKick } from "../effects/helpers";
 
 /** Per-effect settings (index-aligned with the motion ids). Declared in `effects/stack.ts`
@@ -31,7 +31,9 @@ interface LayerProps {
   exit?: TransitionKind;
   enterDurationInFrames?: number;
   exitDurationInFrames?: number;
-  /** Easing curves for the enter / exit ramps (default easeInOut). */
+  /** Text length, so a typewriter enter/exit steps per character (text overlays). */
+  ioChars?: number;
+  /** Easing curves for the enter / exit ramps (default linear). */
   enterEasing?: EasingName;
   exitEasing?: EasingName;
   /** Per-layer fallback loop/strength (applied to every effect lacking a per-effect override). */
@@ -54,6 +56,12 @@ interface LayerProps {
   flipX?: boolean;
   flipY?: boolean;
   params?: Record<string, number>;
+  /** Shine sweep (the `shineSweep` motion emits a `--shine` gradient): the band is drawn over the
+   *  children on an overlay-blended layer masked with this CSS image (an image layer's own src, so
+   *  the band follows its alpha) … */
+  shineMask?: string;
+  /** … or drawn by the host (text: the same glyphs with the band clipped to them). */
+  renderShine?: (background: string) => React.ReactNode;
   /** Editor-only: stamps `data-ovl-index` so the canvas editor can find/measure this node. Ignored by render. */
   dataIndex?: number;
   style?: React.CSSProperties;
@@ -78,8 +86,9 @@ export const Layer: React.FC<LayerProps> = ({
   exit = "none",
   enterDurationInFrames = 15,
   exitDurationInFrames = 15,
-  enterEasing = "easeInOut",
-  exitEasing = "easeInOut",
+  ioChars,
+  enterEasing,
+  exitEasing,
   loop = false,
   strength = 1,
   motionParams,
@@ -90,6 +99,8 @@ export const Layer: React.FC<LayerProps> = ({
   flipX = false,
   flipY = false,
   params = {},
+  shineMask,
+  renderShine,
   dataIndex,
   style,
   children,
@@ -114,7 +125,7 @@ export const Layer: React.FC<LayerProps> = ({
   const { transform: motionTransform, opacity: motionOpacity, filter: motionFilter, ...motionRest } = stackMotions(
     ids,
     motionParams,
-    { frame, fps, t, beat, z: zz, params },
+    { frame, fps, t, beat, z: zz, params, width, height },
     f,
     win,
     loop,
@@ -130,10 +141,12 @@ export const Layer: React.FC<LayerProps> = ({
     durationInFrames: durationInFrames ?? undefined,
     enterFrames: enterDurationInFrames,
     exitFrames: exitDurationInFrames,
-    enterEasing,
-    exitEasing,
+    // Unset: linear for the reel-tuned kinds (their curve is the easing), easeInOut otherwise.
+    enterEasing: enterEasing ?? (REEL_TUNED_KINDS.has(enter) ? "linear" : "easeInOut"),
+    exitEasing: exitEasing ?? (REEL_TUNED_KINDS.has(exit) ? "linear" : "easeInOut"),
     w: width,
     h: height,
+    chars: ioChars,
   });
   const ioOpacity = io.opacity;
   const ioTx = io.tx;
@@ -182,13 +195,43 @@ export const Layer: React.FC<LayerProps> = ({
   // that origin and displace the layer by a full height/width. transformOrigin: "center center"
   // here keeps it always mirroring in place. (fx layers have no children and flip via the outer
   // transform instead — see hasChildren/flipStr above.)
+  // Shine: only while a `shineSweep` pass is live does the DOM gain a wrapper + band, so every other
+  // layer renders exactly as before.
+  const { "--shine": shineBg, ...motionOwn } = motionRest as Record<string, unknown>;
+  const shine =
+    typeof shineBg === "string" && hasChildren
+      ? renderShine
+        ? renderShine(shineBg)
+        : (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage: shineBg,
+                mixBlendMode: "overlay",
+                pointerEvents: "none",
+                ...(shineMask
+                  ? { maskImage: shineMask, WebkitMaskImage: shineMask, maskSize: "100% 100%", WebkitMaskSize: "100% 100%", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat" }
+                  : {}),
+              }}
+            />
+          )
+      : null;
+  const body = shine ? (
+    <div style={{ position: "relative" }}>
+      {children}
+      {shine}
+    </div>
+  ) : (
+    children
+  );
   const content =
     flipStr && hasChildren ? (
       <div style={{ display: "inline-block", transform: flipStr, transformOrigin: "center center" }}>
-        {children}
+        {body}
       </div>
     ) : (
-      children
+      body
     );
 
   return (
@@ -198,7 +241,7 @@ export const Layer: React.FC<LayerProps> = ({
         position: "absolute",
         willChange: "transform, opacity",
         ...styleRest,
-        ...motionRest,
+        ...(motionOwn as React.CSSProperties),
         opacity: finalOpacity,
         ...(filter ? { filter } : {}),
         ...(ioClip ? { clipPath: ioClip } : {}),

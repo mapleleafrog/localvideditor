@@ -27,7 +27,7 @@ export type MotionParam = { loop?: boolean; strength?: number; easing?: EasingNa
  *  `params` is always present: portable.ts reads params.speed (parallaxPan), params.radius
  *  (orbit), params.angle (dutchAngle) and params.z (parallaxDepth), so omitting it is a
  *  render-killing TypeError one Effect-Browser click away. */
-export type StackCtx = Omit<MotionCtx, "progress">;
+export type StackCtx = Omit<MotionCtx, "progress" | "local">;
 
 /**
  * Compose a stack of registry motions into one CSS style.
@@ -51,8 +51,12 @@ export const stackMotions = (
 ): CSSProperties => {
   const perEffect = ids.map((id, i) => {
     const p = params?.[i];
-    const looped = (p?.loop ?? loop) ? f / win - Math.floor(f / win) : clamp(f / win);
+    const loops = p?.loop ?? loop;
+    const looped = loops ? f / win - Math.floor(f / win) : clamp(f / win);
     const progress = ease(p?.easing ?? "linear", looped);
+    // Seconds since the effect started — wraps with the loop so a looped one-shot (ring, burst)
+    // re-fires every window; unclamped otherwise so decays keep decaying past the window.
+    const local = (loops ? f - Math.floor(f / win) * win : f) / ctx.fps;
     return scaleStrength(
       getMotion(id)({
         progress,
@@ -62,6 +66,9 @@ export const stackMotions = (
         beat: ctx.beat,
         z: ctx.z,
         params: ctx.params,
+        local,
+        width: ctx.width,
+        height: ctx.height,
       }),
       p?.strength ?? strength,
     );

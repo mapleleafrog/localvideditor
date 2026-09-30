@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getMotion } from "../lib/effects-bridge";
 import { beatKick } from "../../../src/effects/helpers";
 
@@ -15,6 +15,8 @@ export const FxPreview: React.FC<{ id: string; className?: string; active: boole
   active,
 }) => {
   const [style, setStyle] = useState<React.CSSProperties>({});
+  // The swatch's own size, so positioned full-frame effects (the reel glow set) draw inside it.
+  const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!active) {
       setStyle({});
@@ -34,6 +36,10 @@ export const FxPreview: React.FC<{ id: string; className?: string; active: boole
           beat: beatKick(elapsed, 120, 6, 0),
           z: 0.4,
           params: {},
+          // One-shots (burst, ring, punch, squash, flash, shine) re-fire every preview loop.
+          local: frame / PREVIEW_FPS,
+          width: ref.current?.offsetWidth || undefined,
+          height: ref.current?.offsetHeight || undefined,
         }),
       );
       raf = requestAnimationFrame(tick);
@@ -43,7 +49,7 @@ export const FxPreview: React.FC<{ id: string; className?: string; active: boole
   }, [id, active]);
   return (
     <span className={className ?? "fx-swatch"}>
-      <span className="fx-swatch-inner" style={style} />
+      <span ref={ref} className="fx-swatch-inner" style={style} />
     </span>
   );
 };

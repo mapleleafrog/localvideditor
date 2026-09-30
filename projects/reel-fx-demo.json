@@ -1,0 +1,156 @@
+{
+  "background": {
+    "type": "gradient",
+    "color": "#0c1322",
+    "gradient": "radial-gradient(circle at 50% 55%, #3a2a55, #0b0f1e 70%)",
+    "motion": "none"
+  },
+  "clips": [],
+  "overlays": [
+    {
+      "type": "fx",
+      "text": "",
+      "src": "",
+      "from": 21,
+      "durationInFrames": 279,
+      "x": 50,
+      "y": 56,
+      "scale": 0.55,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [
+        "heroGlow"
+      ],
+      "windowInFrames": 60,
+      "fontSize": 80,
+      "color": "#ffffff",
+      "glow": "",
+      "width": 200,
+      "enter": "none",
+      "exit": "none"
+    },
+    {
+      "type": "image",
+      "text": "Title",
+      "src": "orange-mush.gif",
+      "from": 0,
+      "durationInFrames": 300,
+      "x": 50,
+      "y": 56,
+      "scale": 1,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [
+        "landingSquash",
+        "shineSweep"
+      ],
+      "z": 0.5,
+      "windowInFrames": 108,
+      "fontSize": 80,
+      "color": "#ffffff",
+      "glow": "",
+      "width": 420,
+      "motionParams": [
+        {},
+        {
+          "loop": true
+        }
+      ],
+      "enter": "none",
+      "exit": "none"
+    },
+    {
+      "type": "fx",
+      "text": "",
+      "src": "",
+      "from": 21,
+      "durationInFrames": 279,
+      "x": 50,
+      "y": 56,
+      "scale": 0.55,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [
+        "sparkleBurst",
+        "sparkleTwinkle"
+      ],
+      "windowInFrames": 60,
+      "fontSize": 80,
+      "color": "#ffffff",
+      "glow": "",
+      "width": 200,
+      "enter": "none",
+      "exit": "none"
+    },
+    {
+      "type": "fx",
+      "text": "",
+      "src": "",
+      "from": 21,
+      "durationInFrames": 40,
+      "x": 50,
+      "y": 56,
+      "scale": 0.55,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [
+        "impactFlash"
+      ],
+      "windowInFrames": 60,
+      "fontSize": 80,
+      "color": "#ffffff",
+      "glow": "",
+      "width": 200,
+      "enter": "none",
+      "exit": "none"
+    },
+    {
+      "type": "text",
+      "text": "SORANJI",
+      "src": "orange-mush.gif",
+      "from": 84,
+      "durationInFrames": 216,
+      "x": 50,
+      "y": 18,
+      "scale": 1,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [],
+      "windowInFrames": 60,
+      "fontSize": 150,
+      "color": "#ffffff",
+      "glow": "",
+      "width": 200,
+      "textStyle": "goldTitle",
+      "enter": "pop",
+      "enterDurationInFrames": 27,
+      "exit": "none"
+    },
+    {
+      "type": "text",
+      "text": "\u3042\u308a\u304c\u3068\u3046 \u00b7 thank you",
+      "src": "orange-mush.gif",
+      "from": 102,
+      "durationInFrames": 198,
+      "x": 50,
+      "y": 88,
+      "scale": 1,
+      "rotation": 0,
+      "opacity": 1,
+      "motions": [],
+      "windowInFrames": 60,
+      "fontSize": 64,
+      "color": "#fff4b8",
+      "glow": "0 3px 0 #5e3706, 0 0 18px rgba(255,196,80,.6)",
+      "width": 200,
+      "enter": "slideUp",
+      "enterDurationInFrames": 27,
+      "exit": "none",
+      "fontFamily": "zenMaruGothic"
+    }
+  ],
+  "fps": 60,
+  "width": 1920,
+  "height": 1080,
+  "audio": []
+}

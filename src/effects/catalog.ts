@@ -276,4 +276,18 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "motion", id: "lensFlare", name: "Anamorphic Lens Flare", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["flare", "cinematic", "fullframe"], license: "write-own" },
   { kind: "motion", id: "godRays", name: "God Rays (Komorebi)", category: "Japan MV", engine: "css", tier: "Ext", status: "todo", tags: ["light", "atmosphere", "fullframe"], license: "write-own" },
   { kind: "motion", id: "japanMvGrade", name: "Japan MV Pastel Grade", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["grade", "pastel", "japan"], license: "write-own" },
+
+  // --- Promo reel pack (glow / impact / shine — from the promo-reel canvas engine) ---
+  // Glow set: full-frame, for fx layers; centred on the layer's Centre X/Y, sized by its Size.
+  { kind: "motion", id: "heroGlow", name: "Hero Glow (rays + bloom + ring)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "impact", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "glowRays", name: "Glow Rays (rotating)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "glowBloom", name: "Glow Bloom (breathing)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "shockwaveRing", name: "Shockwave Ring", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "beat", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "sparkleBurst", name: "Sparkle Burst", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "sparkle", "impact", "fullframe", "wedding"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "sparkleTwinkle", name: "Sparkle Twinkle (orbit)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "sparkle", "loop", "fullframe", "wedding"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "impactFlash", name: "Impact Flash", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "flash", "beat", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  // Impact set: on the subject (image / text / wall item).
+  { kind: "motion", id: "landingSquash", name: "Landing Squash (drop + wobble)", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "entrance", "bouncy"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "impactPunch", name: "Impact Punch (scale + tilt kick)", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "beat", "energetic"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+  { kind: "motion", id: "shineSweep", name: "Shine Sweep", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "shine", "gold", "photo"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
 ];

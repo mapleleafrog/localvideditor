@@ -26,6 +26,7 @@ var SoranjiEffects = (() => {
     TAU: () => TAU,
     TRANSITION_FORMULAS: () => TRANSITION_FORMULAS,
     TRANSITION_META: () => TRANSITION_META,
+    backOutStrong: () => backOutStrong,
     beatIndex: () => beatIndex,
     beatKick: () => beatKick,
     bevel: () => bevel,
@@ -33,14 +34,18 @@ var SoranjiEffects = (() => {
     bounceOut: () => bounceOut,
     clamp: () => clamp,
     composeStyles: () => composeStyles,
+    decay: () => decay,
     depthScale: () => depthScale,
     depthShadow: () => depthShadow,
     easeInOutCubic: () => easeInOutCubic,
+    easeInQuad: () => easeInQuad,
     easeOutCubic: () => easeOutCubic,
     elasticOut: () => elasticOut,
+    lehmer: () => lehmer,
     lerp: () => lerp,
     quantize: () => quantize,
     seededRandom: () => seededRandom,
+    shineGradient: () => shineGradient,
     smooth: () => smooth,
     springy: () => springy,
     stepTime: () => stepTime
@@ -93,6 +98,16 @@ var SoranjiEffects = (() => {
   var seededRandom = (seed) => {
     const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
     return x - Math.floor(x);
+  };
+  var backOutStrong = (x, c1 = 2.2) => {
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+  };
+  var easeInQuad = (x) => x * x;
+  var decay = (u, k) => u < 0 ? 0 : Math.exp(-u * k);
+  var lehmer = (seed) => {
+    let s = seed;
+    return () => (s = s * 16807 % 2147483647) / 2147483647;
   };
 
   // src/effects/catalog.ts
@@ -327,7 +342,20 @@ var SoranjiEffects = (() => {
     { kind: "motion", id: "sakuraPetals", name: "Sakura Petals", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["japan", "sakura", "atmosphere", "fullframe", "wedding"], license: "write-own" },
     { kind: "motion", id: "lensFlare", name: "Anamorphic Lens Flare", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["flare", "cinematic", "fullframe"], license: "write-own" },
     { kind: "motion", id: "godRays", name: "God Rays (Komorebi)", category: "Japan MV", engine: "css", tier: "Ext", status: "todo", tags: ["light", "atmosphere", "fullframe"], license: "write-own" },
-    { kind: "motion", id: "japanMvGrade", name: "Japan MV Pastel Grade", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["grade", "pastel", "japan"], license: "write-own" }
+    { kind: "motion", id: "japanMvGrade", name: "Japan MV Pastel Grade", category: "Japan MV", engine: "css", tier: "Core", status: "todo", tags: ["grade", "pastel", "japan"], license: "write-own" },
+    // --- Promo reel pack (glow / impact / shine — from the promo-reel canvas engine) ---
+    // Glow set: full-frame, for fx layers; centred on the layer's Centre X/Y, sized by its Size.
+    { kind: "motion", id: "heroGlow", name: "Hero Glow (rays + bloom + ring)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "impact", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "glowRays", name: "Glow Rays (rotating)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "glowBloom", name: "Glow Bloom (breathing)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "glow", "gold", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "shockwaveRing", name: "Shockwave Ring", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "beat", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "sparkleBurst", name: "Sparkle Burst", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "sparkle", "impact", "fullframe", "wedding"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "sparkleTwinkle", name: "Sparkle Twinkle (orbit)", category: "Reel Glow", engine: "css", tier: "Core", status: "todo", tags: ["reel", "sparkle", "loop", "fullframe", "wedding"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "impactFlash", name: "Impact Flash", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "flash", "beat", "fullframe"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    // Impact set: on the subject (image / text / wall item).
+    { kind: "motion", id: "landingSquash", name: "Landing Squash (drop + wobble)", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "entrance", "bouncy"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "impactPunch", name: "Impact Punch (scale + tilt kick)", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "impact", "beat", "energetic"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" },
+    { kind: "motion", id: "shineSweep", name: "Shine Sweep", category: "Reel Impact", engine: "css", tier: "Core", status: "todo", tags: ["reel", "shine", "gold", "photo"], license: "write-own", credit: "Ported from the promo-reel canvas engine (reel_template.html)" }
   ];
 
   // src/effects/portable.ts
@@ -369,6 +397,113 @@ var SoranjiEffects = (() => {
     if (filters.length) out.filter = filters.join(" ");
     if (hasOpacity) out.opacity = opacity;
     return out;
+  };
+  var REEL_GOLD = "255,196,80";
+  var REEL_STAR = "M30 0C32 20 40 28 60 30 40 32 32 40 30 60 28 40 20 32 0 30 20 28 28 20 30 0Z";
+  var reelGeom = (ctx) => {
+    const W = ctx.width ?? 1920;
+    const H = ctx.height ?? 1080;
+    const m = Math.min(W, H);
+    return {
+      W,
+      H,
+      cx: (ctx.params.cx ?? 50) / 100 * W,
+      cy: (ctx.params.cy ?? 50) / 100 * H,
+      K: 0.74 * m * (ctx.params.size ?? 1),
+      k: m / 1080,
+      u: ctx.local ?? ctx.progress
+    };
+  };
+  var bgLayers = (layers, extra = {}) => layers.length ? {
+    backgroundImage: layers.map((l) => l.img).join(", "),
+    backgroundPosition: layers.map((l) => l.pos ?? "0px 0px").join(", "),
+    backgroundSize: layers.map((l) => l.size ?? "100% 100%").join(", "),
+    backgroundRepeat: "no-repeat",
+    ...extra
+  } : {};
+  var f1 = (n) => n.toFixed(1);
+  var f3 = (n) => n.toFixed(3);
+  var svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  var RAY_WEDGES = (() => {
+    const pt = (deg) => {
+      const r = deg * Math.PI / 180;
+      return `${Math.sin(r).toFixed(5)} ${(-Math.cos(r)).toFixed(5)}`;
+    };
+    let d = "";
+    for (let a = 0; a < 360; a += 22) d += `M0 0L${pt(a)}A1 1 0 0 1 ${pt(Math.min(360, a + 7))}Z`;
+    return d;
+  })();
+  var raysLayer = (g, t, alpha, color = REEL_GOLD) => {
+    if (alpha <= 1e-3) return null;
+    const side = 2 * 950 * (g.K / 820);
+    const a = 0.55 * alpha;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 2 2'><defs><radialGradient id='g' cx='0' cy='0' r='1' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='rgb(${color})' stop-opacity='${f3(a)}'/><stop offset='0.113' stop-color='rgb(${color})' stop-opacity='${f3(a)}'/><stop offset='0.495' stop-color='rgb(${color})' stop-opacity='${f3(a * 0.35)}'/><stop offset='0.877' stop-color='rgb(${color})' stop-opacity='0'/></radialGradient></defs><path transform='rotate(${f1(t * 14 % 360)})' fill='url(#g)' d='${RAY_WEDGES}'/></svg>`;
+    return { img: svgUrl(svg), pos: `${f1(g.cx - side / 2)}px ${f1(g.cy - side / 2)}px`, size: `${f1(side)}px ${f1(side)}px` };
+  };
+  var bloomLayer = (g, t, alpha, color = REEL_GOLD) => {
+    if (alpha <= 1e-3) return null;
+    const R = 600 * Math.SQRT2 * (g.K / 820) * (1 + 0.06 * Math.sin(t * 4.2));
+    return {
+      img: `radial-gradient(circle ${f1(R)}px at ${f1(g.cx)}px ${f1(g.cy)}px, rgba(255,244,210,${f3(0.95 * alpha)}) 0%, rgba(${color},${f3(0.6 * alpha)}) 22%, rgba(${color},${f3(0.22 * alpha)}) 45%, rgba(${color},0) 68%)`
+    };
+  };
+  var ringLayers = (g, u, color = REEL_GOLD) => {
+    const rp = u / 0.55;
+    if (rp < 0 || rp >= 1) return [];
+    const a = 1 - rp;
+    const Rr = lerp(g.K * 0.35, g.K * 1.05, easeOutCubic(rp)) - 5 * g.k;
+    const hw = 5 * g.k;
+    const glow = 40 * g.k;
+    const at = `at ${f1(g.cx)}px ${f1(g.cy)}px`;
+    return [
+      {
+        img: `radial-gradient(circle ${at}, rgba(255,244,184,0) ${f1(Rr - hw - 1)}px, rgba(255,244,184,${f3(a)}) ${f1(Rr - hw)}px, rgba(255,244,184,${f3(a)}) ${f1(Rr + hw)}px, rgba(255,244,184,0) ${f1(Rr + hw + 1)}px)`
+      },
+      {
+        img: `radial-gradient(circle ${at}, rgba(${color},0) ${f1(Math.max(0, Rr - glow))}px, rgba(${color},${f3(0.6 * a)}) ${f1(Rr)}px, rgba(${color},0) ${f1(Rr + glow)}px)`
+      }
+    ];
+  };
+  var REEL_RND = lehmer(7);
+  var REEL_BURST = Array.from({ length: 26 }, () => ({ a: REEL_RND() * TAU, d: 380 + REEL_RND() * 420, s: 0.5 + REEL_RND() * 1.1, r: REEL_RND() * 180 }));
+  var REEL_TWINKLE = Array.from({ length: 12 }, () => ({ a: REEL_RND() * TAU, d: 300 + REEL_RND() * 200, ph: REEL_RND() * 6.28, sp: 5 + REEL_RND() * 5, s: 0.5 + REEL_RND() * 0.8 }));
+  var starLayer = (x, y, size, rot, a) => {
+    if (a <= 1e-3 || size <= 0.5) return null;
+    const box = size * 86 / 60;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='-13 -13 86 86'><path d='${REEL_STAR}' fill='#FFF6C8' fill-opacity='${f3(a)}' transform='rotate(${f1(rot)} 30 30)'/></svg>`;
+    return { img: svgUrl(svg), pos: `${f1(x - box / 2)}px ${f1(y - box / 2)}px`, size: `${f1(box)}px ${f1(box)}px` };
+  };
+  var burstLayers = (g) => {
+    const out = [];
+    REEL_BURST.forEach((b, i) => {
+      const t0 = i % 2 ? 0 : 0.35;
+      const up = (g.u - t0) / 0.9;
+      if (up < 0 || up >= 1) return;
+      const d = b.d * easeOutCubic(up) * (t0 ? 0.8 : 1) * (g.K / 800);
+      const l = starLayer(g.cx + Math.cos(b.a) * d, g.cy + Math.sin(b.a) * d, 60 * b.s * (1 - up * 0.6) * (g.K / 800), b.r + up * 90, 1 - up);
+      if (l) out.push(l);
+    });
+    return out;
+  };
+  var twinkleLayers = (g, t) => {
+    const fade = clamp(g.u / 0.3);
+    const out = [];
+    for (const w of REEL_TWINKLE) {
+      const v = Math.max(0, Math.sin(t * w.sp + w.ph));
+      const d = w.d * (g.K / 820);
+      const l = starLayer(g.cx + Math.cos(w.a) * d, g.cy + Math.sin(w.a) * d * 0.95, 60 * w.s * v * (g.K / 800), t * 60, v * fade);
+      if (l) out.push(l);
+    }
+    return out;
+  };
+  var nonNull = (xs) => xs.filter((x) => x != null);
+  var raysAlpha = (u, t) => (0.55 + 0.2 * Math.sin(t * 3)) * easeOutCubic(clamp(u / 0.45));
+  var bloomAlpha = (u) => clamp(0.8 + 0.2 * Math.sin(u * 4.2)) * easeOutCubic(clamp(u / 0.3));
+  var shineGradient = (sp) => {
+    const X = lerp(120, -20, easeInOutCubic(clamp(sp)));
+    const f = 0.5 + (1e3 - 20 * X) * 0.9063 / 1329;
+    const pct = (v) => `${(v * 100).toFixed(2)}%`;
+    return `linear-gradient(115deg, rgba(255,255,255,0) ${pct(f - 0.189)}, rgba(255,255,255,0.95) ${pct(f)}, rgba(255,255,255,0) ${pct(f + 0.189)})`;
   };
   var MOTION_FORMULAS = {
     // --- Ken Burns / Zoom ---
@@ -943,7 +1078,46 @@ var SoranjiEffects = (() => {
       // Pastel J-MV grade: lowered contrast (lifted blacks), desaturated, warm-pink cast, with a
       // barely-there exposure breath so it feels filmic rather than frozen.
       filter: `contrast(0.94) saturate(0.82) brightness(${(1.05 + Math.sin(t * 0.5) * 0.015).toFixed(3)}) sepia(0.10) hue-rotate(-6deg)`
-    })
+    }),
+    // ======================= PACK: Promo reel — glow / impact / shine (reel_template.html) =======================
+    // Full-frame (fx layer) — centred on the layer's Centre X/Y, sized by its Size:
+    heroGlow: (ctx) => {
+      const g = reelGeom(ctx);
+      return bgLayers(nonNull([...ringLayers(g, g.u), bloomLayer(g, ctx.t, bloomAlpha(g.u)), raysLayer(g, ctx.t, raysAlpha(g.u, ctx.t))]), { mixBlendMode: "screen" });
+    },
+    glowRays: (ctx) => {
+      const g = reelGeom(ctx);
+      return bgLayers(nonNull([raysLayer(g, ctx.t, raysAlpha(g.u, ctx.t))]), { mixBlendMode: "screen" });
+    },
+    glowBloom: (ctx) => {
+      const g = reelGeom(ctx);
+      return bgLayers(nonNull([bloomLayer(g, ctx.t, bloomAlpha(g.u))]), { mixBlendMode: "screen" });
+    },
+    shockwaveRing: (ctx) => bgLayers(ringLayers(reelGeom(ctx), reelGeom(ctx).u)),
+    sparkleBurst: (ctx) => bgLayers(burstLayers(reelGeom(ctx))),
+    sparkleTwinkle: (ctx) => bgLayers(twinkleLayers(reelGeom(ctx), ctx.t)),
+    impactFlash: (ctx) => {
+      const a = 0.7 * decay(ctx.local ?? ctx.progress, 12);
+      return a > 1e-3 ? { backgroundColor: `rgba(255,248,224,${f3(a)})` } : {};
+    },
+    // On the subject (image / text layer):
+    landingSquash: (ctx) => {
+      const u = ctx.local ?? ctx.progress;
+      const H = ctx.height ?? 1080;
+      const IMPACT = 0.35;
+      if (u < IMPACT) return { transform: `translateY(${f1(-0.677 * H * (1 - easeInQuad(u / IMPACT)))}px)`, transformOrigin: "50% 90%" };
+      const v = u - IMPACT;
+      const d = Math.exp(-v * 7) * Math.cos(v * 30);
+      return { transform: `scale(${(1 + 0.16 * d).toFixed(4)}, ${(1 - 0.16 * d).toFixed(4)})`, transformOrigin: "50% 90%" };
+    },
+    impactPunch: (ctx) => {
+      const u = ctx.local ?? ctx.progress;
+      return { transform: `scale(${(1 + 0.28 * decay(u, 12)).toFixed(4)}) rotate(${(-5 * decay(u, 8)).toFixed(3)}deg)` };
+    },
+    shineSweep: (ctx) => {
+      const sp = ((ctx.local ?? ctx.progress) - 0.15) / 0.6;
+      return sp >= 0 && sp < 1 ? { "--shine": shineGradient(sp) } : {};
+    }
   };
   var fullMask = (uri, size) => ({
     maskImage: uri,

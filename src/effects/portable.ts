@@ -12,6 +12,10 @@ import {
   seededRandom,
   quantize,
   stepTime,
+  easeInQuad,
+  easeInOutCubic,
+  decay,
+  lehmer,
 } from "./helpers";
 import { CATALOG } from "./catalog";
 
@@ -97,6 +101,157 @@ export const composeStyles = (styles: StyleObject[]): StyleObject => {
 };
 
 // ===== every ready motion formula, keyed by id (verbatim relocation) =====
+// ===== promo-reel effects: shared geometry + layers (ported from reel_template.html) =====
+//
+// The reel draws on a canvas; here every piece is a CSS background layer on ONE full-frame element,
+// so the glow set stacks on an fx layer and renders frame-exactly. Positions/sizes are in px of the
+// composition (ctx.width/height), centred on params.cx / params.cy (% of the frame) with a subject
+// size K = 0.74 · min(W, H) · params.size — the reel's 800 px hero on its 1080-wide canvas. Every
+// one-shot runs on ctx.local (seconds since the effect started). No Math.random: sparkles come from
+// the reel's own seeded Lehmer PRNG (seed 7, drawn in the reel's order), so the layout matches it.
+
+const REEL_GOLD = "255,196,80"; // #FFC450 — the reel's default glow colour
+const REEL_STAR = "M30 0C32 20 40 28 60 30 40 32 32 40 30 60 28 40 20 32 0 30 20 28 28 20 30 0Z";
+
+interface ReelGeom {
+  W: number;
+  H: number;
+  cx: number;
+  cy: number;
+  K: number;
+  /** Line / blur scale against the reel's 1080-px short side. */
+  k: number;
+  u: number;
+}
+const reelGeom = (ctx: MotionCtx): ReelGeom => {
+  const W = ctx.width ?? 1920;
+  const H = ctx.height ?? 1080;
+  const m = Math.min(W, H);
+  return {
+    W,
+    H,
+    cx: ((ctx.params.cx ?? 50) / 100) * W,
+    cy: ((ctx.params.cy ?? 50) / 100) * H,
+    K: 0.74 * m * (ctx.params.size ?? 1),
+    k: m / 1080,
+    u: ctx.local ?? ctx.progress,
+  };
+};
+
+type BgLayer = { img: string; pos?: string; size?: string };
+/** Stack background layers (first = on top, CSS order) into one style. */
+const bgLayers = (layers: BgLayer[], extra: StyleObject = {}): StyleObject =>
+  layers.length
+    ? {
+        backgroundImage: layers.map((l) => l.img).join(", "),
+        backgroundPosition: layers.map((l) => l.pos ?? "0px 0px").join(", "),
+        backgroundSize: layers.map((l) => l.size ?? "100% 100%").join(", "),
+        backgroundRepeat: "no-repeat",
+        ...extra,
+      }
+    : {};
+
+const f1 = (n: number) => n.toFixed(1);
+const f3 = (n: number) => n.toFixed(3);
+const svgUrl = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+
+// Conic rays: 17 wedges, 7° lit / 15° dark (the reel's 22° step), a radial fade, rotating.
+const RAY_WEDGES = (() => {
+  const pt = (deg: number) => {
+    const r = (deg * Math.PI) / 180;
+    return `${Math.sin(r).toFixed(5)} ${(-Math.cos(r)).toFixed(5)}`;
+  };
+  let d = "";
+  for (let a = 0; a < 360; a += 22) d += `M0 0L${pt(a)}A1 1 0 0 1 ${pt(Math.min(360, a + 7))}Z`;
+  return d;
+})();
+const raysLayer = (g: ReelGeom, t: number, alpha: number, color = REEL_GOLD): BgLayer | null => {
+  if (alpha <= 0.001) return null;
+  const side = 2 * 950 * (g.K / 820);
+  const a = 0.55 * alpha;
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 2 2'><defs><radialGradient id='g' cx='0' cy='0' r='1' gradientUnits='userSpaceOnUse'>` +
+    `<stop offset='0' stop-color='rgb(${color})' stop-opacity='${f3(a)}'/><stop offset='0.113' stop-color='rgb(${color})' stop-opacity='${f3(a)}'/>` +
+    `<stop offset='0.495' stop-color='rgb(${color})' stop-opacity='${f3(a * 0.35)}'/><stop offset='0.877' stop-color='rgb(${color})' stop-opacity='0'/>` +
+    `</radialGradient></defs><path transform='rotate(${f1((t * 14) % 360)})' fill='url(#g)' d='${RAY_WEDGES}'/></svg>`;
+  return { img: svgUrl(svg), pos: `${f1(g.cx - side / 2)}px ${f1(g.cy - side / 2)}px`, size: `${f1(side)}px ${f1(side)}px` };
+};
+const bloomLayer = (g: ReelGeom, t: number, alpha: number, color = REEL_GOLD): BgLayer | null => {
+  if (alpha <= 0.001) return null;
+  const R = 600 * Math.SQRT2 * (g.K / 820) * (1 + 0.06 * Math.sin(t * 4.2));
+  return {
+    img: `radial-gradient(circle ${f1(R)}px at ${f1(g.cx)}px ${f1(g.cy)}px, rgba(255,244,210,${f3(0.95 * alpha)}) 0%, rgba(${color},${f3(0.6 * alpha)}) 22%, rgba(${color},${f3(0.22 * alpha)}) 45%, rgba(${color},0) 68%)`,
+  };
+};
+/** The shockwave: one ring over 0.55 s — a glow band under a crisp pale-gold line. */
+const ringLayers = (g: ReelGeom, u: number, color = REEL_GOLD): BgLayer[] => {
+  const rp = u / 0.55;
+  if (rp < 0 || rp >= 1) return [];
+  const a = 1 - rp;
+  const Rr = lerp(g.K * 0.35, g.K * 1.05, easeOutCubic(rp)) - 5 * g.k;
+  const hw = 5 * g.k;
+  const glow = 40 * g.k;
+  const at = `at ${f1(g.cx)}px ${f1(g.cy)}px`;
+  return [
+    {
+      img: `radial-gradient(circle ${at}, rgba(255,244,184,0) ${f1(Rr - hw - 1)}px, rgba(255,244,184,${f3(a)}) ${f1(Rr - hw)}px, rgba(255,244,184,${f3(a)}) ${f1(Rr + hw)}px, rgba(255,244,184,0) ${f1(Rr + hw + 1)}px)`,
+    },
+    {
+      img: `radial-gradient(circle ${at}, rgba(${color},0) ${f1(Math.max(0, Rr - glow))}px, rgba(${color},${f3(0.6 * a)}) ${f1(Rr)}px, rgba(${color},0) ${f1(Rr + glow)}px)`,
+    },
+  ];
+};
+
+// The reel's sparkle data, drawn in its order from its seed.
+const REEL_RND = lehmer(7);
+const REEL_BURST = Array.from({ length: 26 }, () => ({ a: REEL_RND() * TAU, d: 380 + REEL_RND() * 420, s: 0.5 + REEL_RND() * 1.1, r: REEL_RND() * 180 }));
+const REEL_TWINKLE = Array.from({ length: 12 }, () => ({ a: REEL_RND() * TAU, d: 300 + REEL_RND() * 200, ph: REEL_RND() * 6.28, sp: 5 + REEL_RND() * 5, s: 0.5 + REEL_RND() * 0.8 }));
+/** One 4-point star at (x, y), `size` px across, rotated `rot`°, alpha `a`. */
+const starLayer = (x: number, y: number, size: number, rot: number, a: number): BgLayer | null => {
+  if (a <= 0.001 || size <= 0.5) return null;
+  const box = (size * 86) / 60;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='-13 -13 86 86'><path d='${REEL_STAR}' fill='#FFF6C8' fill-opacity='${f3(a)}' transform='rotate(${f1(rot)} 30 30)'/></svg>`;
+  return { img: svgUrl(svg), pos: `${f1(x - box / 2)}px ${f1(y - box / 2)}px`, size: `${f1(box)}px ${f1(box)}px` };
+};
+const burstLayers = (g: ReelGeom): BgLayer[] => {
+  const out: BgLayer[] = [];
+  REEL_BURST.forEach((b, i) => {
+    // The reel fires odd stars on the impact and even ones on the hero reveal; here the second
+    // wave follows 0.35 s later, at 80 % of the distance.
+    const t0 = i % 2 ? 0 : 0.35;
+    const up = (g.u - t0) / 0.9;
+    if (up < 0 || up >= 1) return;
+    const d = b.d * easeOutCubic(up) * (t0 ? 0.8 : 1) * (g.K / 800);
+    const l = starLayer(g.cx + Math.cos(b.a) * d, g.cy + Math.sin(b.a) * d, 60 * b.s * (1 - up * 0.6) * (g.K / 800), b.r + up * 90, 1 - up);
+    if (l) out.push(l);
+  });
+  return out;
+};
+const twinkleLayers = (g: ReelGeom, t: number): BgLayer[] => {
+  const fade = clamp(g.u / 0.3);
+  const out: BgLayer[] = [];
+  for (const w of REEL_TWINKLE) {
+    const v = Math.max(0, Math.sin(t * w.sp + w.ph));
+    const d = w.d * (g.K / 820);
+    const l = starLayer(g.cx + Math.cos(w.a) * d, g.cy + Math.sin(w.a) * d * 0.95, 60 * w.s * v * (g.K / 800), t * 60, v * fade);
+    if (l) out.push(l);
+  }
+  return out;
+};
+const nonNull = <T,>(xs: (T | null)[]): T[] => xs.filter((x): x is T => x != null);
+/** Rays' ambient opacity: eases in over 0.45 s, then breathes (the reel's hero-phase curve). */
+const raysAlpha = (u: number, t: number) => (0.55 + 0.2 * Math.sin(t * 3)) * easeOutCubic(clamp(u / 0.45));
+const bloomAlpha = (u: number) => clamp(0.8 + 0.2 * Math.sin(u * 4.2)) * easeOutCubic(clamp(u / 0.3));
+
+/** The reel's shine pass: a 25° white band sweeping across in 0.6 s (eased in-out), as the
+ *  background of an overlay-blended layer. Positions are % of the gradient line, so it fits any box. */
+export const shineGradient = (sp: number): string => {
+  const X = lerp(120, -20, easeInOutCubic(clamp(sp)));
+  const f = 0.5 + ((1000 - 20 * X) * 0.9063) / 1329;
+  const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+  return `linear-gradient(115deg, rgba(255,255,255,0) ${pct(f - 0.189)}, rgba(255,255,255,0.95) ${pct(f)}, rgba(255,255,255,0) ${pct(f + 0.189)})`;
+};
+
 export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = {
   // --- Ken Burns / Zoom ---
   kenBurns: ({ progress: p }) => ({
@@ -699,6 +854,50 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
     // barely-there exposure breath so it feels filmic rather than frozen.
     filter: `contrast(0.94) saturate(0.82) brightness(${(1.05 + Math.sin(t * 0.5) * 0.015).toFixed(3)}) sepia(0.10) hue-rotate(-6deg)`,
   }),
+
+  // ======================= PACK: Promo reel — glow / impact / shine (reel_template.html) =======================
+  // Full-frame (fx layer) — centred on the layer's Centre X/Y, sized by its Size:
+  heroGlow: (ctx) => {
+    const g = reelGeom(ctx);
+    return bgLayers(nonNull([...ringLayers(g, g.u), bloomLayer(g, ctx.t, bloomAlpha(g.u)), raysLayer(g, ctx.t, raysAlpha(g.u, ctx.t))]), { mixBlendMode: "screen" });
+  },
+  glowRays: (ctx) => {
+    const g = reelGeom(ctx);
+    return bgLayers(nonNull([raysLayer(g, ctx.t, raysAlpha(g.u, ctx.t))]), { mixBlendMode: "screen" });
+  },
+  glowBloom: (ctx) => {
+    const g = reelGeom(ctx);
+    return bgLayers(nonNull([bloomLayer(g, ctx.t, bloomAlpha(g.u))]), { mixBlendMode: "screen" });
+  },
+  shockwaveRing: (ctx) => bgLayers(ringLayers(reelGeom(ctx), reelGeom(ctx).u)),
+  sparkleBurst: (ctx) => bgLayers(burstLayers(reelGeom(ctx))),
+  sparkleTwinkle: (ctx) => bgLayers(twinkleLayers(reelGeom(ctx), ctx.t)),
+  impactFlash: (ctx): StyleObject => {
+    const a = 0.7 * decay(ctx.local ?? ctx.progress, 12);
+    return a > 0.001 ? { backgroundColor: `rgba(255,248,224,${f3(a)})` } : {};
+  },
+  // On the subject (image / text layer):
+  landingSquash: (ctx) => {
+    // Drop in from above on an ease-in (0.35 s), land, then a damped squash e^(−7u)·cos(30u).
+    const u = ctx.local ?? ctx.progress;
+    const H = ctx.height ?? 1080;
+    const IMPACT = 0.35;
+    if (u < IMPACT) return { transform: `translateY(${f1(-0.677 * H * (1 - easeInQuad(u / IMPACT)))}px)`, transformOrigin: "50% 90%" };
+    const v = u - IMPACT;
+    const d = Math.exp(-v * 7) * Math.cos(v * 30);
+    return { transform: `scale(${(1 + 0.16 * d).toFixed(4)}, ${(1 - 0.16 * d).toFixed(4)})`, transformOrigin: "50% 90%" };
+  },
+  impactPunch: (ctx) => {
+    // The blitz-cut kick: a 28 % scale punch decaying at 12/s and a −5° tilt decaying at 8/s.
+    const u = ctx.local ?? ctx.progress;
+    return { transform: `scale(${(1 + 0.28 * decay(u, 12)).toFixed(4)}) rotate(${(-5 * decay(u, 8)).toFixed(3)}deg)` };
+  },
+  shineSweep: (ctx): StyleObject => {
+    // One pass 0.15 s after the layer starts, 0.6 s long. Drawn by the host (Layer / portal) as an
+    // overlay-blended band masked to the image (or clipped to the text) — see "--shine".
+    const sp = ((ctx.local ?? ctx.progress) - 0.15) / 0.6;
+    return sp >= 0 && sp < 1 ? { "--shine": shineGradient(sp) } : {};
+  },
 };
 
 // ===== CSS transition formulas (moved verbatim from presentations.tsx) =====
@@ -990,4 +1189,8 @@ export {
   quantize,
   stepTime,
   seededRandom,
+  backOutStrong,
+  easeInQuad,
+  decay,
+  lehmer,
 } from "./helpers";

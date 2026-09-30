@@ -23,6 +23,14 @@ export interface MotionCtx {
   /** Depth 0 = far .. 1 = near. Drives the 2.5D shadow/scale/parallax system. */
   z: number;
   params: Record<string, number>;
+  /** Seconds since this effect started (the layer's first frame; wraps with a per-effect loop).
+   *  What the one-shot reel effects (burst, ring, punch, squash, flash, shine) run on. Optional so
+   *  every older host still type-checks; formulas fall back to `progress` seconds when absent. */
+  local?: number;
+  /** Composition size in px — what full-frame effects size themselves against (optional; the
+   *  formulas fall back to 1920×1080). */
+  width?: number;
+  height?: number;
 }
 
 export interface EffectMeta {

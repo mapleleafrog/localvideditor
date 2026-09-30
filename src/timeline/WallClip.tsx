@@ -156,10 +156,11 @@ const WallItemView: React.FC<ItemViewProps> = ({
     exitFrames: Math.round(secs(it.exitSeconds, 0.5) * fps),
     enterEasing: it.enterEasing,
     exitEasing: it.exitEasing,
-    // Slides travel 20 % of the ITEM (not the frame); direction is wall-space, so under a rolled
-    // camera "left" is the wall's left.
+    // Slides are sized by the ITEM box (not the frame) — see io.ts for the reel distances; direction
+    // is wall-space, so under a rolled camera "left" is the wall's left.
     w: box.w,
     h: box.h,
+    chars: (it.type ?? "image") === "text" ? Array.from(it.text ?? "").length : undefined,
   });
 
   // Item motions go through the SAME stacker overlays use (effects/stack.ts), so the two can never
@@ -175,7 +176,9 @@ const WallItemView: React.FC<ItemViewProps> = ({
   const stacked = stackMotions(
     it.motions ?? [],
     it.motionParams,
-    { frame, fps, t: tAbs, beat, z: 0, params: {} },
+    // width/height = the ITEM box: size-relative motions (the reel's landing drop) scale to the
+    // item, the way enter/exit slides already do.
+    { frame, fps, t: tAbs, beat, z: 0, params: {}, width: box.w, height: box.h },
     fLocal,
     Math.max(1, finite(it.windowInFrames, 90)),
     false,

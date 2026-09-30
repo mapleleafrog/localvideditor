@@ -29,3 +29,13 @@
 - **Lower Third Bar** (`lowerThirdBar`) — MIT — Adapted from reactvideoeditor/remotion-templates
 - **Polaroid Frame** (`polaroidFrame`) — MIT — Adapted from reactvideoeditor/remotion-templates
 - **Circular Progress Ring** (`circularProgressReveal`) — MIT — Adapted from reactvideoeditor/remotion-templates
+- **Hero Glow (rays + bloom + ring)** (`heroGlow`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Glow Rays (rotating)** (`glowRays`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Glow Bloom (breathing)** (`glowBloom`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Shockwave Ring** (`shockwaveRing`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Sparkle Burst** (`sparkleBurst`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Sparkle Twinkle (orbit)** (`sparkleTwinkle`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Impact Flash** (`impactFlash`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Landing Squash (drop + wobble)** (`landingSquash`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Impact Punch (scale + tilt kick)** (`impactPunch`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)
+- **Shine Sweep** (`shineSweep`) — write-own — Ported from the promo-reel canvas engine (reel_template.html)

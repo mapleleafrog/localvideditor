@@ -195,6 +195,29 @@ Fastest start: import a folder of photos in **Assets** → choose **🧱 Wall** 
 them into clusters, generates one scene per cluster with suggested glide timings, appends a fitted wall clip and
 opens it.
 
+## Promo-reel effects (glow, impact, shine, gold title)
+
+Ported from the promo-reel tool, so the same smooth feel works on the wedding timeline.
+
+- **Hero glow behind a photo or sprite:** `+ FX` → add **Hero Glow** (or Glow Rays / Glow Bloom / Shockwave Ring
+  separately). In the Layer section set **Centre X / Centre Y** to where your subject sits (the same % as the
+  subject's X / Y) and **Size** to taste. Keep the fx lane **below** the subject's lane. Start it on the frame the
+  subject lands.
+- **Sparkles / flash in front:** a second fx layer with **Sparkle Burst** (+ **Sparkle Twinkle** for the idle
+  shimmer) and a third with **Impact Flash**, same Centre / Size, lane **above** the subject. One fx effect per
+  layer: two background-based fx on one layer overwrite each other.
+- **On the subject itself:** **Landing Squash** (drops in and wobbles on landing, 0.35 s), **Impact Punch**
+  (scale + tilt kick; tick Loop on the effect to kick every window), **Shine Sweep** (a diagonal highlight
+  masked to the image, or clipped to the glyphs on text; tick Loop to repeat it).
+- **Gold title:** a text layer → Text section → **Text style: Gold title (reel)**. It uses Lilita One unless
+  you pick a font. Color and Glow are ignored while it is on.
+- **Entrances** (Transitions section): Pop, Fade, Slide and Zoom now use the reel's curves: a stronger
+  overshoot, a slide that arrives from off-frame, and a zoom that comes down from 1.8×. Typewriter reveals whole
+  characters. Leave the easing on Linear; the curve is already built in.
+- **Smoothness:** the reel renders at **60 fps**. Set the project to 60 fps in the Canvas tab for the same
+  glassy motion (renders take about twice as long).
+- Try `projects/reel-fx-demo.json` (Import) to see every piece together.
+
 ## Common workflows
 
 | Goal | How |

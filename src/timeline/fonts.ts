@@ -20,6 +20,10 @@ import { loadFont as loadNotoSansJP } from "@remotion/google-fonts/NotoSansJP";
 import { loadFont as loadCaveat } from "@remotion/google-fonts/Caveat";
 import { loadFont as loadYomogi } from "@remotion/google-fonts/Yomogi";
 import { loadFont as loadZenKurenaido } from "@remotion/google-fonts/ZenKurenaido";
+// The promo reel's pair: Lilita One (titles, numbers — the gold title's default) and Fredoka 600
+// (body). Latin only, a handful of chunks each.
+import { loadFont as loadLilitaOne } from "@remotion/google-fonts/LilitaOne";
+import { loadFont as loadFredoka } from "@remotion/google-fonts/Fredoka";
 
 // Options are inlined per call (not a shared const) so each font's weight/subset literal-union
 // types check — a widened `string[]` const would not be assignable to `("400"|"700"|…)[]`.
@@ -41,7 +45,13 @@ const LOADERS: Record<string, () => string> = {
     loadYomogi("normal", { weights: ["400"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
   zenKurenaido: () =>
     loadZenKurenaido("normal", { weights: ["400"], subsets: ["japanese", "latin"], ignoreTooManyRequestsWarning: true }).fontFamily,
+  lilitaOne: () => loadLilitaOne("normal", { weights: ["400"], subsets: ["latin"] }).fontFamily,
+  fredoka: () => loadFredoka("normal", { weights: ["600"], subsets: ["latin"] }).fontFamily,
 };
+
+/** Faces that only ship one (non-bold) weight: text overlays render them at their own weight
+ *  instead of the default 700, which the browser would fake-embolden. */
+export const SINGLE_WEIGHT_FONTS: Record<string, number> = { lilitaOne: 400, fredoka: 600 };
 
 export const FONT_IDS = [
   "default",
@@ -52,6 +62,8 @@ export const FONT_IDS = [
   "caveat",
   "yomogi",
   "zenKurenaido",
+  "lilitaOne",
+  "fredoka",
 ] as const;
 export type FontId = (typeof FONT_IDS)[number];
 
@@ -68,6 +80,8 @@ export const FONT_OPTIONS: { id: FontId; label: string }[] = [
   { id: "caveat", label: "Caveat (hand — latin only)" },
   { id: "yomogi", label: "Yomogi (hand — JP)" },
   { id: "zenKurenaido", label: "Zen Kurenaido (hand — JP)" },
+  { id: "lilitaOne", label: "Lilita One (reel title — latin only)" },
+  { id: "fredoka", label: "Fredoka (reel body — latin only)" },
 ];
 
 const cache = new Map<string, string>();

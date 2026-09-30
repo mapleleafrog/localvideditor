@@ -82,3 +82,28 @@ export const seededRandom = (seed: number) => {
   const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
 };
+
+// ---------------------------------------------------------------------------------------------
+// Promo-reel curves (ported from the promo-reel canvas engine, reel_template.html). Same shapes,
+// same constants — these are what make its motion read as "smooth": a strong back-overshoot on
+// every entrance, exponential decays for every kick, a damped cosine for the landing squash.
+// ---------------------------------------------------------------------------------------------
+
+/** Ease-out with overshoot. c1 = 2.2 is the reel's (stronger than the classic 1.70158). */
+export const backOutStrong = (x: number, c1 = 2.2) => {
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+};
+
+/** Quadratic ease-in (the reel's `eIn`). */
+export const easeInQuad = (x: number) => x * x;
+
+/** Exponential kick: 1 at u = 0, e^(−k·u) after, 0 before. `u` in seconds. */
+export const decay = (u: number, k: number) => (u < 0 ? 0 : Math.exp(-u * k));
+
+/** The reel's Lehmer / Park–Miller PRNG (seed · 16807 mod 2³¹−1), as a generator. Deterministic by
+ *  construction; drawing in the same order as the reel reproduces its exact sparkle layout. */
+export const lehmer = (seed: number) => {
+  let s = seed;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+};

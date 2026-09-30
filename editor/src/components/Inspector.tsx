@@ -259,6 +259,16 @@ export const Inspector: React.FC = () => {
           {(o.textAnimation ?? "none") !== "none" && (
             <Field label="Stagger (frames)"><input type="number" min={0} step={1} value={o.textAnimationStagger ?? 3} onChange={(e) => patchOverlay(i, { textAnimationStagger: Math.max(0, Math.round(+e.target.value)) })} /></Field>
           )}
+          <Field label="Text style">
+            <select
+              value={o.textStyle ?? "none"}
+              title="Gold title = the promo reel's layered title (pale-gold stroke, brown outline, gold gradient fill, drop shadow). Uses Lilita One unless you pick a font; Color and Glow are ignored while it is on."
+              onChange={(e) => patchOverlay(i, { textStyle: e.target.value === "none" ? undefined : (e.target.value as Overlay["textStyle"]) })}
+            >
+              <option value="none">Plain</option>
+              <option value="goldTitle">Gold title (reel)</option>
+            </select>
+          </Field>
         </>
       )}
       {(o.type === "image" || o.type === "video") && (
@@ -313,6 +323,17 @@ export const Inspector: React.FC = () => {
             <Field label="Y (%)"><Slider value={o.y} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
             <Field label="Scale"><Slider value={o.scale} min={0.1} max={4} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
             <Field label="Rotation"><Slider value={o.rotation} min={-180} max={180} step={1} onChange={(v) => patchOverlay(i, { rotation: v })} suffix="°" /></Field>
+          </>
+        )}
+        {o.type === "fx" && (
+          <>
+            <div className="muted" style={{ fontSize: 11 }}>
+              Centre + Size place the positioned glow effects (Reel Glow: hero glow, rays, bloom, ring, sparkles) —
+              put the centre on your subject. Other fx fill the frame and ignore them.
+            </div>
+            <Field label="Centre X (%)"><Slider value={o.x ?? 50} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { x: v })} /></Field>
+            <Field label="Centre Y (%)"><Slider value={o.y ?? 50} min={-20} max={120} step={0.5} onChange={(v) => patchOverlay(i, { y: v })} /></Field>
+            <Field label="Size"><Slider value={o.scale ?? 1} min={0.1} max={3} step={0.05} onChange={(v) => patchOverlay(i, { scale: v })} /></Field>
           </>
         )}
         <Field label="Opacity"><Slider value={o.opacity} min={0} max={1} step={0.05} onChange={(v) => patchOverlay(i, { opacity: v })} /></Field>

@@ -701,6 +701,272 @@ export const MOTION_FORMULAS: Record<string, (ctx: MotionCtx) => StyleObject> = 
   }),
 };
 
+// ===== CSS transition formulas (moved verbatim from presentations.tsx) =====
+//
+// A transition at progress p (0..1) is up to three styled full-frame layers:
+//   a = the EXITING scene (below), b = the ENTERING scene (on top), o = an overlay drawn above b
+//   (dip colour, light-leak sweep). A missing part means "unstyled".
+// presentations.tsx wraps these in Remotion TransitionPresentations; the no-npm portal applies the
+// SAME functions to its two scene divs + overlay — one formula, no hand-mirrored copy.
+
+export interface TransitionParts {
+  a?: StyleObject;
+  b?: StyleObject;
+  o?: StyleObject;
+}
+/** Per-transition props: frame size (starWipe sizes its star to the diagonal) and an optional
+ *  dip colour override. */
+export interface TransitionProps {
+  width?: number;
+  height?: number;
+  color?: string;
+}
+export type TransitionFormula = (p: number, props: TransitionProps) => TransitionParts;
+
+const fullMask = (uri: string, size: string): StyleObject => ({
+  maskImage: uri,
+  WebkitMaskImage: uri,
+  maskSize: size,
+  WebkitMaskSize: size,
+  maskRepeat: "no-repeat",
+  WebkitMaskRepeat: "no-repeat",
+  maskPosition: "center",
+  WebkitMaskPosition: "center",
+});
+
+const tiledMask = (uri: string, tile: string): StyleObject => ({
+  maskImage: uri,
+  WebkitMaskImage: uri,
+  maskSize: tile,
+  WebkitMaskSize: tile,
+  maskRepeat: "repeat",
+  WebkitMaskRepeat: "repeat",
+});
+
+const HEART_URI =
+  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50,32 C50,12 18,12 18,38 C18,60 50,74 50,90 C50,74 82,60 82,38 C82,12 50,12 50,32 Z' fill='black'/%3E%3C/svg%3E\")";
+
+// A tile with a centered black square sized by progress -> blocky grid reveal.
+const squaresURI = (p: number) => {
+  const s = Math.round(p * 100);
+  const o = Math.round((1 - p) * 50);
+  return `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='${o}' y='${o}' width='${s}' height='${s}' fill='black'/%3E%3C/svg%3E")`;
+};
+
+// Doom melt: the entering screen fills in column-by-column from the top, each
+// column at a seeded-random rate (mask black = revealed entering scene).
+const doomMaskURI = (p: number) => {
+  const cols = 16;
+  const w = 100 / cols;
+  let rects = "";
+  for (let i = 0; i < cols; i++) {
+    const fill = clamp(p * 155 - seededRandom(i) * 55, 0, 100);
+    rects += `%3Crect x='${(i * w).toFixed(2)}' y='0' width='${(w + 0.4).toFixed(2)}' height='${fill.toFixed(2)}' fill='black'/%3E`;
+  }
+  return `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
+};
+
+// 4x4 Bayer-ordered dither: an 8px tile where cells whose threshold < p are
+// black (revealed). Grows from none (p=0) to full (p=1) for a true 8-bit dissolve.
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const ditherURI = (p: number) => {
+  let rects = "";
+  for (let i = 0; i < 16; i++) {
+    if ((BAYER4[i] + 0.5) / 16 < p) {
+      rects += `%3Crect x='${(i % 4) * 2}' y='${Math.floor(i / 4) * 2}' width='2' height='2' fill='black'/%3E`;
+    }
+  }
+  return `url("data:image/svg+xml,%3Csvg width='8' height='8' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
+};
+
+// Ordered mosaic: a full-frame NxN grid whose cells reveal in a pseudo-scrambled
+// order as p:0->1 — a blocky "pixelate" fill distinct from randomSquares (random
+// growing tiles), pixelDither (8px Bayer) and doomScreen (columns). The fill-order
+// idea is ported from remocn's dither-dissolve; the block look is our own CSS mask.
+const gridPixelURI = (p: number) => {
+  const N = 14;
+  const c = 100 / N;
+  let rects = "";
+  for (let row = 0; row < N; row++) {
+    for (let col = 0; col < N; col++) {
+      if (((col * 7 + row * 13) % 197) / 197 < p) {
+        rects += `%3Crect x='${(col * c).toFixed(2)}' y='${(row * c).toFixed(2)}' width='${(c + 0.3).toFixed(2)}' height='${(c + 0.3).toFixed(2)}' fill='black'/%3E`;
+      }
+    }
+  }
+  return `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E${rects}%3C/svg%3E")`;
+};
+
+/** A 5-point star as an SVG path, centred on its bounding box at (cx, cy). The same vertices as
+ *  @remotion/shapes' makeStar (point i at angle i·π/5 − π/2, alternating outer/inner radius),
+ *  re-centred the way the old presentation did (translate by the bbox centre) — written here so
+ *  the portal bundle does not have to carry @remotion/shapes + React. */
+const starPath = (outer: number, inner: number, cx: number, cy: number) => {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    pts.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  const xs = pts.map((q) => q[0]);
+  const ys = pts.map((q) => q[1]);
+  const dx = cx - (Math.min(...xs) + Math.max(...xs)) / 2;
+  const dy = cy - (Math.min(...ys) + Math.max(...ys)) / 2;
+  return "M " + pts.map(([x, y]) => `${x + dx} ${y + dy}`).join(" L ") + " Z";
+};
+
+// Dip-to-color / flash: scenes hard-cut at the midpoint while a full-frame
+// color overlay peaks at p=0.5.
+const dipParts =
+  (color: string, sharpness: number): TransitionFormula =>
+  (p, props) => ({
+    a: { opacity: clamp(1 - p * 2) },
+    b: { opacity: clamp(p * 2 - 1) },
+    o: { backgroundColor: props.color ?? color, opacity: Math.pow(1 - Math.abs(2 * p - 1), sharpness) },
+  });
+
+/** Style the entering (top) layer only; the exiting scene stays opaque behind it. */
+const reveal =
+  (fn: (p: number) => StyleObject): TransitionFormula =>
+  (p) => ({ b: fn(p) });
+
+export const TRANSITION_FORMULAS: Record<string, TransitionFormula> = {
+  // Light / color
+  dipToColor: dipParts("#000000", 1),
+  flashWhite: dipParts("#ffffff", 1.6),
+  // Warm light-leak sweep over a crossfade.
+  lightLeak: (p) => ({
+    b: { opacity: p },
+    o: {
+      backgroundImage:
+        "linear-gradient(115deg, transparent 20%, rgba(255,190,120,0.85) 45%, rgba(255,120,160,0.65) 55%, transparent 80%)",
+      backgroundSize: "260% 100%",
+      backgroundPosition: `${lerp(-80, 180, p)}% 0`,
+      mixBlendMode: "screen",
+      opacity: Math.sin(p * Math.PI) * 0.95,
+    },
+  }),
+
+  // Zoom / blur — CSS look-alikes of the shader versions. Exiting layer stays
+  // opaque behind; entering fades/scales in on top (clean crossfade, no bleed).
+  whipPan: (p) => ({
+    a: { transform: `translateX(${-p * 120}%)`, filter: `blur(${Math.sin(p * Math.PI) * 12}px)` },
+    b: { transform: `translateX(${(1 - p) * 120}%)`, filter: `blur(${Math.sin(p * Math.PI) * 12}px)` },
+  }),
+  zoomBlur: (p) => ({
+    a: { transform: `scale(${lerp(1, 0.85, p)})`, filter: `blur(${p * 14}px)` },
+    b: { opacity: p, transform: `scale(${lerp(1.3, 1, p)})`, filter: `blur(${(1 - p) * 14}px)` },
+  }),
+  zoomInOut: (p) => ({
+    a: { transform: `scale(${lerp(1, 1.4, p)})` },
+    b: { opacity: clamp(p * 1.5), transform: `scale(${lerp(0.7, 1, p)})` },
+  }),
+  dreamyZoom: (p) => ({
+    a: { transform: `scale(${lerp(1, 1.15, p)})`, filter: `blur(${p * 8}px) brightness(${lerp(1, 1.6, p)})` },
+    b: {
+      opacity: p,
+      transform: `scale(${lerp(1.25, 1, p)}) rotate(${(1 - p) * 3}deg)`,
+      filter: `blur(${(1 - p) * 10}px) brightness(${lerp(1.6, 1, p)})`,
+    },
+  }),
+  simpleZoom: (p) => ({ a: {}, b: { opacity: clamp(p * 1.5), transform: `scale(${lerp(0.8, 1, p)})` } }),
+  rgbSplit: (p) => {
+    const off = Math.sin(p * Math.PI) * 12;
+    const filter = `drop-shadow(${off}px 0 0 rgba(255,0,0,0.6)) drop-shadow(${-off}px 0 0 rgba(0,255,255,0.6))`;
+    return { a: { filter }, b: { opacity: p, filter } };
+  },
+  // Directional glitch wipe with RGB channel fringing at the moving edge — distinct
+  // from rgbSplit's static crossfade. Per-channel offset (remocn rgb-glitch-text
+  // idea) swells at mid-progress while the entering scene wipes in left->right.
+  chromaticAberration: (p) => {
+    const off = Math.sin(p * Math.PI) * 26;
+    const fringe = `drop-shadow(${off}px 0 0 rgba(255,0,64,0.75)) drop-shadow(${-off}px 0 0 rgba(0,220,255,0.75))`;
+    return {
+      a: { transform: `translateX(${-p * 22}%) skewX(${-p * 5}deg)`, filter: fringe },
+      b: {
+        clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`,
+        transform: `translateX(${(1 - p) * 22}%) skewX(${(1 - p) * 5}deg)`,
+        filter: fringe,
+      },
+    };
+  },
+
+  // Slide / shape / mask — entering-only reveals over the held exiting scene.
+  coverUncover: reveal((p) => ({ transform: `translateX(${(1 - p) * 100}%)` })),
+  barnDoor: reveal((p) => ({ clipPath: `inset(0 ${(1 - p) * 50}% 0 ${(1 - p) * 50}%)` })),
+  doorway: (p) => ({
+    a: { filter: `brightness(${1 - p * 0.7})`, transform: `scale(${1 + p * 0.1})` },
+    b: { clipPath: `inset(0 ${(1 - p) * 50}% 0 ${(1 - p) * 50}%)` },
+  }),
+  circleCrop: reveal((p) => ({ clipPath: `circle(${p * 75}% at 50% 50%)` })),
+  rectangleCrop: reveal((p) => ({ clipPath: `inset(${(1 - p) * 50}% ${(1 - p) * 50}%)` })),
+  svgMaskReveal: reveal((p) => ({
+    clipPath: `polygon(0 0, ${p * 150}% 0, ${p * 150 - 50}% 100%, 0% 100%)`,
+  })),
+  windowBlinds: reveal((p) => {
+    const g = `repeating-linear-gradient(180deg, #000 0, #000 ${p * 40}px, transparent ${p * 40}px, transparent 40px)`;
+    return { maskImage: g, WebkitMaskImage: g };
+  }),
+  heart: reveal((p) => fullMask(HEART_URI, `${p * 200}%`)),
+  // Star wipe: entering scene revealed through a growing, frame-centered star.
+  starWipe: (p, props) => {
+    const w = props.width ?? 1920;
+    const h = props.height ?? 1080;
+    const outer = Math.max(1, (Math.sqrt(w * w + h * h) / 2) * p);
+    const clip = `path('${starPath(outer, outer * 0.5, w / 2, h / 2)}')`;
+    return { b: { clipPath: clip, WebkitClipPath: clip } };
+  },
+
+  // Pixel / retro
+  pixelize: (p) => ({
+    a: { filter: `blur(${p * 9}px) contrast(1.1)` },
+    b: { opacity: clamp(p * 1.4), filter: `blur(${(1 - p) * 9}px) contrast(1.1)`, imageRendering: "pixelated" },
+  }),
+  randomSquares: reveal((p) => tiledMask(squaresURI(clamp(p)), "64px 64px")),
+  mosaicShatter: (p) => ({
+    a: { transform: `scale(${lerp(1, 0.9, p)}) rotate(${-p * 4}deg)`, filter: `blur(${p * 4}px)` },
+    b: { opacity: clamp(p * 1.5), transform: `scale(${lerp(1.15, 1, p)}) rotate(${(1 - p) * 4}deg)` },
+  }),
+  doomScreen: reveal((p) => fullMask(doomMaskURI(clamp(p)), "100% 100%")),
+  gridPixelate: reveal((p) => fullMask(gridPixelURI(clamp(p)), "100% 100%")),
+
+  // Advanced retro
+  crtOn: reveal((p) => {
+    const a = clamp(p / 0.4);
+    const b = clamp((p - 0.4) / 0.6);
+    return {
+      transform: `scaleX(${0.2 + a * 0.8}) scaleY(${0.02 + b * 0.98})`,
+      filter: `brightness(${1 + (1 - b) * 2})`,
+      transformOrigin: "center",
+    };
+  }),
+  glitchCut: reveal((p) => {
+    const j = 1 - clamp(p * 1.4);
+    return {
+      opacity: clamp(p * 1.6),
+      transform: `translateX(${Math.sin(p * 80) * 22 * j}px) skewX(${Math.sin(p * 50) * 6 * j}deg)`,
+      filter: `hue-rotate(${Math.sin(p * 60) * 160 * j}deg) saturate(${1 + 2 * j}) contrast(${1 + j})`,
+    };
+  }),
+  pixelDither: reveal((p) => tiledMask(ditherURI(clamp(p)), "8px 8px")),
+  scanlineWipe: reveal((p) => {
+    const e = p * 102;
+    const g = `linear-gradient(180deg, #000 ${Math.max(0, e - 2)}%, transparent ${e}%)`;
+    return { maskImage: g, WebkitMaskImage: g };
+  }),
+  vhsRewind: reveal((p) => ({
+    opacity: clamp(p * 1.5),
+    filter: `blur(${(1 - p) * 2.5}px) saturate(1.6) contrast(1.1)`,
+    transform: `translateX(${(1 - p) * -34}px) skewX(${(1 - p) * 8}deg)`,
+  })),
+};
+
+// ===== transition display metadata for the portal (derived from the catalog) =====
+export const TRANSITION_META: Record<string, { name: string; category: string; tier: string; engine: string }> =
+  Object.fromEntries(
+    CATALOG.filter((e) => e.kind === "transition").map((e) => [e.id, { name: e.name, category: e.category, tier: e.tier, engine: e.engine }]),
+  );
+
 // ===== motion display metadata for the portal (derived from the catalog) =====
 export const MOTION_META: Record<string, { name: string; category: string; tier: string }> =
   Object.fromEntries(

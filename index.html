@@ -188,61 +188,46 @@
       }
 
       // ===== TRANSITIONS (a = exiting scene, b = entering scene, o = overlay) =====
-      const HEART = "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50,32 C50,12 18,12 18,38 C18,60 50,74 50,90 C50,74 82,60 82,38 C82,12 50,12 50,32 Z' fill='black'/%3E%3C/svg%3E\")";
-      const squaresURI = (p) => { const s = Math.round(p * 100), o = Math.round((1 - p) * 50); return `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='${o}' y='${o}' width='${s}' height='${s}' fill='black'/%3E%3C/svg%3E")`; };
-      const doomURI = (p) => { let r = ""; for (let i = 0; i < 16; i++) { const f = clamp(p * 155 - seededRandom(i) * 55, 0, 100); r += `%3Crect x='${(i * 6.25).toFixed(2)}' y='0' width='6.65' height='${f.toFixed(2)}' fill='black'/%3E`; } return `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E${r}%3C/svg%3E")`; };
-      const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-      const ditherURI = (p) => { let r = ""; for (let i = 0; i < 16; i++) if ((BAYER[i] + 0.5) / 16 < p) r += `%3Crect x='${(i % 4) * 2}' y='${Math.floor(i / 4) * 2}' width='2' height='2' fill='black'/%3E`; return `url("data:image/svg+xml,%3Csvg width='8' height='8' xmlns='http://www.w3.org/2000/svg'%3E${r}%3C/svg%3E")`; };
-      const fullMask = (uri, size) => ({ maskImage: uri, WebkitMaskImage: uri, maskSize: size, WebkitMaskSize: size, maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat", maskPosition: "center", WebkitMaskPosition: "center" });
-      const tileMask = (uri, tile) => ({ maskImage: uri, WebkitMaskImage: uri, maskSize: tile, WebkitMaskSize: tile, maskRepeat: "repeat", WebkitMaskRepeat: "repeat" });
-      const starPoly = (p) => { const oR = p * 72, iR = p * 30, pts = []; for (let i = 0; i < 10; i++) { const r = i % 2 ? iR : oR; const a = -Math.PI / 2 + (i * Math.PI) / 5; pts.push(`${(50 + Math.cos(a) * r).toFixed(1)}% ${(50 + Math.sin(a) * r).toFixed(1)}%`); } return `polygon(${pts.join(",")})`; };
+      // Every CSS transition the render uses comes from the bundle (SE.TRANSITION_FORMULAS — the
+      // same functions presentations.tsx wraps), so what you see here IS the render's formula.
+      // Only transitions whose render is a Remotion built-in or a WebGL shader keep a local CSS
+      // stand-in below; the shader stand-ins are flagged ⚡ (approximation).
       const held = () => ({ opacity: 1 });
       const tr = (name, cat, b, a, o, approx) => ({ name, cat, a: a || held, b, o, approx: !!approx });
-      const TRANSITIONS = {
+      const stageSize = () => { const el = document.getElementById("stage"); return { width: el.clientWidth || 1920, height: el.clientHeight || 1080 }; };
+      const shared = (id) => {
+        const f = SE.TRANSITION_FORMULAS[id], m = SE.TRANSITION_META[id] || { name: id, category: "" };
+        const parts = (p) => f(p, stageSize());
+        const hasO = !!f(0.5, stageSize()).o;
+        return { name: m.name, cat: m.category, a: (p) => parts(p).a || {}, b: (p) => parts(p).b || {}, o: hasO ? (p) => parts(p).o : null, approx: false };
+      };
+      const LOCAL = {
+        // Remotion built-ins (fade / slide / wipe / clockWipe / iris / flip) — CSS equivalents.
         crossfade: tr("Crossfade", "Dissolve", (p) => ({ opacity: p })),
-        dipToColor: tr("Dip to Black", "Dissolve", (p) => ({ opacity: clamp(p * 2 - 1) }), (p) => ({ opacity: clamp(1 - p * 2) }), (p) => ({ background: "#000", opacity: 1 - Math.abs(2 * p - 1) })),
-        flashWhite: tr("Flash White", "Light", (p) => ({ opacity: clamp(p * 2 - 1) }), (p) => ({ opacity: clamp(1 - p * 2) }), (p) => ({ background: "#fff", opacity: Math.pow(1 - Math.abs(2 * p - 1), 1.6) })),
-        lightLeak: tr("Light Leak", "Light", (p) => ({ opacity: p }), (p) => ({ opacity: 1 - p }), (p) => ({ backgroundImage: "linear-gradient(115deg, transparent 20%, rgba(255,190,120,0.85) 45%, rgba(255,120,160,0.65) 55%, transparent 80%)", backgroundSize: "260% 100%", backgroundPosition: `${lerp(-80, 180, p)}% 0`, mixBlendMode: "screen", opacity: Math.sin(p * Math.PI) * 0.95 })),
         slidePush: tr("Slide Push", "Slide", (p) => ({ transform: `translateX(${(1 - p) * 100}%)` }), (p) => ({ transform: `translateX(${-p * 100}%)` })),
         slideOver: tr("Slide Over", "Slide", (p) => ({ transform: `translateY(${(1 - p) * 100}%)` })),
-        coverUncover: tr("Cover/Uncover", "Slide", (p) => ({ transform: `translateX(${(1 - p) * 100}%)` })),
         linearWipe: tr("Linear Wipe", "Wipe", (p) => ({ clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` })),
         clockWipe: tr("Clock Wipe", "Wipe", (p) => { const g = `conic-gradient(from -90deg, #000 ${p * 360}deg, transparent 0)`; return { maskImage: g, WebkitMaskImage: g }; }),
-        barnDoor: tr("Barn Door", "Wipe", (p) => ({ clipPath: `inset(0 ${(1 - p) * 50}% 0 ${(1 - p) * 50}%)` })),
-        windowBlinds: tr("Window Blinds", "Wipe", (p) => { const g = `repeating-linear-gradient(180deg, #000 0, #000 ${p * 40}px, transparent ${p * 40}px, transparent 40px)`; return { maskImage: g, WebkitMaskImage: g }; }),
         irisCircle: tr("Iris Circle", "Shape", (p) => ({ clipPath: `circle(${p * 75}% at 50% 50%)` })),
-        circleCrop: tr("Circle Crop", "Shape", (p) => ({ clipPath: `circle(${p * 75}% at 50% 50%)` })),
-        rectangleCrop: tr("Rectangle Crop", "Shape", (p) => ({ clipPath: `inset(${(1 - p) * 50}% ${(1 - p) * 50}%)` })),
-        heart: tr("Heart", "Shape", (p) => fullMask(HEART, `${p * 200}%`)),
-        starWipe: tr("Star Wipe", "Shape", (p) => ({ clipPath: starPoly(clamp(p)) })),
-        doorway: tr("Doorway", "Shape", (p) => ({ clipPath: `inset(0 ${(1 - p) * 50}% 0 ${(1 - p) * 50}%)` }), (p) => ({ filter: `brightness(${1 - p * 0.7})`, transform: `scale(${1 + p * 0.1})` })),
-        svgMaskReveal: tr("Diagonal Reveal", "Shape", (p) => ({ clipPath: `polygon(0 0, ${p * 150}% 0, ${p * 150 - 50}% 100%, 0% 100%)` })),
         flip3D: tr("Flip 3D", "3D", (p) => ({ transform: `perspective(1200px) rotateY(${-90 + p * 90}deg)`, opacity: p > 0.5 ? 1 : 0 }), (p) => ({ transform: `perspective(1200px) rotateY(${p * 90}deg)`, opacity: p < 0.5 ? 1 : 0 })),
+        // WebGL shaders in the render — approximations only (⚡).
         bookFlip: tr("Book Flip", "3D", (p) => ({ transform: `perspective(1500px) rotateY(${90 - p * 90}deg)`, transformOrigin: "left", opacity: p > 0.5 ? 1 : 0 }), (p) => ({ transform: `perspective(1500px) rotateY(${-p * 90}deg)`, transformOrigin: "left", opacity: p < 0.5 ? 1 : 0 }), null, true),
-        zoomBlur: tr("Zoom Blur", "Zoom", (p) => ({ opacity: p, transform: `scale(${lerp(1.3, 1, p)})`, filter: `blur(${(1 - p) * 14}px)` }), (p) => ({ transform: `scale(${lerp(1, 0.85, p)})`, filter: `blur(${p * 14}px)` })),
-        zoomInOut: tr("Zoom In/Out", "Zoom", (p) => ({ opacity: clamp(p * 1.5), transform: `scale(${lerp(0.7, 1, p)})` }), (p) => ({ transform: `scale(${lerp(1, 1.4, p)})` })),
-        simpleZoom: tr("Simple Zoom", "Zoom", (p) => ({ opacity: clamp(p * 1.5), transform: `scale(${lerp(0.8, 1, p)})` })),
         crossZoom: tr("Cross Zoom", "Zoom", (p) => ({ opacity: p, transform: `scale(${lerp(1.6, 1, p)})`, filter: `blur(${(1 - p) * 18}px)` }), (p) => ({ transform: `scale(${1 + p * 0.6})`, filter: `blur(${p * 18}px)`, opacity: 1 - p }), null, true),
         linearBlur: tr("Linear Blur", "Zoom", (p) => ({ opacity: p, filter: `blur(${(1 - p) * 16}px)` }), (p) => ({ filter: `blur(${p * 16}px)`, opacity: 1 - p }), null, true),
-        whipPan: tr("Whip Pan", "Zoom", (p) => ({ transform: `translateX(${(1 - p) * 120}%)`, filter: `blur(${Math.sin(p * Math.PI) * 12}px)` }), (p) => ({ transform: `translateX(${-p * 120}%)`, filter: `blur(${Math.sin(p * Math.PI) * 12}px)` })),
-        dreamyZoom: tr("Dreamy Zoom", "Light", (p) => ({ opacity: p, transform: `scale(${lerp(1.25, 1, p)}) rotate(${(1 - p) * 3}deg)`, filter: `blur(${(1 - p) * 10}px) brightness(${lerp(1.6, 1, p)})` }), (p) => ({ transform: `scale(${lerp(1, 1.15, p)})`, filter: `blur(${p * 8}px) brightness(${lerp(1, 1.6, p)})` })),
         filmBurn: tr("Film Burn", "Light", (p) => ({ opacity: p }), (p) => ({ opacity: 1 - p, filter: `brightness(${1 + p}) sepia(${p})` }), (p) => ({ background: "radial-gradient(circle, rgba(255,150,0,0.9), rgba(120,20,0,0.5))", mixBlendMode: "screen", opacity: Math.sin(p * Math.PI) }), true),
         crossWarp: tr("Cross Warp", "Warp", (p) => ({ opacity: p, filter: `blur(${(1 - p) * 6}px)`, transform: `skewX(${-(1 - p) * 6}deg)` }), (p) => ({ opacity: 1 - p, filter: `blur(${p * 6}px)`, transform: `scale(${1 + p * 0.1}) skewX(${p * 6}deg)` }), null, true),
         ripple: tr("Ripple", "Warp", (p) => ({ opacity: clamp(p * 1.5), filter: `blur(${(1 - p) * 3}px)`, transform: `scale(${lerp(1.1, 1, p)})` }), null, null, true),
-        rgbSplit: tr("RGB Split", "Glitch", (p) => { const o = Math.sin(p * Math.PI) * 12; return { opacity: p, filter: `drop-shadow(${o}px 0 0 rgba(255,0,0,0.6)) drop-shadow(${-o}px 0 0 rgba(0,255,255,0.6))` }; }, (p) => { const o = Math.sin(p * Math.PI) * 12; return { filter: `drop-shadow(${o}px 0 0 rgba(255,0,0,0.6)) drop-shadow(${-o}px 0 0 rgba(0,255,255,0.6))` }; }),
-        pixelize: tr("Pixelize", "Pixel", (p) => ({ opacity: clamp(p * 1.4), filter: `blur(${(1 - p) * 9}px) contrast(1.1)`, imageRendering: "pixelated" }), (p) => ({ filter: `blur(${p * 9}px) contrast(1.1)` })),
-        randomSquares: tr("Random Squares", "Pixel", (p) => tileMask(squaresURI(clamp(p)), "64px 64px")),
-        mosaicShatter: tr("Mosaic Shatter", "Pixel", (p) => ({ opacity: clamp(p * 1.5), transform: `scale(${lerp(1.15, 1, p)}) rotate(${(1 - p) * 4}deg)` }), (p) => ({ transform: `scale(${lerp(1, 0.9, p)}) rotate(${-p * 4}deg)`, filter: `blur(${p * 4}px)` })),
-        doomScreen: tr("Doom Melt", "Pixel", (p) => fullMask(doomURI(clamp(p)), "100% 100%")),
-        crtOn: tr("CRT Power-on", "Retro", (p) => { const a = clamp(p / 0.4), b = clamp((p - 0.4) / 0.6); return { transform: `scaleX(${0.2 + a * 0.8}) scaleY(${0.02 + b * 0.98})`, filter: `brightness(${1 + (1 - b) * 2})`, transformOrigin: "center" }; }),
-        glitchCut: tr("Glitch Cut", "Retro", (p) => { const j = 1 - clamp(p * 1.4); return { opacity: clamp(p * 1.6), transform: `translateX(${Math.sin(p * 80) * 22 * j}px) skewX(${Math.sin(p * 50) * 6 * j}deg)`, filter: `hue-rotate(${Math.sin(p * 60) * 160 * j}deg) saturate(${1 + 2 * j}) contrast(${1 + j})` }; }),
-        pixelDither: tr("Bayer Dither", "Retro", (p) => tileMask(ditherURI(clamp(p)), "8px 8px")),
-        scanlineWipe: tr("Scanline Sweep", "Retro", (p) => { const e = p * 102; const g = `linear-gradient(180deg, #000 ${Math.max(0, e - 2)}%, transparent ${e}%)`; return { maskImage: g, WebkitMaskImage: g }; }),
-        vhsRewind: tr("VHS Rewind", "Retro", (p) => ({ opacity: clamp(p * 1.5), filter: `blur(${(1 - p) * 2.5}px) saturate(1.6) contrast(1.1)`, transform: `translateX(${(1 - p) * -34}px) skewX(${(1 - p) * 8}deg)` })),
       };
+      const ORDER = ["crossfade", "dipToColor", "flashWhite", "lightLeak", "slidePush", "slideOver", "coverUncover", "linearWipe", "clockWipe", "barnDoor", "windowBlinds", "irisCircle", "circleCrop", "rectangleCrop", "heart", "starWipe", "doorway", "svgMaskReveal", "flip3D", "bookFlip", "zoomBlur", "zoomInOut", "simpleZoom", "crossZoom", "linearBlur", "whipPan", "dreamyZoom", "filmBurn", "crossWarp", "ripple", "rgbSplit", "chromaticAberration", "pixelize", "randomSquares", "mosaicShatter", "doomScreen", "gridPixelate", "crtOn", "glitchCut", "pixelDither", "scanlineWipe", "vhsRewind"];
+      const TRANSITIONS = {};
+      for (const id of [...ORDER, ...Object.keys(SE.TRANSITION_FORMULAS)]) {
+        if (TRANSITIONS[id]) continue;
+        if (SE.TRANSITION_FORMULAS[id]) TRANSITIONS[id] = shared(id);
+        else if (LOCAL[id]) TRANSITIONS[id] = LOCAL[id];
+      }
 
       // ===== compose: stack multiple motion styles =====
-      const RESET = ["transform", "filter", "opacity", "clipPath", "webkitClipPath", "maskImage", "webkitMaskImage", "maskSize", "webkitMaskSize", "maskRepeat", "webkitMaskRepeat", "maskPosition", "webkitMaskPosition", "backgroundImage", "backgroundColor", "backgroundPosition", "backgroundSize", "boxShadow", "mixBlendMode", "transformOrigin", "left", "top"];
+      const RESET = ["transform", "filter", "opacity", "clipPath", "webkitClipPath", "maskImage", "webkitMaskImage", "maskSize", "webkitMaskSize", "maskRepeat", "webkitMaskRepeat", "maskPosition", "webkitMaskPosition", "backgroundImage", "backgroundColor", "backgroundPosition", "backgroundSize", "backgroundRepeat", "boxShadow", "mixBlendMode", "transformOrigin", "imageRendering", "left", "top"];
       // composeStyles is provided by the bundle (declared above as `const composeStyles = SE.composeStyles`).
       function applyStyle(el, style, baseTransform) {
         for (const p of RESET) el.style[p] = "";
